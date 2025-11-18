@@ -22,34 +22,23 @@ class SplitwiseClient:
         return self.sObj.getCurrentUser().getId()
 
     def get_expenses_by_date_range(self, start_date, end_date):
-        data = []
         expenses = self.sObj.getExpenses(dated_after=start_date.strftime("%Y-%m-%d"),
                                          dated_before=end_date.strftime("%Y-%m-%d"))
+        my_user_id = self.get_current_user_id()
 
-        for expense in expenses:
-            friends_split = [user.getFirstName() + ": " + str(user.getPaidShare()) for user in expense.getUsers()]
-            data.append({
-                "date": expense.getDate(),
-                "amount": expense.getCost(),
-                "category": expense.getCategory().getName() if expense.getCategory() else None,
-                "description": expense.getDescription(),
-                "friends_split": friends_split
-            })
+        # Filter: keep only expenses where current user is involved (paid share > 0)
+        filtered_expenses = [e for e in expenses if any(u.getId() == my_user_id and float(u.getPaidShare()) > 0 for u in e.getUsers())]
+        data = [
+            {
+                "date": e.getDate(),
+                "amount": e.getCost(),
+                "category": e.getCategory().getName() if e.getCategory() else None,
+                "description": e.getDescription(),
+                "friends_split": [f"{u.getFirstName()}: {u.getPaidShare()}" for u in e.getUsers()]
+            }
+            for e in filtered_expenses
+        ]
         df = pd.DataFrame(data)
-
-        def balaji_involved(split_entry):
-            """Filter: keep only expenses where 'Balaji' is involved (paid share > 0 or present)"""
-            for entry in split_entry:
-                if "Balaji" in entry:
-                    # Extract paid share value
-                    try:
-                        paid_share = float(entry.split(": ")[-1])
-                        if paid_share > 0:
-                            return True
-                    except Exception:
-                        continue
-            return False
-        df = df[df["friends_split"].apply(balaji_involved)]
         return df
 
 # Example usage:
