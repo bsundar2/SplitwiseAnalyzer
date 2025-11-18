@@ -1,6 +1,7 @@
 venv/
 __pycache__/
 config/credentials.env
+config/gsheets_authentication.json
 *.pyc
 .ipynb_checkpoints/
 .idea/
