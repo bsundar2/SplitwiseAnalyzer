@@ -3,4 +3,5 @@ pandas
 pygsheets
 python-dateutil
 python-dotenv
+PyYAML
 splitwise
