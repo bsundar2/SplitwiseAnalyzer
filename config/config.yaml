@@ -1,0 +1,11 @@
+# date config to help parsing & mapping
+date_formats:
+  - "%Y-%m-%d"
+  - "%m/%d/%Y"
+  - "%d/%m/%Y"
+
+# bank-specific parsing hints (add patterns for vendor normalization)
+merchant_overrides:
+  "UBER": "Uber"
+  "LYFT": "Lyft"
+  "SPOTIFY": "Spotify"
