@@ -8,19 +8,16 @@ Parse CSV or PDF statements into a pandas DataFrame with columns:
 """
 
 import os
+import dateparser
 import pandas as pd
-from dateutil import parser as dateparser
+
+from src.constants.config import CFG_PATHS
 from src.utils import LOG, load_yaml
 
-# Robust config loading: try repo root config.yaml or config/config.yaml
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-CFG_PATHS = [
-    os.path.join(BASE_DIR, "config.yaml"),
-    os.path.join(BASE_DIR, "config", "config.yaml"),
-]
+# Load configuration
 CFG = None
 for p in CFG_PATHS:
-    if os.path.exists(p):
+    if p.exists():
         try:
             CFG = load_yaml(p)
             break

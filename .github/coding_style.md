@@ -2,9 +2,67 @@ Coding Style Guide — Project conventions
 
 Purpose
 -------
-This small guide captures a few project-specific rules so future edits are consistent and readable. It focuses on exception handling, logging, and avoiding magic strings.
+This small guide captures a few project-specific rules so future edits are consistent and readable. It focuses on exception handling, imports, logging, and avoiding magic strings.
 
-Rule 1 — Do not catch ImportError or use broad excepts
+Rule 0 — Organize imports at the top of the file
+------------------------------------------------
+- All imports should be at the top of the file, grouped in the following order:
+  1. Standard library imports
+  2. Third-party library imports
+  3. Local application/library specific imports
+- Separate each group with a blank line
+- Within each group, sort imports alphabetically
+
+Example:
+```python
+# Standard library
+import os
+from datetime import datetime, timedelta
+
+# Third-party
+import pandas as pd
+from dotenv import load_dotenv
+from splitwise import Splitwise
+
+# Local application
+from src.utils import LOG, merchant_slug
+```
+
+Rule 1 — Remove unused imports and variables
+-------------------------------------------
+- Always remove unused imports and variables to keep the code clean and maintainable.
+- Use your IDE's "Optimize Imports" feature before committing.
+- If you're temporarily commenting out code that uses certain imports, remove those imports and add them back when needed.
+
+Bad:
+```python
+import os  # unused import
+from datetime import datetime  # unused import
+
+unused_var = "This is never used"  # unused variable
+
+def my_function():
+    return "Hello"
+```
+
+Good:
+```python
+def my_function():
+    return "Hello"
+```
+
+- If a variable is intentionally unused (e.g., in tuple unpacking), prefix it with an underscore:
+
+```python
+# Good: Using _ to indicate intentionally unused variable
+first, _ = (1, 2)
+
+# Good: Using _ for unused loop variables
+for _ in range(3):
+    do_something()
+```
+
+Rule 2 — Do not catch ImportError or use broad excepts
 -----------------------------------------------------
 Do not catch ImportError. If a dependency is required, let ImportError propagate so missing libraries fail fast and are visible to the user.
 

@@ -1,10 +1,14 @@
+# Standard library
 import os
 from datetime import datetime, timedelta
-import pandas as pd
-from splitwise import Splitwise
-from dotenv import load_dotenv
 
-from src.utils import merchant_slug, LOG
+# Third-party
+import pandas as pd
+from dotenv import load_dotenv
+from splitwise import Expense, ExpenseUser, Splitwise
+
+# Local application
+from src.utils import LOG, merchant_slug
 
 load_dotenv("config/credentials.env")
 
@@ -123,8 +127,7 @@ class SplitwiseClient:
         date = txn.get("date")
         currency = txn.get("currency") or DEFAULT_CURRENCY
 
-        # Use SDK Expense objects (ImportError will propagate if SDK pieces missing)
-        from splitwise import Expense, ExpenseUser
+        # Use SDK Expense objects
         expense = Expense()
         expense.setCost(str(cost))
         expense.setDescription(desc_with_marker)

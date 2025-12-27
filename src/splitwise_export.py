@@ -4,26 +4,28 @@
 Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints in data/splitwise_exported.json.
 """
 
-import argparse
-import pandas as pd
-from dateutil import parser as dateparser
 import os
+from pathlib import Path
+from typing import Dict, List, Optional, Set
 
-from src.sheets_sync import write_to_sheets
-from src.utils import load_state, save_state_atomic, mkdir_p, compute_import_id, merchant_slug
-from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE
+import pandas as pd
 
-STATE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "splitwise_exported.json")
+from src.constants.config import STATE_PATH
+from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, DEFAULT_SPREADSHEET_NAME
+from src.constants.splitwise import PayloadKeys
+from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug
 
-# Constants / magic strings
-DEFAULT_SPREADSHEET_NAME = "test_expenses"
+# Constants
 DEFAULT_WORKSHEET_NAME = "Splitwise Expenses"
-IMPORTED_ID_MARKER = "[ImportedID:"  # marker prefix used when creating Splitwise description markers
-COL_DATE = "date"
-COL_AMOUNT = "amount"
-COL_DESCRIPTION = "description"
-COL_FINGERPRINT = "fingerprint"
-COL_ID = "id"
+
+# Column names for the export
+class ExportColumns:
+    """Column names used in the exported data."""
+    DATE = "date"
+    AMOUNT = "amount"
+    DESCRIPTION = "description"
+    FINGERPRINT = "fingerprint"
+    ID = "id"
 
 
 def parse_date(s: str):
@@ -33,8 +35,8 @@ def parse_date(s: str):
 def mock_expenses(start_date, end_date):
     # Small mock DataFrame matching get_expenses_by_date_range shape
     rows = [
-        {COL_DATE: start_date.isoformat(), COL_AMOUNT: "97.01", "category": "Internet", COL_DESCRIPTION: "Google Fit [Imported]", "friends_split": "Alice: 97.01", COL_ID: "mock-1"},
-        {COL_DATE: end_date.isoformat(), COL_AMOUNT: "2.99", "category": "Entertainment", COL_DESCRIPTION: "Hulu [Imported]", "friends_split": "Alice: 2.99", COL_ID: "mock-2"},
+        {ExportColumns.DATE: start_date.isoformat(), ExportColumns.AMOUNT: "97.01", "category": "Internet", ExportColumns.DESCRIPTION: "Google Fit [Imported]", "friends_split": "Alice: 97.01", ExportColumns.ID: "mock-1"},
+        {ExportColumns.DATE: end_date.isoformat(), ExportColumns.AMOUNT: "2.99", "category": "Entertainment", ExportColumns.DESCRIPTION: "Hulu [Imported]", "friends_split": "Alice: 2.99", ExportColumns.ID: "mock-2"},
     ]
     return pd.DataFrame(rows)
 
@@ -76,9 +78,9 @@ def _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name):
 
     fps = set()
     for _, r in exist_df.iterrows():
-        date_val = r.get(COL_DATE) if COL_DATE in r.index else r.get(0)
-        amount_val = r.get(COL_AMOUNT) if COL_AMOUNT in r.index else r.get(1)
-        desc_val = r.get(COL_DESCRIPTION) if COL_DESCRIPTION in r.index else r.get("friends_split") if "friends_split" in r.index else r.get(2)
+        date_val = r.get(ExportColumns.DATE) if ExportColumns.DATE in r.index else r.get(0)
+        amount_val = r.get(ExportColumns.AMOUNT) if ExportColumns.AMOUNT in r.index else r.get(1)
+        desc_val = r.get(ExportColumns.DESCRIPTION) if ExportColumns.DESCRIPTION in r.index else r.get("friends_split") if "friends_split" in r.index else r.get(2)
         # normalize
         try:
             from dateutil import parser as _dp
@@ -125,15 +127,15 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
     # Compute stable fingerprint for each row using date (YYYY-MM-DD), amount, and normalized description
     fps = []
     for _, r in df.iterrows():
-        date_val = r.get(COL_DATE)
+        date_val = r.get(ExportColumns.DATE)
         # Normalize date to YYYY-MM-DD
         try:
             from dateutil import parser as _dp
             dnorm = _dp.parse(str(date_val)).date().isoformat()
         except (ValueError, TypeError, OverflowError):
             dnorm = str(date_val)
-        amount_val = r.get(COL_AMOUNT)
-        desc_val = r.get(COL_DESCRIPTION) or r.get("friends_split") or ""
+        amount_val = r.get(ExportColumns.AMOUNT)
+        desc_val = r.get(ExportColumns.DESCRIPTION) or r.get("friends_split") or ""
         # Normalize description using merchant_slug for stable matching
         desc_norm = merchant_slug(desc_val)
         # Ensure amount numeric
@@ -146,7 +148,7 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
                 amt = 0.0
         fp = compute_import_id(dnorm, amt, desc_norm)
         fps.append(fp)
-    df[COL_FINGERPRINT] = fps
+    df[ExportColumns.FINGERPRINT] = fps
 
     # Load existing exported state
     exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())
@@ -161,7 +163,7 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
 
     # Filter new rows: not in exported ids and not in exported fingerprints
     if dedupe:
-        mask_new = ~((df[COL_ID].isin(exported_ids)) | (df[COL_FINGERPRINT].isin(exported_fps)))
+        mask_new = ~((df[ExportColumns.ID].isin(exported_ids)) | (df[ExportColumns.FINGERPRINT].isin(exported_fps)))
         new_df = df[mask_new].reset_index(drop=True)
         skipped_df = df[~mask_new].reset_index(drop=True)
     else:
@@ -172,8 +174,8 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
         # annotate skip reason
         reasons = []
         for _, r in skipped_df.iterrows():
-            rid = r.get(COL_ID)
-            fp = r.get(COL_FINGERPRINT)
+            rid = r.get(ExportColumns.ID)
+            fp = r.get(ExportColumns.FINGERPRINT)
             reason_parts = []
             if rid in exported_ids:
                 reason_parts.append("id")
@@ -190,14 +192,14 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
         return new_df, None
 
     # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
-    if COL_DATE in new_df.columns:
+    if ExportColumns.DATE in new_df.columns:
         # parse and format as 'YYYY-MM-DD' (date-only) strings so Google Sheets will parse them as dates
-        parsed = pd.to_datetime(new_df[COL_DATE], errors="coerce", utc=True)
+        parsed = pd.to_datetime(new_df[ExportColumns.DATE], errors="coerce", utc=True)
         # Format where parse succeeded; otherwise leave the original string
-        new_df[COL_DATE] = parsed.dt.strftime('%Y-%m-%d').where(parsed.notna(), new_df[COL_DATE])
+        new_df[ExportColumns.DATE] = parsed.dt.strftime('%Y-%m-%d').where(parsed.notna(), new_df[ExportColumns.DATE])
 
-    if COL_AMOUNT in new_df.columns:
-        new_df[COL_AMOUNT] = pd.to_numeric(new_df[COL_AMOUNT], errors="coerce")
+    if ExportColumns.AMOUNT in new_df.columns:
+        new_df[ExportColumns.AMOUNT] = pd.to_numeric(new_df[ExportColumns.AMOUNT], errors="coerce")
 
     # Write to sheets
     if sheet_key or sheet_name:

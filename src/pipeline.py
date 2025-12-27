@@ -1,22 +1,21 @@
 # Orchestrates the ETL pipeline
 
 import os
-import argparse
+from pathlib import Path
+from typing import Dict, List, Optional
+
 import pandas as pd
-from datetime import datetime
 
-from src.parse_statement import parse_any
+from src.constants.config import CACHE_PATH, PROCESSED_DIR
+from src.parse_statement import parse_statement
 from src.splitwise_client import SplitwiseClient
-from src.utils import LOG, compute_import_id, load_state, save_state_atomic, mkdir_p, now_iso
+from src.utils import LOG, compute_import_id, load_state, save_state_atomic, now_iso
 from src.sheets_sync import write_to_sheets
-
-CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "splitwise_cache.json")
-PROCESSED_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "processed")
 
 
 def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sheet_key: str = None, worksheet_name: str = "Imported Transactions", no_sheet: bool = False):
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
-    df = parse_any(path)
+    df = parse_statement(path)
     if df is None or df.empty:
         LOG.info("No transactions parsed from %s", path)
         return
