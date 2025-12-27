@@ -18,10 +18,9 @@ from splitwise import Expense, Splitwise
 # Local application
 from src.constants.splitwise import (
     IMPORTED_ID_MARKER,
-    DEFAULT_CURRENCY,
-    PayloadKeys
+    DEFAULT_CURRENCY
 )
-from src.utils import LOG, merchant_slug, compute_import_id
+from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint
 
 load_dotenv("config/credentials.env")
 
@@ -56,7 +55,7 @@ class SplitwiseClient:
                 "friends_split": [f"{u.getFirstName()}: {u.getPaidShare()}" for u in e.getUsers()],
                 "id": e.getId(),
             }
-            for e in filtered_expenses
+            for e in expenses
         ]
         df = pd.DataFrame(data)
         return df
@@ -115,37 +114,6 @@ class SplitwiseClient:
         # If nothing found, return None
         return None
 
-    def generate_fingerprint(self, date_val: str, amount_val: Union[str, float], desc_val: str) -> str:
-        """Generate a stable fingerprint for a transaction.
-        
-        Args:
-            date_val: Date string in any parseable format
-            amount_val: Transaction amount (string or number)
-            desc_val: Transaction description
-            
-        Returns:
-            A stable string fingerprint for the transaction
-        """
-        # Normalize date to YYYY-MM-DD
-        try:
-            dnorm = date_parser.parse(str(date_val)).date().isoformat()
-        except (ValueError, TypeError, OverflowError):
-            dnorm = str(date_val)
-        
-        # Normalize amount
-        try:
-            amt = float(amount_val)
-        except (ValueError, TypeError):
-            try:
-                amt = float(str(amount_val).replace(',', '').replace('$', ''))
-            except (ValueError, TypeError):
-                amt = 0.0
-        
-        # Normalize description
-        desc_norm = merchant_slug(desc_val or "")
-        
-        return compute_import_id(dnorm, amt, desc_norm)
-
     def add_expense_from_txn(self, txn: Dict[str, Any], import_id: str, users: Optional[List[Dict]] = None) -> Union[str, int]:
         """Create a Splitwise expense from normalized transaction data.
 
@@ -196,6 +164,9 @@ class SplitwiseClient:
             return created.getId() if hasattr(created, 'getId') else created
         except Exception as e:
             raise RuntimeError(f"Failed to create expense: {str(e)}")
+
+    def get_categories(self):
+        return self.sObj.getCategories()
 
 
 # Example usage:

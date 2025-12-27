@@ -18,7 +18,7 @@ from src.constants.config import STATE_PATH
 from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, SPLITWISE_EXPENSES_WORKSHEET, DEFAULT_SPREADSHEET_NAME
 from src.sheets_sync import write_to_sheets
 from src.splitwise_client import SplitwiseClient
-from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG
+from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG, generate_fingerprint
 
 # Column names for the export
 class ExportColumns:
@@ -203,26 +203,15 @@ def fetch_and_write(
     for col in df.columns:
         df[col] = df[col].astype(str)
 
-    # Generate fingerprints using the client's method if available
-    if client:
-        df[ExportColumns.FINGERPRINT] = df.apply(
-            lambda r: client.generate_fingerprint(
-                r.get(ExportColumns.DATE),
-                r.get(ExportColumns.AMOUNT),
-                r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
-            ),
-            axis=1
-        )
-    else:
-        # Fallback to local implementation if no client (mock mode)
-        df[ExportColumns.FINGERPRINT] = df.apply(
-            lambda r: compute_import_id(
-                r.get(ExportColumns.DATE, ""),
-                float(str(r.get(ExportColumns.AMOUNT, "0")).replace(',', '').replace('$', '') or 0),
-                merchant_slug(r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""))
-            ),
-            axis=1
-        )
+    # Generate fingerprints using the utility function
+    df[ExportColumns.FINGERPRINT] = df.apply(
+        lambda r: generate_fingerprint(
+            r.get(ExportColumns.DATE),
+            r.get(ExportColumns.AMOUNT),
+            r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
+        ),
+        axis=1
+    )
 
     # Load existing exported state
     exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())

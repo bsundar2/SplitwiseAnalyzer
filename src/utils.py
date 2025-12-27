@@ -1,5 +1,7 @@
 import os
 import json
+
+import dateparser
 from dotenv import load_dotenv
 from datetime import datetime
 import logging
@@ -7,6 +9,7 @@ import yaml
 import hashlib
 import re
 import tempfile
+from typing import Union
 
 load_dotenv()
 
@@ -87,3 +90,43 @@ def compute_import_id(date: str, amount: float, merchant: str) -> str:
     key = f"{date}|{cents}|{merchant_slug(merchant)}"
     h = hashlib.sha256(key.encode("utf-8")).hexdigest()
     return h
+
+
+def generate_fingerprint(date_val: str, amount_val: Union[str, float], desc_val: str) -> str:
+    """Generate a stable fingerprint for a transaction.
+    
+    Args:
+        date_val: Date string in any parseable format
+        amount_val: Transaction amount (string or float)
+        desc_val: Transaction description
+        
+    Returns:
+        A stable fingerprint string for the transaction
+    """
+    from datetime import datetime
+    
+    # Parse and normalize date to YYYY-MM-DD
+    try:
+        dt = dateparser.parse(str(date_val))
+        if dt is None:
+            raise ValueError(f"Could not parse date: {date_val}")
+        date_str = dt.strftime("%Y-%m-%d")
+    except Exception as e:
+        raise ValueError(f"Invalid date format: {date_val}") from e
+    
+    # Normalize amount to float
+    try:
+        if isinstance(amount_val, str):
+            # Remove any non-numeric characters except decimal point and negative sign
+            amount_str = re.sub(r'[^\d.-]', '', str(amount_val))
+            amount = float(amount_str)
+        else:
+            amount = float(amount_val)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid amount: {amount_val}") from e
+    
+    # Generate a slug from the description
+    slug = merchant_slug(desc_val)
+    
+    # Create a fingerprint using the same logic as compute_import_id
+    return compute_import_id(date_str, amount, slug)
