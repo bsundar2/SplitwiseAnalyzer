@@ -5,7 +5,6 @@ Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints i
 """
 
 import argparse
-from datetime import datetime
 import pandas as pd
 from dateutil import parser as dateparser
 import os
@@ -95,7 +94,7 @@ def _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name):
         return set()
 
 
-def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, worksheet_name="Splitwise Expenses", mock=False, append=False, dedupe=True):
+def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, worksheet_name="Splitwise Expenses", mock=False, append=True, dedupe=True, show_skipped=False):
     """Fetch expenses (real or mock), de-duplicate, and write to Google Sheets.
 
     Returns the DataFrame written and the sheet URL (or None on failure).
@@ -166,12 +165,46 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
     if dedupe:
         mask_new = ~((df["id"].isin(exported_ids)) | (df["fingerprint"].isin(exported_fps)))
         new_df = df[mask_new].reset_index(drop=True)
+        skipped_df = df[~mask_new].reset_index(drop=True)
     else:
         new_df = df
+        skipped_df = pd.DataFrame()
+
+    if show_skipped and not skipped_df.empty:
+        # annotate skip reason
+        reasons = []
+        for _, r in skipped_df.iterrows():
+            rid = r.get("id")
+            fp = r.get("fingerprint")
+            reason_parts = []
+            if rid in exported_ids:
+                reason_parts.append("id")
+            if fp in exported_fps:
+                reason_parts.append("fingerprint")
+            reasons.append(" & ".join(reason_parts) if reason_parts else "unknown")
+        skipped_df = skipped_df.copy()
+        skipped_df["skip_reason"] = reasons
+        print(f"Skipped {len(skipped_df)} rows (dedupe). Showing up to 20:")
+        print(skipped_df.head(20).to_string())
 
     if new_df.empty:
         print("No new Splitwise expenses to export (all rows already exported).")
         return new_df, None
+
+    # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
+    try:
+        if "date" in new_df.columns:
+            # parse and format as 'YYYY-MM-DD' (date-only) strings so Google Sheets will parse them as dates
+            parsed = pd.to_datetime(new_df["date"], errors="coerce", utc=True)
+            # Format where parse succeeded; otherwise leave the original string
+            new_df["date"] = parsed.dt.strftime('%Y-%m-%d').where(parsed.notna(), new_df["date"])
+    except Exception:
+        pass
+    try:
+        if "amount" in new_df.columns:
+            new_df["amount"] = pd.to_numeric(new_df["amount"], errors="coerce")
+    except Exception:
+        pass
 
     # Write to sheets
     if sheet_key or sheet_name:
@@ -199,8 +232,9 @@ if __name__ == "__main__":
     parser.add_argument("--sheet-key", default=None, help="Spreadsheet key to write to (preferred)")
     parser.add_argument("--sheet-name", default=None, help="Spreadsheet name to write to (fallback)")
     parser.add_argument("--worksheet-name", default="Splitwise Expenses", help="Worksheet/tab name to write into")
-    parser.add_argument("--append", action="store_true", help="Append to existing worksheet instead of overwriting")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite the entire worksheet and skip dedupe (default is append)")
     parser.add_argument("--no-dedupe", action="store_true", help="Do not deduplicate; export all rows")
+    parser.add_argument("--show-skipped", action="store_true", help="Show rows that were skipped due to dedupe and reasons")
     parser.add_argument("--mock", action="store_true", help="Use mock data instead of calling Splitwise (for testing)")
 
     args = parser.parse_args()
@@ -208,7 +242,14 @@ if __name__ == "__main__":
     sd = parse_date(args.start_date)
     ed = parse_date(args.end_date)
 
-    new_df, url = fetch_and_write(sd, ed, sheet_key=args.sheet_key, sheet_name=args.sheet_name, worksheet_name=args.worksheet_name, mock=args.mock, append=args.append, dedupe=not args.no_dedupe)
+    # Decide append/dedupe behavior: default is append; explicit --overwrite will force overwrite and disable dedupe
+    append_flag = not args.overwrite
+    dedupe_flag = not args.no_dedupe
+    if args.overwrite:
+        # When overwriting we skip dedupe checks entirely
+        dedupe_flag = False
+
+    new_df, url = fetch_and_write(sd, ed, sheet_key=args.sheet_key, sheet_name=args.sheet_name, worksheet_name=args.worksheet_name, mock=args.mock, append=append_flag, dedupe=dedupe_flag, show_skipped=args.show_skipped)
     if new_df is not None:
         print(f"Exported {len(new_df)} rows")
     if url:

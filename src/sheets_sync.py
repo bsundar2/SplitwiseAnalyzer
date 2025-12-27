@@ -8,6 +8,15 @@ from src.constants.gsheets import DEFAULT_SPREADSHEET_NAME, SHEETS_AUTHENTICATIO
 from src.utils import LOG
 
 
+def _colnum_to_a1(n: int) -> str:
+    # 1 -> A, 27 -> AA
+    s = ""
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
 def write_to_sheets(
     write_data: pd.DataFrame,
     worksheet_name: str,
@@ -19,16 +28,7 @@ def write_to_sheets(
 
     If append=True, the data will be appended after existing rows (header not duplicated).
     Otherwise the worksheet is cleared (or created) and rewritten.
-
-    Args:
-      write_data: DataFrame to write.
-      worksheet_name: Title of the worksheet/tab to write into.
-      spreadsheet_name: Spreadsheet title (used when spreadsheet_key is not provided).
-      spreadsheet_key: Optional spreadsheet id/key (preferred; unique).
-      append: Whether to append data (True) or overwrite (False).
-
-    Returns:
-      The spreadsheet URL (string) after writing.
+    After writing, attempt to format key columns (date, amount) and freeze the header row.
     """
     # Login/Authenticate
     LOG.info("Authenticating to Google Sheets using %s", SHEETS_AUTHENTICATION_FILE)
@@ -106,6 +106,75 @@ def write_to_sheets(
             pass
         LOG.info("Writing to sheet (overwrite)")
         worksheet.set_dataframe(write_data, (1, 1), copy_index=False, copy_head=True)
+
+    # Post-write formatting: freeze header, bold header, autosize and format columns
+    try:
+        # Freeze header row
+        try:
+            worksheet.frozen_rows = 1
+        except Exception:
+            pass
+
+        # Bold header row
+        try:
+            header_range = f"A1:{_colnum_to_a1(len(write_data.columns))}1"
+            worksheet.format(header_range, {"textFormat": {"bold": True}})
+        except Exception:
+            pass
+
+        # Autosize columns if API available
+        try:
+            for i in range(1, len(write_data.columns) + 1):
+                try:
+                    worksheet.adjust_column_width(i, 200)
+                except Exception:
+                    # fallback: ignore if method not available
+                    pass
+        except Exception:
+            pass
+
+        # Determine used rows for formatting ranges
+        try:
+            try:
+                values = worksheet.get_all_values(include_tailing_empty=False)
+            except TypeError:
+                values = worksheet.get_all_values()
+            used_rows = len(values) if values else 1
+        except Exception:
+            used_rows = None
+
+        # Apply number/date formats for known columns
+        cols = list(write_data.columns)
+        # amount -> currency
+        if "amount" in cols and used_rows:
+            idx = cols.index("amount") + 1
+            col_letter = _colnum_to_a1(idx)
+            rng = f"{col_letter}2:{col_letter}{used_rows}"
+            try:
+                worksheet.format(rng, {"numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"}})
+            except Exception:
+                try:
+                    # alternative pattern
+                    worksheet.format(rng, {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}})
+                except Exception:
+                    pass
+
+        # date -> date/time format
+        if "date" in cols and used_rows:
+            idx = cols.index("date") + 1
+            col_letter = _colnum_to_a1(idx)
+            rng = f"{col_letter}2:{col_letter}{used_rows}"
+            try:
+                # Use US-style month/day/year display
+                worksheet.format(rng, {"numberFormat": {"type": "DATE", "pattern": "mm/dd/yyyy"}})
+            except Exception:
+                try:
+                    worksheet.format(rng, {"numberFormat": {"type": "DATE", "pattern": "mm/dd/yyyy"}})
+                except Exception:
+                    pass
+
+    except Exception as e:
+        LOG.info("Sheet formatting failed: %s", str(e))
 
     LOG.info("Updated Google sheet successfully: %s", sheet.url)
     return sheet.url
