@@ -8,6 +8,14 @@ from src.utils import merchant_slug, LOG
 
 load_dotenv("config/credentials.env")
 
+# Module-level constants
+IMPORTED_ID_MARKER = "[ImportedID:"
+DEFAULT_CURRENCY = "USD"
+PAYLOAD_KEY_COST = "cost"
+PAYLOAD_KEY_DESCRIPTION = "description"
+PAYLOAD_KEY_DATE = "date"
+PAYLOAD_KEY_CURRENCY = "currency_code"
+
 
 # Handles Splitwise API/CSV integration
 class SplitwiseClient:
@@ -53,11 +61,8 @@ class SplitwiseClient:
         # naive strategy: fetch last N days and scan descriptions for marker
         end = datetime.now().date()
         start = end - timedelta(days=lookback_days)
-        try:
-            df = self.get_expenses_by_date_range(start, end)
-        except Exception as e:
-            LOG.warning("Failed to fetch expenses for lookup: %s", str(e))
-            return None
+
+        df = self.get_expenses_by_date_range(start, end)
         if df.empty:
             return None
         # First, try exact marker search in description
@@ -71,26 +76,17 @@ class SplitwiseClient:
 
         # Fallback fuzzy match if merchant provided
         candidates = []
-        try:
-            # If merchant not provided, try to derive nothing
-            target_slug = merchant_slug(merchant) if merchant else None
-            # Parse import_id isn't directly helpful for fuzzy match; instead iterate rows
-            for _, r in df.iterrows():
-                try:
-                    r_amount = float(r.get("amount", 0))
-                except Exception:
-                    continue
-                # compare amounts (exact cents)
-                # Note: Splitwise cost may be a string; ensure floats compared
-                # We don't have the original amount here; import_id is computed from original amount.
-                # To keep this fallback conservative, require exact amount equality.
-                # We don't know the original amount here, so if merchant provided, we'll compute slug similarity as tie-breaker below.
-                candidates.append(r)
-        except Exception:
-            candidates = []
+        # If merchant not provided, try to derive nothing
+        target_slug = merchant_slug(merchant) if merchant else None
+        # Build candidates conservatively, skipping rows with non-numeric amounts
+        for _, r in df.iterrows():
+            try:
+                r_amount = float(r.get("amount", 0))
+            except (ValueError, TypeError):
+                continue
+            candidates.append(r)
 
-        # Filter candidates by amount and date if import_id contains date and amount info otherwise, skip
-        # For simplicity, attempt to parse import_id not possible; instead, if merchant provided, search by merchant slug and return best match
+        # If merchant provided, filter by slug similarity
         if target_slug:
             slug_matches = []
             for r in candidates:
@@ -121,52 +117,39 @@ class SplitwiseClient:
         Returns the created expense id or raises on failure.
         """
         desc = txn.get("description") or txn.get("merchant") or "Imported expense"
-        desc_with_marker = f"{desc} [ImportedID:{import_id}]"
+        desc_with_marker = f"{desc} {IMPORTED_ID_MARKER}{import_id}]"
 
         cost = float(txn.get("amount"))
         date = txn.get("date")
-        currency = txn.get("currency") or "USD"
+        currency = txn.get("currency") or DEFAULT_CURRENCY
 
-        # Build basic payload using Splitwise SDK helper objects if available
+        # Use SDK Expense objects (ImportError will propagate if SDK pieces missing)
+        from splitwise import Expense, ExpenseUser
+        expense = Expense()
+        expense.setCost(str(cost))
+        expense.setDescription(desc_with_marker)
+        expense.setDate(date)
+        expense.setCurrencyCode(currency)
+        # By default: mark as paid by current user and owed by others (if users provided)
+        if users:
+            # users is list of {"user_id": id, "paid_share": x, "owed_share": y}
+            for u in users:
+                eu = ExpenseUser()
+                eu.setId(u.get("user_id"))
+                if "paid_share" in u:
+                    eu.setPaidShare(str(u.get("paid_share")))
+                if "owed_share" in u:
+                    eu.setOwedShare(str(u.get("owed_share")))
+                expense.addUser(eu)
+        # If no users specified, leave it as a simple expense paid by current user
+        created = self.sObj.createExpense(expense)
+        # created may be an Expense object or dict depending on SDK
         try:
-            from splitwise import Expense, ExpenseUser
-            expense = Expense()
-            expense.setCost(str(cost))
-            expense.setDescription(desc_with_marker)
-            expense.setDate(date)
-            expense.setCurrencyCode(currency)
-            # By default: mark as paid by current user and owed by others (if users provided)
-            if users:
-                # users is list of {"user_id": id, "paid_share": x, "owed_share": y}
-                for u in users:
-                    eu = ExpenseUser()
-                    eu.setId(u.get("user_id"))
-                    if "paid_share" in u:
-                        eu.setPaidShare(str(u.get("paid_share")))
-                    if "owed_share" in u:
-                        eu.setOwedShare(str(u.get("owed_share")))
-                    expense.addUser(eu)
-            # If no users specified, leave it as a simple expense paid by current user
-            created = self.sObj.createExpense(expense)
-            # created may be an Expense object or dict depending on SDK
-            try:
-                return created.getId()
-            except Exception:
-                return created
-        except Exception as e:
-            # Fallback: use raw API call
-            payload = {
-                "cost": str(cost),
-                "description": desc_with_marker,
-                "date": date,
-                "currency_code": currency
-            }
-            # attempt to call createExpense with dict
-            try:
-                created = self.sObj.createExpense(payload)
-                return created
-            except Exception:
-                raise
+            return created.getId()
+        except AttributeError:
+            return created
+
+        # Note: no broad except blocks — let unexpected errors propagate so failures are visible
 
 
 # Example usage:

@@ -2,60 +2,69 @@ Coding Style Guide — Project conventions
 
 Purpose
 -------
-This small guide captures a few project-specific rules so future edits are consistent and readable. It focuses on exception handling and logging because we ran into several nested bare `except:` blocks that made debugging and reliability harder.
+This small guide captures a few project-specific rules so future edits are consistent and readable. It focuses on exception handling, logging, and avoiding magic strings.
 
-Rule 1 — Avoid bare `except:`
-----------------------------
-Do not use bare `except:` anywhere. Bare excepts hide KeyboardInterrupt/SystemExit and make debugging hard.
+Rule 1 — Do not catch ImportError or use broad excepts
+-----------------------------------------------------
+Do not catch ImportError. If a dependency is required, let ImportError propagate so missing libraries fail fast and are visible to the user.
+
+Also avoid bare `except:` and prefer not to use `except Exception:` unless you have a documented, specific recovery plan. Let unexpected errors propagate rather than silently masking failures.
 
 Bad:
 ```python
 try:
-    do_something()
-except:
+    import pygsheets
+except ImportError:
+    # silently skip
     pass
 ```
 
 Good:
 ```python
-try:
-    do_something()
-except SpecificError as e:
-    LOG.warning("Failed doing something: %s", e)
-    raise
+import pygsheets  # let ImportError propagate and surface missing dependency
 ```
 
-If you must catch all exceptions, prefer `except Exception as e:` and always log the exception with context. E.g.:
-```python
-try:
-    do_something()
-except Exception as e:
-    LOG.exception("Unexpected error doing something: %s", e)
-    raise
-```
-Updated guidance: Prefer not catching all exceptions (including `except Exception`) unless you have a specific reason. If you cannot choose a concrete exception class, let the exception propagate so the failure is visible and can be debugged. Use broad catch only when implementing a deliberate fallback with logging and a clear recovery path.
+If you must catch a class of errors, prefer a specific exception (e.g., `OSError`, `ValueError`) and handle it with a clear recovery or a logged re-raise.
 
 Rule 2 — Prefer specific exceptions where possible
 -------------------------------------------------
-Catching specific exceptions (ValueError, KeyError, TypeError, IOError, etc.) is preferred. Only use broader catches when you truly intend to handle any runtime error and when you log it.
+Catching specific exceptions (ValueError, KeyError, TypeError, OSError, etc.) is preferred. Only use broader catches when you truly intend to handle any runtime error and when you log it and re-raise if appropriate.
 
-Rule 3 — Small helpers and flattened control flow
+Rule 3 — No silent broad catches; fail fast
+-----------------------------------------
+If you cannot choose a concrete exception class, allow the exception to propagate so the failure is visible and can be addressed. Silent failures make debugging much harder.
+
+Rule 4 — Avoid magic strings and numbers; use constants
+------------------------------------------------------
+Do not sprinkle identical literal strings or numeric literals across the codebase. Pull repeated or meaningful literals into module-level constants with descriptive names.
+
+Bad:
+```python
+worksheet = sheet.worksheet_by_title("Splitwise Expenses")
+parser.add_argument("--worksheet-name", default="Splitwise Expenses")
+```
+
+Good:
+```python
+DEFAULT_WORKSHEET_NAME = "Splitwise Expenses"
+# ... later ...
+worksheet = sheet.worksheet_by_title(DEFAULT_WORKSHEET_NAME)
+parser.add_argument("--worksheet-name", default=DEFAULT_WORKSHEET_NAME)
+```
+
+Rule 5 — Small helpers and flattened control flow
 ------------------------------------------------
-Avoid deeply nested try/except blocks. Break functionality into small helper functions that each have a single responsibility (e.g. `_safe_authorize`, `_open_spreadsheet`, `_apply_column_formats`). Helpers make try/except scoping explicit and easier to read and test.
+Avoid deeply nested try/except blocks. Break functionality into small helper functions with a single responsibility (e.g., `_apply_column_formats`). Helpers make try/except scoping explicit and easier to test.
 
-Rule 4 — Logging
+Rule 6 — Logging
 ----------------
 - Use the project `LOG` (from `src.utils`) for consistent logging.
 - Use `LOG.exception(...)` when logging inside an except block to capture stack traces.
 - Use `LOG.info`, `LOG.debug`, `LOG.warning`, `LOG.error` appropriately.
 
-Rule 5 — Fail fast
--------------------
-If an operation must succeed (e.g., authenticating to an API) and you cannot proceed without it, log the error and re-raise to stop execution. Silent failures should be avoided.
-
-Rule 6 — Document fallback behavior
+Rule 7 — Document fallback behavior
 -----------------------------------
-If you implement best-effort fallbacks (e.g., try `worksheet.format` and fall back to `batchUpdate`), document the steps in a short comment and still log both success and failure cases.
+If you implement best-effort fallbacks (e.g., try `worksheet.format` and fall back to an alternative), document the steps in a short comment and still log both success and failure cases.
 
 Examples (bad -> good)
 ----------------------
@@ -83,10 +92,11 @@ Notes for reviewers / PRs
 ------------------------
 - If you see a nested try/except, consider extracting the inner block into a helper and giving the outer block a smaller scope.
 - Keep error messages actionable (include variable values or identifiers when safe), but never log secrets.
+- Use module-level constants for repeated literals and refer to them across modules where applicable.
 
 Automation
 ----------
-- Consider adding a lint rule or pre-commit hook that flags bare `except:` occurrences.
+- Consider adding a lint rule or pre-commit hook that flags bare `except:`, broad `except Exception`, and repeated literal strings beyond a threshold.
 
 Acknowledgements
 ----------------

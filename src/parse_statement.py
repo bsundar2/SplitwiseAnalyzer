@@ -10,7 +10,7 @@ Parse CSV or PDF statements into a pandas DataFrame with columns:
 import os
 import pandas as pd
 from dateutil import parser as dateparser
-from src.utils import LOG, mkdir_p, load_yaml
+from src.utils import LOG, load_yaml
 
 # Robust config loading: try repo root config.yaml or config/config.yaml
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -24,7 +24,8 @@ for p in CFG_PATHS:
         try:
             CFG = load_yaml(p)
             break
-        except Exception:
+        except (OSError, ValueError) as e:
+            LOG.exception("Failed to load config %s: %s", p, e)
             CFG = None
             break
 
@@ -66,6 +67,7 @@ def parse_any(path):
     else:
         raise ValueError("Unsupported extension: " + ext)
 
+
 def parse_date_safe(s):
     if pd.isna(s):
         return None
@@ -73,13 +75,14 @@ def parse_date_safe(s):
     try:
         dt = dateparser.parse(s, dayfirst=False)
         return dt.date().isoformat()
-    except Exception:
+    except (ValueError, TypeError, OverflowError):
         # Try adding year if not present
         try:
             dt = dateparser.parse(s + " 2025")
             return dt.date().isoformat()
-        except Exception:
+        except (ValueError, TypeError, OverflowError):
             return None
+
 
 def parse_amount_safe(s):
     if pd.isna(s):
@@ -88,9 +91,12 @@ def parse_amount_safe(s):
     s = s.replace("$", "").replace(",", "")
     try:
         return float(s)
-    except Exception:
+    except ValueError:
         # handle parentheses as negative
         if "(" in s and ")" in s:
             s2 = s.replace("(", "").replace(")", "")
-            return -float(s2)
+            try:
+                return -float(s2)
+            except ValueError:
+                raise
         raise

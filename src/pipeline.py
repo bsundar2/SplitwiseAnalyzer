@@ -7,7 +7,7 @@ from datetime import datetime
 
 from src.parse_statement import parse_any
 from src.splitwise_client import SplitwiseClient
-from src.utils import LOG, compute_import_id, load_state, save_state_atomic, merchant_slug, mkdir_p
+from src.utils import LOG, compute_import_id, load_state, save_state_atomic, mkdir_p, now_iso
 from src.sheets_sync import write_to_sheets
 
 CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "splitwise_cache.json")
@@ -55,7 +55,7 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
         if client:
             try:
                 remote_found = client.find_expense_by_import_id(import_id, merchant=merchant)
-            except Exception as e:
+            except (RuntimeError, ValueError) as e:
                 LOG.warning("Error searching remote for import_id %s: %s", import_id, str(e))
                 remote_found = None
         if remote_found:
@@ -68,7 +68,7 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
                 "amount": amount,
                 "date": date,
                 "description": remote_found.get("description"),
-                "added_at": datetime.utcnow().isoformat() + "Z",
+                "added_at": now_iso(),
             }
             results.append(entry)
             continue
@@ -89,12 +89,12 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
                 "amount": amount,
                 "date": date,
                 "description": desc,
-                "added_at": datetime.utcnow().isoformat() + "Z",
+                "added_at": now_iso(),
             }
             save_state_atomic(CACHE_PATH, cache)
             LOG.info("Added expense to Splitwise id=%s for txn %s %s", sid, import_id)
             added += 1
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             entry["status"] = "error"
             entry["error"] = str(e)
             LOG.exception("Failed to add txn %s: %s", import_id, str(e))
@@ -114,7 +114,7 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
             LOG.info("Pushing processed output to Google Sheets (name=%s, key=%s)", target_name, sheet_key)
             url = write_to_sheets(out_df, worksheet_name=worksheet_name, spreadsheet_name=target_name, spreadsheet_key=sheet_key)
             LOG.info("Wrote processed output to sheet: %s", url)
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             LOG.exception("Failed to write processed output to Google Sheets: %s", str(e))
 
     return out_df

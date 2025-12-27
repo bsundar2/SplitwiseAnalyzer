@@ -30,7 +30,9 @@ def mkdir_p(path):
     os.makedirs(path, exist_ok=True)
 
 def now_iso():
-    return datetime.utcnow().isoformat() + "Z"
+    # Use timezone-aware UTC timestamp
+    from datetime import timezone
+    return datetime.now(timezone.utc).isoformat()
 
 def load_state(path):
     if not os.path.exists(path):
@@ -52,11 +54,13 @@ def save_state_atomic(path, obj):
         with os.fdopen(fd, "w") as f:
             json.dump(obj, f, indent=2)
         os.replace(tmp, path)
-    except Exception:
+    except OSError as e:
+        # If replace failed, try to remove the temp file. Only catch OSError for filesystem ops.
         try:
             os.remove(tmp)
-        except Exception:
-            pass
+        except OSError:
+            # If we can't remove the temp file, log and re-raise the original exception.
+            LOG.warning("Failed to remove temp file %s: %s", tmp, e)
         raise
 
 
