@@ -12,7 +12,22 @@ import pandas as pd
 from dateutil import parser as dateparser
 from utils import LOG, mkdir_p, load_yaml
 
-CFG = load_yaml(os.path.join(os.path.dirname(__file__), "..", "config.yaml"))
+# Robust config loading: try repo root config.yaml or config/config.yaml
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+CFG_PATHS = [
+    os.path.join(BASE_DIR, "config.yaml"),
+    os.path.join(BASE_DIR, "config", "config.yaml"),
+]
+CFG = None
+for p in CFG_PATHS:
+    if os.path.exists(p):
+        try:
+            CFG = load_yaml(p)
+            break
+        except Exception:
+            CFG = None
+            break
+
 
 def parse_csv(path):
     LOG.info("Parsing CSV: %s", path)
