@@ -4,7 +4,7 @@ import pandas as pd
 from splitwise import Splitwise
 from dotenv import load_dotenv
 
-from utils import merchant_slug, LOG
+from src.utils import merchant_slug, LOG
 
 load_dotenv("config/credentials.env")
 

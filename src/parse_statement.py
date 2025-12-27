@@ -10,7 +10,7 @@ Parse CSV or PDF statements into a pandas DataFrame with columns:
 import os
 import pandas as pd
 from dateutil import parser as dateparser
-from utils import LOG, mkdir_p, load_yaml
+from src.utils import LOG, mkdir_p, load_yaml
 
 # Robust config loading: try repo root config.yaml or config/config.yaml
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))

@@ -5,9 +5,9 @@ import argparse
 import pandas as pd
 from datetime import datetime
 
-from parse_statement import parse_any
-from splitwise_client import SplitwiseClient
-from utils import LOG, compute_import_id, load_state, save_state_atomic, merchant_slug, mkdir_p
+from src.parse_statement import parse_any
+from src.splitwise_client import SplitwiseClient
+from src.utils import LOG, compute_import_id, load_state, save_state_atomic, merchant_slug, mkdir_p
 from src.sheets_sync import write_to_sheets
 
 CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "splitwise_cache.json")
