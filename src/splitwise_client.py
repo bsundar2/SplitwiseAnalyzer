@@ -1,24 +1,29 @@
+"""Client for interacting with the Splitwise API.
+
+This module provides a high-level interface for common Splitwise operations,
+including expense management, search, and data export.
+"""
+
 # Standard library
 import os
 from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Union, List
 
 # Third-party
 import pandas as pd
+from dateutil import parser as date_parser
 from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
 
 # Local application
-from src.utils import LOG, merchant_slug
+from src.constants.splitwise import (
+    IMPORTED_ID_MARKER,
+    DEFAULT_CURRENCY,
+    PayloadKeys
+)
+from src.utils import LOG, merchant_slug, compute_import_id
 
 load_dotenv("config/credentials.env")
-
-# Module-level constants
-IMPORTED_ID_MARKER = "[ImportedID:"
-DEFAULT_CURRENCY = "USD"
-PAYLOAD_KEY_COST = "cost"
-PAYLOAD_KEY_DESCRIPTION = "description"
-PAYLOAD_KEY_DATE = "date"
-PAYLOAD_KEY_CURRENCY = "currency_code"
 
 
 # Handles Splitwise API/CSV integration
@@ -110,20 +115,63 @@ class SplitwiseClient:
         # If nothing found, return None
         return None
 
-    def add_expense_from_txn(self, txn: dict, import_id: str, users=None):
-        """Create a Splitwise expense from normalized txn.
+    def generate_fingerprint(self, date_val: str, amount_val: Union[str, float], desc_val: str) -> str:
+        """Generate a stable fingerprint for a transaction.
+        
+        Args:
+            date_val: Date string in any parseable format
+            amount_val: Transaction amount (string or number)
+            desc_val: Transaction description
+            
+        Returns:
+            A stable string fingerprint for the transaction
+        """
+        # Normalize date to YYYY-MM-DD
+        try:
+            dnorm = date_parser.parse(str(date_val)).date().isoformat()
+        except (ValueError, TypeError, OverflowError):
+            dnorm = str(date_val)
+        
+        # Normalize amount
+        try:
+            amt = float(amount_val)
+        except (ValueError, TypeError):
+            try:
+                amt = float(str(amount_val).replace(',', '').replace('$', ''))
+            except (ValueError, TypeError):
+                amt = 0.0
+        
+        # Normalize description
+        desc_norm = merchant_slug(desc_val or "")
+        
+        return compute_import_id(dnorm, amt, desc_norm)
 
-        - txn: dict with keys: date (YYYY-MM-DD), amount (float), currency, description, merchant
-        - import_id: string
-        - users: optional list of dicts with user_id and share info
+    def add_expense_from_txn(self, txn: Dict[str, Any], import_id: str, users: Optional[List[Dict]] = None) -> Union[str, int]:
+        """Create a Splitwise expense from normalized transaction data.
 
-        This will append a marker [ImportedID:{import_id}] to the description so we can find it later.
-        Returns the created expense id or raises on failure.
+        Args:
+            txn: Dictionary containing:
+                - date (str): Date in YYYY-MM-DD format
+                - amount (float): Transaction amount
+                - currency (str, optional): Currency code (default: USD)
+                - description (str): Transaction description
+                - merchant (str, optional): Merchant name (used if description is empty)
+            import_id: Unique identifier for this transaction
+            users: Optional list of user participation details:
+                - user_id (int): Splitwise user ID
+                - paid_share (float): Amount paid by this user
+                - owed_share (float): Amount owed by this user
+
+        Returns:
+            The created expense ID
+
+        Raises:
+            RuntimeError: If expense creation fails
         """
         desc = txn.get("description") or txn.get("merchant") or "Imported expense"
         desc_with_marker = f"{desc} {IMPORTED_ID_MARKER}{import_id}]"
 
-        cost = float(txn.get("amount"))
+        cost = float(txn.get("amount", 0))
         date = txn.get("date")
         currency = txn.get("currency") or DEFAULT_CURRENCY
 
@@ -133,23 +181,21 @@ class SplitwiseClient:
         expense.setDescription(desc_with_marker)
         expense.setDate(date)
         expense.setCurrencyCode(currency)
-        # By default: mark as paid by current user and owed by others (if users provided)
+        
+        # Handle user shares if provided
         if users:
-            # users is list of {"user_id": id, "paid_share": x, "owed_share": y}
-            for u in users:
-                user_id = u.get("user_id")
-                paid_share = str(u.get("paid_share", "0.0"))
-                owed_share = str(u.get("owed_share", "0.0"))
+            for user in users:
+                user_id = user.get("user_id")
+                paid_share = str(user.get("paid_share", "0.0"))
+                owed_share = str(user.get("owed_share", "0.0"))
                 expense.addUser(user_id, paid_share=paid_share, owed_share=owed_share)
-        # If no users specified, leave it as a simple expense paid by current user
-        created = self.sObj.createExpense(expense)
-        # created may be an Expense object or dict depending on SDK
+                
+        # Create the expense and return the ID
         try:
-            return created.getId()
-        except AttributeError:
-            return created
-
-        # Note: no broad except blocks — let unexpected errors propagate so failures are visible
+            created = self.sObj.createExpense(expense)
+            return created.getId() if hasattr(created, 'getId') else created
+        except Exception as e:
+            raise RuntimeError(f"Failed to create expense: {str(e)}")
 
 
 # Example usage:
@@ -158,6 +204,6 @@ if __name__ == "__main__":
     print(f"User ID: {client.get_current_user_id()}")
 
     today = datetime.now().date()
-    seven_days_ago = today - timedelta(days=7)
+    seven_days_ago = today - timedelta(days=25)
     df = client.get_expenses_by_date_range(seven_days_ago, today)
     print(df)

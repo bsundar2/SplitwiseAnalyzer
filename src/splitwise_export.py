@@ -3,28 +3,22 @@
 
 Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints in data/splitwise_exported.json.
 """
-
+# Standard library
 import argparse
-import os
-from pathlib import Path
-from typing import Dict, List, Optional, Set
+import json
+from datetime import datetime
+from typing import List, Optional, Union
 
+# Third-party
 import dateparser
 import pandas as pd
 
+# Local application
 from src.constants.config import STATE_PATH
-from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, DEFAULT_SPREADSHEET_NAME
-from src.utils import (
-    load_state, 
-    save_state_atomic, 
-    compute_import_id, 
-    merchant_slug,
-    mkdir_p
-)
+from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, SPLITWISE_EXPENSES_WORKSHEET, DEFAULT_SPREADSHEET_NAME
 from src.sheets_sync import write_to_sheets
-
-# Constants
-DEFAULT_WORKSHEET_NAME = "Splitwise Expenses"
+from src.splitwise_client import SplitwiseClient
+from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG
 
 # Column names for the export
 class ExportColumns:
@@ -41,60 +35,118 @@ def parse_date(s: str):
 
 
 def mock_expenses(start_date, end_date):
+    """Generate mock expense data for testing.
+    
+    Args:
+        start_date: Start date for mock data
+        end_date: End date for mock data
+        
+    Returns:
+        DataFrame with mock expense data
+    """
     # Small mock DataFrame matching get_expenses_by_date_range shape
     rows = [
-        {ExportColumns.DATE: start_date.isoformat(), ExportColumns.AMOUNT: "97.01", "category": "Internet", ExportColumns.DESCRIPTION: "Google Fit [Imported]", "friends_split": "Alice: 97.01", ExportColumns.ID: "mock-1"},
-        {ExportColumns.DATE: end_date.isoformat(), ExportColumns.AMOUNT: "2.99", "category": "Entertainment", ExportColumns.DESCRIPTION: "Hulu [Imported]", "friends_split": "Alice: 2.99", ExportColumns.ID: "mock-2"},
+        {
+            ExportColumns.DATE: start_date.isoformat(),
+            ExportColumns.AMOUNT: "97.01",
+            "category": "Internet",
+            ExportColumns.DESCRIPTION: "Google Fit [Imported]",
+            "friends_split": "Alice: 97.01",
+            ExportColumns.ID: "mock-1"
+        },
+        {
+            ExportColumns.DATE: end_date.isoformat(),
+            ExportColumns.AMOUNT: "2.99",
+            "category": "Entertainment",
+            ExportColumns.DESCRIPTION: "Hulu [Imported]",
+            "friends_split": "Alice: 2.99",
+            ExportColumns.ID: "mock-2"
+        },
     ]
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    
+    # Generate fingerprints using the same logic as the client
+    df[ExportColumns.FINGERPRINT] = df.apply(
+        lambda r: compute_import_id(
+            r[ExportColumns.DATE],
+            float(str(r[ExportColumns.AMOUNT]).replace(',', '').replace('$', '') or 0),
+            merchant_slug(r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""))
+        ),
+        axis=1
+    )
+    return df
 
 
-def load_exported_state(path=STATE_PATH):
-    mkdir_p(os.path.dirname(path))
-    state = load_state(path)
-    exported_ids = set(state.get("exported_ids", []))
-    exported_fps = set(state.get("exported_fingerprints", []))
-    return exported_ids, exported_fps
-
-
-def save_exported_state(exported_ids, exported_fps, path=STATE_PATH):
-    mkdir_p(os.path.dirname(path))
-    state = {
-        "exported_ids": sorted(list(exported_ids)),
-        "exported_fingerprints": sorted(list(exported_fps)),
-    }
-    save_state_atomic(path, state)
-
-
-def _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name):
-    """Return a set of fingerprints computed from existing worksheet rows (if any).
-
-    Requires `pygsheets` to be installed; ImportError will propagate if missing.
+def load_exported_state() -> tuple[set, set]:
+    """Load the set of previously exported Splitwise expense IDs and fingerprints.
+    
+    Returns:
+        A tuple of (exported_ids, exported_fingerprints) as sets
     """
-    import pygsheets
+    try:
+        state = load_state(STATE_PATH)
+        return set(state.get("exported_ids", [])), set(state.get("exported_fingerprints", []))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return set(), set()
 
-    gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
-    if sheet_key:
-        sh = gc.open_by_key(sheet_key)
-    else:
-        sh = gc.open(sheet_name)
 
-    wks = sh.worksheet_by_title(worksheet_name)
-    exist_df = wks.get_as_df(has_header=True)
-    if exist_df is None or exist_df.empty:
-        return set()
+def save_exported_state(exported_ids: set, exported_fps: set) -> None:
+    """Save the set of exported Splitwise expense IDs and fingerprints.
+    
+    Args:
+        exported_ids: Set of exported expense IDs
+        exported_fps: Set of exported fingerprints
+    """
+    state = {
+        "exported_ids": list(exported_ids),
+        "exported_fingerprints": list(exported_fps),
+        "last_updated": datetime.now().isoformat(),
+    }
+    save_state_atomic(STATE_PATH, state)
 
-    fps = set()
-    for _, r in exist_df.iterrows():
-        date_val = r.get(ExportColumns.DATE) if ExportColumns.DATE in r.index else r.get(0)
-        amount_val = r.get(ExportColumns.AMOUNT) if ExportColumns.AMOUNT in r.index else r.get(1)
-        desc_val = r.get(ExportColumns.DESCRIPTION) if ExportColumns.DESCRIPTION in r.index else r.get("friends_split") if "friends_split" in r.index else r.get(2)
-        # normalize
+
+def _read_existing_fingerprints(
+    sheet_key: Optional[str] = None, 
+    sheet_name: Optional[str] = None, 
+    worksheet_name: Optional[str] = None
+) -> Optional[List[str]]:
+    """Read existing fingerprints from a Google Sheet.
+    
+    Args:
+        sheet_key: Google Sheet key (takes precedence over sheet_name)
+        sheet_name: Google Sheet name (used if sheet_key not provided)
+        worksheet_name: Name of the worksheet to read from
+        
+    Returns:
+        List of fingerprints or None if the sheet couldn't be read
+    """
+    if not (sheet_key or sheet_name) or not worksheet_name:
+        return None
+    
+    try:
+        import pygsheets
+        gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
+        
+        # Open the spreadsheet by key or name
+        sh = gc.open_by_key(sheet_key) if sheet_key else gc.open(sheet_name)
+        
+        # Get the worksheet
         try:
-            from dateutil import parser as _dp
-            dnorm = _dp.parse(str(date_val)).date().isoformat()
-        except (ValueError, TypeError, OverflowError):
-            dnorm = str(date_val)
+            wks = sh.worksheet_by_title(worksheet_name)
+        except pygsheets.WorksheetNotFound:
+            return None
+            
+        # Read the data
+        df = wks.get_as_df(numerize=False, empty_value=None)
+        if df.empty or ExportColumns.FINGERPRINT not in df.columns:
+            return None
+            
+        # Return non-empty fingerprints
+        return [fp for fp in df[ExportColumns.FINGERPRINT].dropna() if fp]
+        
+    except Exception as e:
+        LOG.warning("Error reading existing fingerprints from sheet: %s", str(e))
+        return None
         try:
             amt = float(amount_val)
         except (ValueError, TypeError):
@@ -108,55 +160,69 @@ def _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name):
     return fps
 
 
-def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, worksheet_name=DEFAULT_WORKSHEET_NAME, mock=False, append=True, dedupe=True, show_skipped=False):
+def fetch_and_write(
+    start_date: Union[datetime, str],
+    end_date: Union[datetime, str],
+    sheet_key: Optional[str] = None,
+    sheet_name: Optional[str] = None, 
+    worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
+    mock: bool = False,
+    append: bool = True,
+    dedupe: bool = True,
+    show_skipped: bool = False
+) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses (real or mock), de-duplicate, and write to Google Sheets.
 
-    Returns the DataFrame written and the sheet URL (or None on failure).
+    Args:
+        start_date: Start date for expense retrieval
+        end_date: End date for expense retrieval
+        sheet_key: Optional Google Sheet key (takes precedence over sheet_name)
+        sheet_name: Optional Google Sheet name (used if sheet_key not provided)
+        worksheet_name: Name of the worksheet to write to
+        mock: If True, use mock data instead of real API calls
+        append: If True, append to existing sheet; otherwise overwrite
+        dedupe: If True, deduplicate expenses based on fingerprint
+        show_skipped: If True, include skipped expenses in output
+
+    Returns:
+        Tuple of (DataFrame with expenses, URL of the updated sheet or None)
     """
-    df = None
-    url = None
-    if mock:
-        df = mock_expenses(start_date, end_date)
-    else:
-        # Import here to avoid requiring SplitwiseClient when mocking; allow ImportError to propagate if missing
-        from src.splitwise_client import SplitwiseClient
+    client = None
+    if not mock:
         client = SplitwiseClient()
         df = client.get_expenses_by_date_range(start_date, end_date)
+    else:
+        df = mock_expenses(start_date, end_date)
 
     if df is None or df.empty:
-        print("No Splitwise expenses found for the given range.")
-        return df, None
+        LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
+        return pd.DataFrame(), None
 
-    # Normalize columns to strings
+    # Ensure all columns are strings for consistency
     df = df.copy()
-    for c in df.columns:
-        df[c] = df[c].astype(str)
+    for col in df.columns:
+        df[col] = df[col].astype(str)
 
-    # Compute stable fingerprint for each row using date (YYYY-MM-DD), amount, and normalized description
-    fps = []
-    for _, r in df.iterrows():
-        date_val = r.get(ExportColumns.DATE)
-        # Normalize date to YYYY-MM-DD
-        try:
-            from dateutil import parser as _dp
-            dnorm = _dp.parse(str(date_val)).date().isoformat()
-        except (ValueError, TypeError, OverflowError):
-            dnorm = str(date_val)
-        amount_val = r.get(ExportColumns.AMOUNT)
-        desc_val = r.get(ExportColumns.DESCRIPTION) or r.get("friends_split") or ""
-        # Normalize description using merchant_slug for stable matching
-        desc_norm = merchant_slug(desc_val)
-        # Ensure amount numeric
-        try:
-            amt = float(amount_val)
-        except (ValueError, TypeError):
-            try:
-                amt = float(str(amount_val).replace(',', '').replace('$', ''))
-            except (ValueError, TypeError):
-                amt = 0.0
-        fp = compute_import_id(dnorm, amt, desc_norm)
-        fps.append(fp)
-    df[ExportColumns.FINGERPRINT] = fps
+    # Generate fingerprints using the client's method if available
+    if client:
+        df[ExportColumns.FINGERPRINT] = df.apply(
+            lambda r: client.generate_fingerprint(
+                r.get(ExportColumns.DATE),
+                r.get(ExportColumns.AMOUNT),
+                r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
+            ),
+            axis=1
+        )
+    else:
+        # Fallback to local implementation if no client (mock mode)
+        df[ExportColumns.FINGERPRINT] = df.apply(
+            lambda r: compute_import_id(
+                r.get(ExportColumns.DATE, ""),
+                float(str(r.get(ExportColumns.AMOUNT, "0")).replace(',', '').replace('$', '') or 0),
+                merchant_slug(r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""))
+            ),
+            axis=1
+        )
 
     # Load existing exported state
     exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())
@@ -223,32 +289,129 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
     return new_df, url
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch Splitwise expenses and write to Google Sheets")
-    parser.add_argument("--start-date", required=True, help="Start date (YYYY-MM-DD) or any parseable date")
-    parser.add_argument("--end-date", required=True, help="End date (YYYY-MM-DD) or any parseable date")
-    parser.add_argument("--sheet-key", default=None, help="Spreadsheet key to write to (preferred)")
-    parser.add_argument("--sheet-name", default=None, help="Spreadsheet name to write to (fallback)")
-    parser.add_argument("--worksheet-name", default=DEFAULT_WORKSHEET_NAME, help="Worksheet/tab name to write into")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite the entire worksheet and skip dedupe (default is append)")
-    parser.add_argument("--no-dedupe", action="store_true", help="Do not deduplicate; export all rows")
-    parser.add_argument("--show-skipped", action="store_true", help="Show rows that were skipped due to dedupe and reasons")
-    parser.add_argument("--mock", action="store_true", help="Use mock data instead of calling Splitwise (for testing)")
+def parse_date_arg(date_str: str) -> datetime.date:
+    """Parse a date string from command line arguments.
+    
+    Args:
+        date_str: Date string to parse
+        
+    Returns:
+        Parsed date object
+        
+    Raises:
+        ValueError: If date cannot be parsed
+    """
+    parsed = dateparser.parse(date_str)
+    if not parsed:
+        raise ValueError(f"Could not parse date: {date_str}")
+    return parsed.date()
+
+
+def main():
+    """Main entry point for the script."""
+    parser = argparse.ArgumentParser(description="Export Splitwise expenses to Google Sheets")
+    parser.add_argument(
+        "--start-date", 
+        required=True, 
+        help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago')"
+    )
+    parser.add_argument(
+        "--end-date", 
+        required=True, 
+        help="End date (any parseable date string, e.g., '2023-12-31' or 'today')"
+    )
+    parser.add_argument(
+        "--sheet-key", 
+        help="Google Sheet key (takes precedence over --sheet-name). "
+             "Find in the sheet URL: https://docs.google.com/spreadsheets/d/<key>/edit"
+    )
+    parser.add_argument(
+        "--sheet-name", 
+        help="Google Sheet name (used if --sheet-key not provided). "
+             "Must be unique in your Google Drive."
+    )
+    parser.add_argument(
+        "--worksheet-name", 
+        default=SPLITWISE_EXPENSES_WORKSHEET,
+        help=f"Worksheet name (default: {SPLITWISE_EXPENSES_WORKSHEET})"
+    )
+    parser.add_argument(
+        "--mock", 
+        action="store_true", 
+        help="Use mock data instead of making real API calls to Splitwise"
+    )
+    # --overwrite is an alias for --no-append for backward compatibility
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--no-append", 
+        dest="append", 
+        action="store_false",
+        help="Overwrite the worksheet instead of appending to it (default: %(default)s)"
+    )
+    group.add_argument(
+        "--overwrite",
+        dest="append",
+        action="store_false",
+        help=argparse.SUPPRESS  # Hidden alias for backward compatibility
+    )
+    parser.add_argument(
+        "--no-dedupe", 
+        dest="dedupe", 
+        action="store_false",
+        default=True,
+        help="Skip deduplication of expenses (not recommended, default: %(default)s)"
+    )
+    parser.add_argument(
+        "--show-skipped", 
+        action="store_true", 
+        help="Show skipped expenses in the output"
+    )
 
     args = parser.parse_args()
 
-    sd = parse_date(args.start_date)
-    ed = parse_date(args.end_date)
+    try:
+        # Parse dates
+        start_date = parse_date_arg(args.start_date)
+        end_date = parse_date_arg(args.end_date)
+        
+        if start_date > end_date:
+            raise ValueError(f"Start date ({start_date}) cannot be after end date ({end_date})")
 
-    # Decide append/dedupe behavior: default is append; explicit --overwrite will force overwrite and disable dedupe
-    append_flag = not args.overwrite
-    dedupe_flag = not args.no_dedupe
-    if args.overwrite:
-        # When overwriting we skip dedupe checks entirely
-        dedupe_flag = False
+        # Ensure at least one of sheet_key or sheet_name is provided
+        if not (args.sheet_key or args.sheet_name):
+            raise ValueError("Either --sheet-key or --sheet-name must be provided")
 
-    new_df, url = fetch_and_write(sd, ed, sheet_key=args.sheet_key, sheet_name=args.sheet_name, worksheet_name=args.worksheet_name, mock=args.mock, append=append_flag, dedupe=dedupe_flag, show_skipped=args.show_skipped)
-    if new_df is not None:
-        print(f"Exported {len(new_df)} rows")
-    if url:
-        print(url)
+        LOG.info("Fetching expenses from %s to %s", start_date, end_date)
+        new_df, url = fetch_and_write(
+            start_date=start_date,
+            end_date=end_date,
+            sheet_key=args.sheet_key,
+            sheet_name=args.sheet_name,
+            worksheet_name=args.worksheet_name,
+            mock=args.mock,
+            append=args.append,
+            dedupe=args.dedupe,
+            show_skipped=args.show_skipped
+        )
+
+        if new_df is not None and not new_df.empty:
+            print(f"Successfully processed {len(new_df)} expenses")
+            if url:
+                print(f"Updated sheet: {url}")
+            
+            if args.show_skipped and 'status' in new_df.columns:
+                print("\nSummary:")
+                print(new_df['status'].value_counts().to_string())
+        else:
+            print("No expenses found or processed")
+            
+    except Exception as e:
+        LOG.error("Error: %s", str(e), exc_info=True)
+        print(f"Error: {str(e)}")
+        return 1
+        
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

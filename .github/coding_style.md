@@ -92,7 +92,25 @@ Rule 3 — No silent broad catches; fail fast
 -----------------------------------------
 If you cannot choose a concrete exception class, allow the exception to propagate so the failure is visible and can be addressed. Silent failures make debugging much harder.
 
-Rule 4 — Avoid magic strings and numbers; use constants
+Rule 4 — No emojis in log messages
+-----------------------------------
+- Do not use emojis in log messages or status outputs
+- Keep log messages clear, concise, and professional
+- Use standard punctuation and formatting instead of emojis
+
+Bad:
+```python
+LOG.info("✅ Successfully processed data")  # Bad: Uses emoji
+print("❌ Error: Could not save file")     # Bad: Uses emoji in console output
+```
+
+Good:
+```python
+LOG.info("Successfully processed data")    # Good: No emoji
+print("Error: Could not save file")       # Good: No emoji
+```
+
+Rule 5 — Avoid magic strings and numbers; use constants
 ------------------------------------------------------
 Do not sprinkle identical literal strings or numeric literals across the codebase. Pull repeated or meaningful literals into module-level constants with descriptive names.
 
