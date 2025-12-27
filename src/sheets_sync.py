@@ -1,9 +1,13 @@
-# Handles Google Sheets sync logic
-import pandas as pd
+"""Google Sheets synchronization functionality."""
+
+# Standard library
 from typing import Optional
 
+# Third-party
+import pandas as pd
 import pygsheets
 
+# Local application
 from src.constants.gsheets import DEFAULT_SPREADSHEET_NAME, SHEETS_AUTHENTICATION_FILE
 from src.utils import LOG
 
@@ -64,28 +68,28 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
         values = worksheet.get_all_values()
 
     used_rows = len(values) if values else 1
+    if used_rows <= 1:  # Only header or empty
+        return
 
     cols = list(write_data.columns)
+    
+    from pygsheets import FormatType
+    
     # amount -> currency
-    if "amount" in cols and used_rows:
+    if "amount" in cols:
         idx = cols.index("amount") + 1
-        col_letter = _colnum_to_a1(idx)
-        rng = f"{col_letter}2:{col_letter}{used_rows}"
-        if hasattr(worksheet, 'format'):
-            # Apply currency pattern; allow any errors to propagate so failures are visible and fixable
-            worksheet.format(rng, {"numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"}})
-        else:
-            raise RuntimeError("Worksheet object does not support .format() — cannot apply amount format")
-
+        # Format as currency for all rows (skip header)
+        for row in range(2, used_rows + 1):
+            cell = worksheet.cell((row, idx))
+            cell.number_format = FormatType.CURRENCY
+    
     # date -> US-style date
-    if "date" in cols and used_rows:
+    if "date" in cols:
         idx = cols.index("date") + 1
-        col_letter = _colnum_to_a1(idx)
-        rng = f"{col_letter}2:{col_letter}{used_rows}"
-        if hasattr(worksheet, 'format'):
-            worksheet.format(rng, {"numberFormat": {"type": "DATE", "pattern": "mm/dd/yyyy"}})
-        else:
-            raise RuntimeError("Worksheet object does not support .format() — cannot apply date format")
+        # Format as date for all rows (skip header)
+        for row in range(2, used_rows + 1):
+            cell = worksheet.cell((row, idx))
+            cell.number_format = FormatType.DATE
 
 
 def write_to_sheets(

@@ -4,16 +4,24 @@
 Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints in data/splitwise_exported.json.
 """
 
+import argparse
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+import dateparser
 import pandas as pd
 
 from src.constants.config import STATE_PATH
 from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, DEFAULT_SPREADSHEET_NAME
-from src.constants.splitwise import PayloadKeys
-from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug
+from src.utils import (
+    load_state, 
+    save_state_atomic, 
+    compute_import_id, 
+    merchant_slug,
+    mkdir_p
+)
+from src.sheets_sync import write_to_sheets
 
 # Constants
 DEFAULT_WORKSHEET_NAME = "Splitwise Expenses"
@@ -208,8 +216,8 @@ def fetch_and_write(start_date, end_date, sheet_key=None, sheet_name=None, works
         print(new_df.head())
 
     # Update exported state
-    updated_ids = set(exported_ids) | set(new_df[COL_ID].tolist())
-    updated_fps = set(exported_fps) | set(new_df[COL_FINGERPRINT].tolist())
+    updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
+    updated_fps = set(exported_fps) | set(new_df[ExportColumns.FINGERPRINT].tolist())
     save_exported_state(updated_ids, updated_fps)
 
     return new_df, url

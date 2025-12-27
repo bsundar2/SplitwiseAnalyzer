@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # Third-party
 import pandas as pd
 from dotenv import load_dotenv
-from splitwise import Expense, ExpenseUser, Splitwise
+from splitwise import Expense, Splitwise
 
 # Local application
 from src.utils import LOG, merchant_slug
@@ -137,13 +137,10 @@ class SplitwiseClient:
         if users:
             # users is list of {"user_id": id, "paid_share": x, "owed_share": y}
             for u in users:
-                eu = ExpenseUser()
-                eu.setId(u.get("user_id"))
-                if "paid_share" in u:
-                    eu.setPaidShare(str(u.get("paid_share")))
-                if "owed_share" in u:
-                    eu.setOwedShare(str(u.get("owed_share")))
-                expense.addUser(eu)
+                user_id = u.get("user_id")
+                paid_share = str(u.get("paid_share", "0.0"))
+                owed_share = str(u.get("owed_share", "0.0"))
+                expense.addUser(user_id, paid_share=paid_share, owed_share=owed_share)
         # If no users specified, leave it as a simple expense paid by current user
         created = self.sObj.createExpense(expense)
         # created may be an Expense object or dict depending on SDK
