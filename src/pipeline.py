@@ -8,12 +8,13 @@ from datetime import datetime
 from parse_statement import parse_any
 from splitwise_client import SplitwiseClient
 from utils import LOG, compute_import_id, load_state, save_state_atomic, merchant_slug, mkdir_p
+from src.sheets_sync import write_to_sheets
 
 CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "splitwise_cache.json")
 PROCESSED_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "processed")
 
 
-def process_statement(path, dry_run=True, limit=None):
+def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sheet_key: str = None, worksheet_name: str = "Imported Transactions", no_sheet: bool = False):
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
     df = parse_any(path)
     if df is None or df.empty:
@@ -105,14 +106,37 @@ def process_statement(path, dry_run=True, limit=None):
     out_path = os.path.join(PROCESSED_DIR, base + ".processed.csv")
     out_df.to_csv(out_path, index=False)
     LOG.info("Wrote processed output to %s", out_path)
+
+    # If requested, push the processed output to Google Sheets
+    if (sheet_name or sheet_key) and not no_sheet:
+        try:
+            target_name = sheet_name or "Splitwise Transactions"
+            LOG.info("Pushing processed output to Google Sheets (name=%s, key=%s)", target_name, sheet_key)
+            url = write_to_sheets(out_df, worksheet_name=worksheet_name, spreadsheet_name=target_name, spreadsheet_key=sheet_key)
+            LOG.info("Wrote processed output to sheet: %s", url)
+        except Exception as e:
+            LOG.exception("Failed to write processed output to Google Sheets: %s", str(e))
+
     return out_df
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a CSV statement and add new expenses to Splitwise")
     parser.add_argument("--statement", "-s", required=True, help="Path to CSV statement")
-    parser.add_argument("--dry-run", action="store_true", help="Don't actually add to Splitwise; just show what would be done")
+    parser.add_argument("--dry-run", action="store_true", help="Don't actually add to Splitwise; sheet writes will still occur unless you pass --no-sheet")
+    parser.add_argument("--no-sheet", action="store_true", help="Do not write processed output to Google Sheets (useful for dry runs)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of expenses to add in a run")
+    parser.add_argument("--sheet-name", type=str, default="Splitwise Transactions", help="Name of spreadsheet to write processed output to")
+    parser.add_argument("--worksheet-name", type=str, default="Imported Transactions", help="Name of the worksheet/tab to write processed output into")
+    parser.add_argument("--sheet-key", type=str, default=None, help="Spreadsheet key (preferred) to write processed output to")
     args = parser.parse_args()
 
-    process_statement(args.statement, dry_run=args.dry_run, limit=args.limit)
+    process_statement(
+        args.statement,
+        dry_run=args.dry_run,
+        limit=args.limit,
+        sheet_name=args.sheet_name,
+        sheet_key=args.sheet_key,
+        worksheet_name=args.worksheet_name,
+        no_sheet=args.no_sheet,
+    )
