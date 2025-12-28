@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Union, List
 from functools import cache
 
+import numpy as np
 # Third-party
 import pandas as pd
 from dotenv import load_dotenv
@@ -157,72 +158,99 @@ class SplitwiseClient:
         LOG.info(f"Found {len(data)} expenses between {start_date} and {end_date}")
         return pd.DataFrame(data)
 
-    def find_expense_by_import_id(self, import_id: str, merchant: str = None, lookback_days: int = 365):
-        """Search recent Splitwise expenses for the import id in details (notes) or description.
-
-        If not found, fall back to fuzzy match: same amount, date within +/-1 day, and merchant slug match.
-        Returns a dict row if a single unambiguous match is found, otherwise None.
+    def find_expense_by_cc_reference(
+        self, 
+        cc_reference_id: str = None, 
+        amount: float = None, 
+        date: str = None, 
+        merchant: str = None, 
+        lookback_days: int = 30
+    ) -> Optional[Dict]:
+        """Find an expense by its cc_reference_id or by matching transaction details.
+        
+        First tries to find an exact match by cc_reference_id in the details field.
+        If not found and additional details (amount, date, merchant) are provided,
+        attempts to find a matching transaction using those criteria.
+        
+        Args:
+            cc_reference_id: The credit card reference ID to search for
+            amount: Transaction amount (required for fuzzy matching)
+            date: Transaction date in YYYY-MM-DD format (required for fuzzy matching)
+            merchant: Merchant name (optional, improves fuzzy matching)
+            lookback_days: Number of days to look back for matching expenses
+            
+        Returns:
+            dict: The matching expense as a dictionary, or None if not found
         """
-        # naive strategy: fetch last N days and scan descriptions for marker
-        end = datetime.now().date()
-        start = end - timedelta(days=lookback_days)
-
-        df = self.get_my_expenses_by_date_range(start, end)
+        if not cc_reference_id and not (amount is not None and date):
+            LOG.debug("Either cc_reference_id or both amount and date must be provided")
+            return None
+            
+        # Clean and validate the reference ID if provided
+        if cc_reference_id:
+            cc_reference_id = str(cc_reference_id).strip()
+            if not cc_reference_id:
+                cc_reference_id = None
+                
+        # Fetch recent expenses
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=lookback_days)
+        
+        df = self.get_my_expenses_by_date_range(start_date, end_date)
         if df.empty:
             return None
 
-        # First, try exact match in details (preferred)
-        if "details" in df.columns:
-            mask = df["details"].astype(str).str.contains(import_id, na=False)
-            matches = df[mask]
+        # First, try exact match by cc_reference_id in details if provided
+        if cc_reference_id and "details" in df.columns:
+            details_matches = df["details"].astype(str).str.strip() == cc_reference_id
+            matches = df[details_matches]
+            
             if len(matches) == 1:
                 return matches.iloc[0].to_dict()
             elif len(matches) > 1:
-                LOG.info("Multiple Splitwise expenses matched import_id %s in details; returning first", import_id)
-                return matches.iloc[0].to_dict()
-
-        # Backward-compatible: try marker search in description
-        mask = df["description"].astype(str).str.contains(import_id, na=False)
-        matches = df[mask]
-        if len(matches) == 1:
-            return matches.iloc[0].to_dict()
-        elif len(matches) > 1:
-            LOG.info("Multiple Splitwise expenses matched import_id %s; returning first", import_id)
-            return matches.iloc[0].to_dict()
-
-        # Fallback fuzzy match if merchant provided
-        candidates = []
-        # If merchant not provided, try to derive nothing
-        target_slug = merchant_slug(merchant) if merchant else None
-        # Build candidates conservatively, skipping rows with non-numeric amounts
-        for _, r in df.iterrows():
+                LOG.warning("Multiple expenses found with cc_reference_id %s", cc_reference_id)
+                return matches.sort_values("date_updated", ascending=False).iloc[0].to_dict()
+        
+        # If we have amount and date, try fuzzy matching
+        if amount is not None and date:
             try:
-                r_amount = float(r.get("amount", 0))
-            except (ValueError, TypeError):
-                continue
-            candidates.append(r)
-
-        # If merchant provided, filter by slug similarity
-        if target_slug:
-            slug_matches = []
-            for r in candidates:
-                desc = r.get("description") or ""
-                rslug = merchant_slug(desc)
-                if not rslug:
-                    continue
-                # exact or prefix match
-                if rslug == target_slug or target_slug in rslug or rslug in target_slug:
-                    slug_matches.append(r)
-            if len(slug_matches) == 1:
-                return slug_matches[0].to_dict()
-            elif len(slug_matches) > 1:
-                LOG.info("Multiple slug matches found for merchant %s; returning first", merchant)
-                return slug_matches[0].to_dict()
-
-        # If nothing found, return None
+                # Convert date string to datetime for comparison
+                target_date = pd.to_datetime(date).date()
+                
+                # Filter for same amount (within a small tolerance for floating point)
+                amount_matches = np.isclose(df["amount"].astype(float), float(amount), rtol=1e-5)
+                df_filtered = df[amount_matches]
+                
+                if not df_filtered.empty:
+                    # Filter for same date
+                    df_filtered["expense_date"] = pd.to_datetime(df_filtered["date"]).dt.date
+                    date_matches = df_filtered["expense_date"] == target_date
+                    df_filtered = df_filtered[date_matches]
+                    
+                    if not df_filtered.empty:
+                        # If we have merchant info, try to match that too
+                        if merchant:
+                            merchant = str(merchant).lower().strip()
+                            if merchant:
+                                merchant_matches = df_filtered["description"].str.lower().str.contains(merchant, regex=False)
+                                merchant_matches = df_filtered[merchant_matches]
+                                if not merchant_matches.empty:
+                                    df_filtered = merchant_matches
+                        
+                        # Return the best match (most recent if multiple)
+                        if not df_filtered.empty:
+                            best_match = df_filtered.sort_values("date_updated", ascending=False).iloc[0]
+                            LOG.info("Found potential match by amount/date/merchant")
+                            return best_match.to_dict()
+                            
+            except Exception as e:
+                LOG.warning("Error during fuzzy matching: %s", str(e), exc_info=True)
+                return None
+                
+        LOG.debug("No matching expense found")
         return None
 
-    def add_expense_from_txn(self, txn: Dict[str, Any], import_id: str, users: Optional[List[Dict]] = None) -> Union[str, int]:
+    def add_expense_from_txn(self, txn: Dict[str, Any], cc_reference_id: str, users: Optional[List[Dict]] = None) -> Union[str, int]:
         """Create a Splitwise expense from normalized transaction data.
 
         Args:
@@ -232,7 +260,8 @@ class SplitwiseClient:
                 - currency (str, optional): Currency code (default: USD)
                 - description (str): Transaction description
                 - merchant (str, optional): Merchant name (used if description is empty)
-            import_id: Unique identifier for this transaction
+                - detail (str, optional): Additional transaction details (stored in notes)
+            cc_reference_id: Credit card reference ID for this transaction
             users: Optional list of user participation details:
                 - user_id (int): Splitwise user ID
                 - paid_share (float): Amount paid by this user
@@ -242,10 +271,12 @@ class SplitwiseClient:
             The created expense ID
 
         Raises:
-            RuntimeError: If expense creation fails
+            RuntimeError: If expense creation fails or cc_reference_id is missing
         """
+        if not cc_reference_id:
+            raise ValueError("cc_reference_id is required")
+            
         desc = txn.get("description") or txn.get("merchant") or "Imported expense"
-
         cost = float(txn.get("amount", 0))
         date = txn.get("date")
         currency = txn.get("currency") or DEFAULT_CURRENCY
@@ -254,10 +285,8 @@ class SplitwiseClient:
         expense = Expense()
         expense.setCost(str(cost))
         expense.setDescription(desc)
-        # Store the unique id in details (notes) so it is not visible in the main description.
-        # Prefer statement reference if provided; otherwise fall back to import_id.
-        details_id = txn.get("reference") or import_id
-        expense.setDetails(str(details_id))
+        # Store the reference ID in details (notes)
+        expense.setDetails(cc_reference_id)
         expense.setDate(date)
         expense.setCurrencyCode(currency)
         

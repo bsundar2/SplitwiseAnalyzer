@@ -39,8 +39,8 @@ def parse_csv(path):
             col_map["description"] = c
         if "amount" in low or "debit" in low or "credit" in low:
             col_map["amount"] = c
-        if "reference" in low or low == "ref":
-            col_map["reference"] = c
+        if "reference" in low or low == "ref" or "detail" in low:
+            col_map["detail"] = c
 
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
         # fallback: try first three columns
@@ -53,8 +53,8 @@ def parse_csv(path):
     out["date"] = df[col_map["date"]].apply(parse_date_safe)
     out["description"] = df[col_map["description"]].astype(str).str.strip()
     out["amount"] = df[col_map["amount"]].apply(parse_amount_safe).abs()
-    if "reference" in col_map:
-        out["reference"] = df[col_map["reference"]].astype(str).str.strip()
+    if "detail" in col_map:
+        out["detail"] = df[col_map["detail"]].astype(str).str.strip()
     out["raw_line"] = df.apply(lambda r: " | ".join([str(r[c]) for c in df.columns]), axis=1)
     out = out.dropna(subset=["date"])
     return out

@@ -10,7 +10,7 @@ import pandas as pd
 from src.constants.config import CACHE_PATH, PROCESSED_DIR
 from src.parse_statement import parse_statement
 from src.splitwise_client import SplitwiseClient
-from src.utils import LOG, compute_import_id, load_state, save_state_atomic, now_iso, mkdir_p
+from src.utils import LOG, load_state, save_state_atomic, now_iso, mkdir_p
 from src.sheets_sync import write_to_sheets
 
 
@@ -35,58 +35,47 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
         date = row.get("date")
         desc = row.get("description")
         amount = row.get("amount")
-        reference = row.get("reference")
+        detail = row.get("detail")
         merchant = row.get("description") or ""
 
-        reference_str = None
-        if reference is not None:
-            s = str(reference).strip()
+        cc_reference_id = None
+        if detail is not None:
+            s = str(detail).strip()
             if s and s.lower() != "nan":
-                reference_str = s
+                cc_reference_id = s
 
-        legacy_import_id = compute_import_id(date, amount, merchant)
-        import_id = reference_str or legacy_import_id
+        if not cc_reference_id:
+            error_msg = f"Transaction is missing required cc_reference_id (date={date}, amount={amount}, description='{desc}')"
+            raise ValueError(error_msg)
+
         entry = {
-            "row_index": int(idx),
             "date": date,
             "description": desc,
             "amount": float(amount),
-            "reference": reference_str,
-            "import_id": import_id,
+            "detail": cc_reference_id,
+            "cc_reference_id": cc_reference_id,
         }
         # check cache
-        if import_id in cache:
+        if cc_reference_id in cache:
             entry["status"] = "cached"
             LOG.info("Skipping cached txn %s %s %s", date, amount, desc)
             results.append(entry)
             continue
 
-        # Backward-compatibility: if we're switching to reference-based ids, avoid re-importing
-        # transactions that were previously cached under the legacy computed import id.
-        if reference_str and legacy_import_id in cache:
-            entry["status"] = "cached"
-            cache[import_id] = cache[legacy_import_id]
-            save_state_atomic(CACHE_PATH, cache)
-            LOG.info("Skipping cached txn via legacy import id %s (reference=%s)", legacy_import_id, reference_str)
-            results.append(entry)
-            continue
         # check remote (only if not dry_run and client exists)
         remote_found = None
         if client:
             try:
-                remote_found = client.find_expense_by_import_id(import_id, merchant=merchant)
-                if (not remote_found) and reference_str:
-                    # Backward-compatibility: look for older imports that used the legacy computed import id
-                    remote_found = client.find_expense_by_import_id(legacy_import_id, merchant=merchant)
+                remote_found = client.find_expense_by_cc_reference(cc_reference_id, merchant=merchant)
             except (RuntimeError, ValueError) as e:
-                LOG.warning("Error searching remote for import_id %s: %s", import_id, str(e))
+                LOG.warning("Error searching remote for cc_reference_id %s: %s", cc_reference_id, str(e))
                 remote_found = None
         if remote_found:
             entry["status"] = "remote_exists"
             entry["remote_id"] = remote_found.get("id")
-            LOG.info("Found existing Splitwise expense for txn %s -> id %s", import_id, remote_found.get("id"))
+            LOG.info("Found existing Splitwise expense for txn %s -> id %s", cc_reference_id, remote_found.get("id"))
             # save to cache for idempotency
-            cache[import_id] = {
+            cache[cc_reference_id] = {
                 "splitwise_id": remote_found.get("id"),
                 "amount": amount,
                 "date": date,
@@ -105,12 +94,12 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
 
         try:
             sid = client.add_expense_from_txn(
-                {"date": date, "amount": amount, "description": desc, "merchant": merchant, "reference": reference_str},
-                import_id,
+                {"date": date, "amount": amount, "description": desc, "merchant": merchant, "detail": cc_reference_id},
+                cc_reference_id,
             )
             entry["status"] = "added"
             entry["splitwise_id"] = sid
-            cache[import_id] = {
+            cache[cc_reference_id] = {
                 "splitwise_id": sid,
                 "amount": amount,
                 "date": date,
@@ -118,12 +107,12 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
                 "added_at": now_iso(),
             }
             save_state_atomic(CACHE_PATH, cache)
-            LOG.info("Added expense to Splitwise id=%s for txn %s %s", sid, import_id)
+            LOG.info("Added expense to Splitwise id=%s for txn %s", sid, cc_reference_id)
             added += 1
         except (RuntimeError, ValueError) as e:
             entry["status"] = "error"
             entry["error"] = str(e)
-            LOG.exception("Failed to add txn %s: %s", import_id, str(e))
+            LOG.exception("Failed to add txn %s: %s", cc_reference_id, str(e))
         results.append(entry)
 
     # write processed CSV (with statuses)
