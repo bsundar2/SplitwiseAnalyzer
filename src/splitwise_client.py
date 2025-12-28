@@ -8,10 +8,10 @@ including expense management, search, and data export.
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Union, List
+from functools import cache
 
 # Third-party
 import pandas as pd
-from dateutil import parser as date_parser
 from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
 
@@ -36,6 +36,7 @@ class SplitwiseClient:
             raise ValueError("One or more Splitwise credentials are missing. Check config/credentials.env and variable names.")
         self.sObj = Splitwise(self.consumer_key, self.consumer_secret, api_key=self.api_key)
 
+    @cache
     def get_current_user_id(self):
         return self.sObj.getCurrentUser().getId()
 
@@ -83,22 +84,68 @@ class SplitwiseClient:
                 raise
         
         # Process the expenses into a DataFrame
+        my_user_id = self.get_current_user_id()
         data = []
         
         for expense in all_expenses:
             try:
                 users = expense.getUsers() or []
-                sorted_users = sorted(users, key=lambda u: (u.getFirstName() or "").lower())
-                friends_split = [
-                    f"{u.getFirstName()}: paid={safe_float(u.getPaidShare()):.2f} owed={safe_float(u.getOwedShare()):.2f}"
-                    for u in sorted_users
-                ]
+
+                def _user_name(u) -> str:
+                    first = u.getFirstName() or ""
+                    last = getattr(u, "getLastName", lambda: "")() or ""
+                    name = (first + " " + last).strip()
+                    return name or str(u.getId())
+
+                user_rows = []
+                for u in users:
+                    user_rows.append(
+                        {
+                            "id": u.getId(),
+                            "name": _user_name(u),
+                            "paid": safe_float(u.getPaidShare()),
+                            "owed": safe_float(u.getOwedShare()),
+                        }
+                    )
+
+                user_rows_sorted = sorted(user_rows, key=lambda r: (r["name"] or "").lower())
+
+                # Sheets-friendly: single deterministic string, easy to parse with SPLIT/REGEX
+                # Example: "Alice|paid=10.00|owed=0.00; Bob|paid=0.00|owed=10.00"
+                friends_split = "; ".join(
+                    [f"{r['name']}|paid={r['paid']:.2f}|owed={r['owed']:.2f}" for r in user_rows_sorted]
+                )
+
+                participant_names = ", ".join([r["name"] for r in user_rows_sorted])
+                participant_count = len(user_rows_sorted)
+
+                my_row = next((r for r in user_rows_sorted if r["id"] == my_user_id), None)
+                my_paid = my_row["paid"] if my_row else 0.0
+                my_owed = my_row["owed"] if my_row else 0.0
+                my_net = my_paid - my_owed
+
+                other_nonzero = any(
+                    r["id"] != my_user_id and (r["paid"] > 0 or r["owed"] > 0) for r in user_rows_sorted
+                )
+                is_shared = bool(other_nonzero)
+                split_type = "shared" if is_shared else "self"
+
+                paid_by = ", ".join(sorted({r["name"] for r in user_rows_sorted if r["paid"] > 0}))
 
                 data.append({
                     "date": expense.getDate(),
                     "amount": expense.getCost(),
                     "category": expense.getCategory().getName() if expense.getCategory() else None,
                     "description": expense.getDescription(),
+                    "details": expense.getDetails(),
+                    "split_type": split_type,
+                    "is_shared": is_shared,
+                    "participant_count": participant_count,
+                    "participant_names": participant_names,
+                    "paid_by": paid_by,
+                    "my_paid": my_paid,
+                    "my_owed": my_owed,
+                    "my_net": my_net,
                     "friends_split": friends_split,
                     "id": expense.getId(),
                 })
@@ -214,6 +261,7 @@ class SplitwiseClient:
         except Exception as e:
             raise RuntimeError(f"Failed to create expense: {str(e)}")
 
+    @cache
     def get_categories(self):
         return self.sObj.getCategories()
 
