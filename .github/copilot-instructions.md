@@ -151,3 +151,9 @@ Create a dataframe merge process to combine CSV + Splitwise data.
 Create the Google Sheets sync function.
 
 Tie everything together in main.py with CLI flags.
+
+Environment / Running Locally
+--------------------------------
+- **Activate virtualenv first:** Always activate the project's Python virtual environment before running scripts or installing packages. Example (typical venv in project root named `.venv`): `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows).
+- **Use the provided VS Code launch configs:** The repository includes `.vscode/launch.json` with entries like "Splitwise Export (Overwrite)" you can use to run scripts with the proper environment variables. These configs set `envFile` to `config/credentials.env` and set `PYTHONPATH` to the workspace.
+- **Install deps into the venv:** Run `pip install -r requirements.txt` after activating the venv so `pandas`, `pygsheets`, and `splitwise` are available.

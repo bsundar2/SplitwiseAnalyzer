@@ -8,7 +8,10 @@ import os
 from pathlib import Path
 
 # Project directory structure
-PROJECT_ROOT = Path(__file__).parent.parent
+# `PROJECT_ROOT` should point to the repository root (one level above `src/`).
+# Use `resolve().parents[2]` to reliably get the workspace root regardless of
+# how the module is imported or the current working directory.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASE_DIR = PROJECT_ROOT
 
 # Configuration files - check both src/ and project root directories

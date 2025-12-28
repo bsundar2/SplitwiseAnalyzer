@@ -5,3 +5,4 @@ config/gsheets_authentication.json
 *.pyc
 .ipynb_checkpoints/
 .idea/
+data/

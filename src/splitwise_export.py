@@ -166,20 +166,13 @@ def fetch_and_write(
     sheet_name: Optional[str] = None,
     worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
     append: bool = True,
-    dedupe: bool = True,
-    show_skipped: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses, de-duplicate, and write to Google Sheets.
 
-    Args:
-        start_date: Start date for expense retrieval
-        end_date: End date for expense retrieval
-        sheet_key: Optional Google Sheet key (takes precedence over sheet_name)
-        sheet_name: Optional Google Sheet name (used if sheet_key not provided)
-        worksheet_name: Name of the worksheet to write to
-        append: If True, append to existing sheet; otherwise overwrite
-        dedupe: If True, deduplicate expenses based on fingerprint
-        show_skipped: If True, include skipped expenses in output
+    Deduplication is always enabled. The function will fetch Splitwise
+    expenses for the given date range, remove known exported IDs/fingerprints,
+    and write the new rows to Google Sheets (or return them when no sheet is
+    provided).
 
     Returns:
         Tuple of (DataFrame with expenses, URL of the updated sheet or None)
@@ -253,11 +246,11 @@ def fetch_and_write(
     if is_overwrite:
         exported_ids, exported_fps = set(), set()
     else:
-        # Load existing exported state
-        exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())
+        # Always load existing exported state when not overwriting
+        exported_ids, exported_fps = load_exported_state()
         # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
         # cases where the local state file is missing or inconsistent.
-        if dedupe and (sheet_key or sheet_name):
+        if sheet_key or sheet_name:
             sheet_existing_fps = _read_existing_fingerprints(
                 sheet_key, sheet_name, worksheet_name
             )
@@ -267,7 +260,7 @@ def fetch_and_write(
                 save_exported_state(exported_ids, exported_fps)
 
     # Filter new rows: not in exported ids and not in exported fingerprints
-    if dedupe and not is_overwrite:
+    if not is_overwrite:
         mask_new = ~(
             (df[ExportColumns.ID].isin(exported_ids))
             | (df[ExportColumns.FINGERPRINT].isin(exported_fps))
@@ -277,23 +270,6 @@ def fetch_and_write(
     else:
         new_df = df
         skipped_df = pd.DataFrame()
-
-    if show_skipped and not skipped_df.empty:
-        # annotate skip reason
-        reasons = []
-        for _, r in skipped_df.iterrows():
-            rid = r.get(ExportColumns.ID)
-            fp = r.get(ExportColumns.FINGERPRINT)
-            reason_parts = []
-            if rid in exported_ids:
-                reason_parts.append("id")
-            if fp in exported_fps:
-                reason_parts.append("fingerprint")
-            reasons.append(" & ".join(reason_parts) if reason_parts else "unknown")
-        skipped_df = skipped_df.copy()
-        skipped_df["skip_reason"] = reasons
-        print(f"Skipped {len(skipped_df)} rows (dedupe). Showing up to 20:")
-        print(skipped_df.head(20).to_string())
 
     if new_df.empty:
         print("No new Splitwise expenses to export (all rows already exported).")
@@ -389,18 +365,7 @@ def main():
         action="store_false",
         help=argparse.SUPPRESS,  # Hidden alias for backward compatibility
     )
-    parser.add_argument(
-        "--no-dedupe",
-        dest="dedupe",
-        action="store_false",
-        default=True,
-        help="Skip deduplication of expenses (not recommended, default: %(default)s)",
-    )
-    parser.add_argument(
-        "--show-skipped",
-        action="store_true",
-        help="Show skipped expenses in the output",
-    )
+    # Deduplication is always enabled now; `--no-dedupe` removed.
 
     args = parser.parse_args()
 
@@ -426,8 +391,6 @@ def main():
             sheet_name=args.sheet_name,
             worksheet_name=args.worksheet_name,
             append=args.append,
-            dedupe=args.dedupe,
-            show_skipped=args.show_skipped,
         )
 
         if new_df is not None and not new_df.empty:
@@ -435,7 +398,7 @@ def main():
             if url:
                 print(f"Updated sheet: {url}")
 
-            if args.show_skipped and "status" in new_df.columns:
+            if "status" in new_df.columns:
                 print("\nSummary:")
                 print(new_df["status"].value_counts().to_string())
         else:
