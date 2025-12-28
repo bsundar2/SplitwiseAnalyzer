@@ -242,11 +242,6 @@ def fetch_and_write(
         num_settle = int(settle_mask.sum())
         if num_settle > 0:
             LOG.info("Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export", num_settle)
-            # Log up to 3 sample rows (date, amount, description)
-            sample = df[settle_mask].head(3)
-            for _, r in sample.iterrows():
-                LOG.info("  Sample settle-row: %s | %s | %s", r.get(ExportColumns.DATE), r.get(ExportColumns.AMOUNT), (r.get(ExportColumns.DESCRIPTION) or '')[:120])
-            # Drop those rows from the DataFrame
             df = df[~settle_mask].reset_index(drop=True)
 
     if df is None or df.empty:
