@@ -8,11 +8,10 @@ Parse CSV or PDF statements into a pandas DataFrame with columns:
 """
 
 import os
-import dateparser
 import pandas as pd
 
 from src.constants.config import CFG_PATHS
-from src.utils import LOG, load_yaml
+from src.utils import LOG, load_yaml, parse_date_safe
 
 # Load configuration
 CFG = None
@@ -40,6 +39,8 @@ def parse_csv(path):
             col_map["description"] = c
         if "amount" in low or "debit" in low or "credit" in low:
             col_map["amount"] = c
+        if "reference" in low or low == "ref":
+            col_map["reference"] = c
 
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
         # fallback: try first three columns
@@ -52,6 +53,8 @@ def parse_csv(path):
     out["date"] = df[col_map["date"]].apply(parse_date_safe)
     out["description"] = df[col_map["description"]].astype(str).str.strip()
     out["amount"] = df[col_map["amount"]].apply(parse_amount_safe).abs()
+    if "reference" in col_map:
+        out["reference"] = df[col_map["reference"]].astype(str).str.strip()
     out["raw_line"] = df.apply(lambda r: " | ".join([str(r[c]) for c in df.columns]), axis=1)
     out = out.dropna(subset=["date"])
     return out
@@ -65,20 +68,8 @@ def parse_any(path):
         raise ValueError("Unsupported extension: " + ext)
 
 
-def parse_date_safe(s):
-    if pd.isna(s):
-        return None
-    s = str(s).strip()
-    try:
-        dt = dateparser.parse(s, dayfirst=False)
-        return dt.date().isoformat()
-    except (ValueError, TypeError, OverflowError):
-        # Try adding year if not present
-        try:
-            dt = dateparser.parse(s + " 2025")
-            return dt.date().isoformat()
-        except (ValueError, TypeError, OverflowError):
-            return None
+def parse_statement(path):
+    return parse_any(path)
 
 
 def parse_amount_safe(s):

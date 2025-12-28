@@ -1,5 +1,6 @@
 import os
 import json
+import pandas as pd
 
 import dateparser
 from dotenv import load_dotenv
@@ -26,9 +27,6 @@ def load_yaml(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-def read_env(key, default=None):
-    return os.getenv(key, default)
-
 def mkdir_p(path):
     os.makedirs(path, exist_ok=True)
 
@@ -42,10 +40,6 @@ def load_state(path):
         return {}
     with open(path, "r") as f:
         return json.load(f)
-
-def save_state(path, obj):
-    with open(path, "w") as f:
-        json.dump(obj, f, indent=2)
 
 def save_state_atomic(path, obj):
     """Write JSON to a temp file then atomically replace the destination."""
@@ -92,10 +86,38 @@ def compute_import_id(date: str, amount: float, merchant: str) -> str:
     return h
 
 
-def safe_float(v) -> float:
+def parse_date_safe(s):
+    """Safely parse a date string into ISO format (YYYY-MM-DD).
+    
+    Args:
+        s: Input date string to parse
+        
+    Returns:
+        str: Date in YYYY-MM-DD format, or None if parsing fails
+    """
+    if pd.isna(s) or not s:
+        return None
+        
+    s = str(s).strip()
+    current_year = datetime.now().year
+    
+    # Try parsing the date as-is first
+    dt = dateparser.parse(s)
+    if dt is not None:
+        return dt.date().isoformat()
+        
+    # If first attempt fails, try appending current year
+    dt = dateparser.parse(f"{s} {current_year}")
+    if dt is not None:
+        return dt.date().isoformat()
+        
+    return None
+
+
+def parse_float_safe(v) -> float:
     try:
         return float(v)
-    except (TypeError, ValueError):
+    except (ValueError, TypeError):
         return 0.0
 
 

@@ -17,11 +17,10 @@ from splitwise import Expense, Splitwise
 
 # Local application
 from src.constants.splitwise import (
-    IMPORTED_ID_MARKER,
     DEFAULT_CURRENCY,
     SplitwiseUserId
 )
-from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint, safe_float
+from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint, parse_float_safe
 
 load_dotenv("config/credentials.env")
 
@@ -102,8 +101,8 @@ class SplitwiseClient:
                         {
                             "id": u.getId(),
                             "name": _user_name(u),
-                            "paid": safe_float(u.getPaidShare()),
-                            "owed": safe_float(u.getOwedShare()),
+                            "paid": parse_float_safe(u.getPaidShare()),
+                            "owed": parse_float_safe(u.getOwedShare()),
                         }
                     )
 
@@ -159,7 +158,7 @@ class SplitwiseClient:
         return pd.DataFrame(data)
 
     def find_expense_by_import_id(self, import_id: str, merchant: str = None, lookback_days: int = 365):
-        """Search recent Splitwise expenses for the import id marker in description.
+        """Search recent Splitwise expenses for the import id in details (notes) or description.
 
         If not found, fall back to fuzzy match: same amount, date within +/-1 day, and merchant slug match.
         Returns a dict row if a single unambiguous match is found, otherwise None.
@@ -171,7 +170,18 @@ class SplitwiseClient:
         df = self.get_my_expenses_by_date_range(start, end)
         if df.empty:
             return None
-        # First, try exact marker search in description
+
+        # First, try exact match in details (preferred)
+        if "details" in df.columns:
+            mask = df["details"].astype(str).str.contains(import_id, na=False)
+            matches = df[mask]
+            if len(matches) == 1:
+                return matches.iloc[0].to_dict()
+            elif len(matches) > 1:
+                LOG.info("Multiple Splitwise expenses matched import_id %s in details; returning first", import_id)
+                return matches.iloc[0].to_dict()
+
+        # Backward-compatible: try marker search in description
         mask = df["description"].astype(str).str.contains(import_id, na=False)
         matches = df[mask]
         if len(matches) == 1:
@@ -235,7 +245,6 @@ class SplitwiseClient:
             RuntimeError: If expense creation fails
         """
         desc = txn.get("description") or txn.get("merchant") or "Imported expense"
-        desc_with_marker = f"{desc} {IMPORTED_ID_MARKER}{import_id}]"
 
         cost = float(txn.get("amount", 0))
         date = txn.get("date")
@@ -244,7 +253,11 @@ class SplitwiseClient:
         # Use SDK Expense objects
         expense = Expense()
         expense.setCost(str(cost))
-        expense.setDescription(desc_with_marker)
+        expense.setDescription(desc)
+        # Store the unique id in details (notes) so it is not visible in the main description.
+        # Prefer statement reference if provided; otherwise fall back to import_id.
+        details_id = txn.get("reference") or import_id
+        expense.setDetails(str(details_id))
         expense.setDate(date)
         expense.setCurrencyCode(currency)
         
