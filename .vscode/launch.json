@@ -17,7 +17,7 @@
         "--end-date",
         "${env:END_DATE}",
         "--worksheet-name",
-        "${env:WORKSHEET_NAME}",
+        "${env:EXPENSES_WORKSHEET_NAME}",
         "--overwrite"
       ]
     },
@@ -34,7 +34,7 @@
         "--end-date",
         "${env:END_DATE}",
         "--worksheet-name",
-        "${env:WORKSHEET_NAME}"
+        "${env:EXPENSES_WORKSHEET_NAME}"
       ]
     },
     {
