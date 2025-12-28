@@ -268,16 +268,24 @@ def fetch_and_write(
             )
             df = df[~settle_mask].reset_index(drop=True)
 
-        # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses)
-        payment_mask = (
-            df[ExportColumns.DESCRIPTION]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            .eq(ExcludedSplitwiseDescriptions.PAYMENT.value.lower())
+        # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses).
+        # Only target the description field; if a `category` column exists require it to be 'General'
+        # to avoid removing other rows accidentally.
+        desc_series = df[ExportColumns.DESCRIPTION].astype(str).str.strip()
+        payment_exact = desc_series.str.lower().eq(
+            ExcludedSplitwiseDescriptions.PAYMENT.value.lower()
         )
+        payment_word = desc_series.str.contains(r"\bpayment\b", case=False, na=False)
+
+        if "category" in df.columns:
+            category_general = df["category"].astype(str).str.strip().eq("General")
+        else:
+            category_general = pd.Series(True, index=df.index)
+
+        payment_mask = (payment_exact | payment_word) & category_general
         num_pay = int(payment_mask.sum())
         if num_pay > 0:
+            LOG.info("Filtered out %d Splitwise 'Payment' transactions from API export", num_pay)
             df = df[~payment_mask].reset_index(drop=True)
     if df is None or df.empty:
         LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
