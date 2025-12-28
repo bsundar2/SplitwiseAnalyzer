@@ -12,6 +12,7 @@ from typing import List, Optional, Union
 # Third-party
 import dateparser
 import pandas as pd
+import pygsheets
 
 # Local application
 from src.constants.config import STATE_PATH
@@ -123,41 +124,80 @@ def _read_existing_fingerprints(
     if not (sheet_key or sheet_name) or not worksheet_name:
         return None
     
+    gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
+
+    # Open the spreadsheet by key or name
+    sh = gc.open_by_key(sheet_key) if sheet_key else gc.open(sheet_name)
+
+    # Get the worksheet
     try:
-        import pygsheets
-        gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
-        
-        # Open the spreadsheet by key or name
-        sh = gc.open_by_key(sheet_key) if sheet_key else gc.open(sheet_name)
-        
-        # Get the worksheet
-        try:
-            wks = sh.worksheet_by_title(worksheet_name)
-        except pygsheets.WorksheetNotFound:
-            return None
-            
-        # Read the data
-        df = wks.get_as_df(numerize=False, empty_value=None)
-        if df.empty or ExportColumns.FINGERPRINT not in df.columns:
-            return None
-            
-        # Return non-empty fingerprints
-        return [fp for fp in df[ExportColumns.FINGERPRINT].dropna() if fp]
-        
-    except Exception as e:
-        LOG.warning("Error reading existing fingerprints from sheet: %s", str(e))
+        wks = sh.worksheet_by_title(worksheet_name)
+    except pygsheets.WorksheetNotFound:
         return None
-        try:
-            amt = float(amount_val)
-        except (ValueError, TypeError):
-            try:
-                amt = float(str(amount_val).replace(',', '').replace('$', ''))
-            except (ValueError, TypeError):
-                amt = 0.0
-        desc_norm = merchant_slug(desc_val)
-        fp = compute_import_id(dnorm, amt, desc_norm)
-        fps.add(fp)
-    return fps
+
+    # Read the data
+    df = wks.get_as_df(numerize=False, empty_value=None)
+    if df.empty or ExportColumns.FINGERPRINT not in df.columns:
+        return None
+
+    # Return non-empty fingerprints
+    return [fp for fp in df[ExportColumns.FINGERPRINT].dropna() if fp]
+
+
+def export_categories(sheet_key: str = None, sheet_name: str = None) -> str:
+    """Export all Splitwise categories to a 'Splitwise Categories' worksheet.
+    
+    Args:
+        sheet_key: Google Sheet key (takes precedence over sheet_name)
+        sheet_name: Google Sheet name (used if sheet_key not provided)
+        
+    Returns:
+        URL of the updated sheet or None if no categories found
+    """
+    client = SplitwiseClient()
+    categories = client.get_categories()
+    
+    # Create a dictionary to hold categories and their subcategories
+    category_dict = {}
+    for category in categories:
+        category_name = category.getName()
+        subcategories = []
+        if hasattr(category, 'getSubcategories'):
+            subcategories = [subcat.getName() for subcat in category.getSubcategories()]
+        category_dict[category_name] = subcategories
+    
+    if not category_dict:
+        LOG.warning("No categories found to export")
+        return None
+    
+    # Find the maximum number of subcategories for any category
+    max_subs = max(len(subs) for subs in category_dict.values())
+    
+    # Create a list of dictionaries for the DataFrame
+    data = []
+    for i in range(max_subs):
+        row = {}
+        for category, subcategories in category_dict.items():
+            # Get the subcategory at index i, or empty string if none
+            row[category] = subcategories[i] if i < len(subcategories) else ""
+        data.append(row)
+    
+    # Create DataFrame from the list of dictionaries
+    df = pd.DataFrame(data)
+    
+    # Reorder columns to match the original category order
+    df = df[list(category_dict.keys())]
+    
+    # Write to Google Sheets
+    url = write_to_sheets(
+        df,
+        worksheet_name="Splitwise Categories",
+        spreadsheet_name=sheet_name,
+        spreadsheet_key=sheet_key,
+        append=False  # Always overwrite the categories sheet
+    )
+    LOG.info("Exported %d categories to Google Sheets", len(category_dict))
+    return url
 
 
 def fetch_and_write(
@@ -190,7 +230,7 @@ def fetch_and_write(
     client = None
     if not mock:
         client = SplitwiseClient()
-        df = client.get_expenses_by_date_range(start_date, end_date)
+        df = client.get_my_expenses_by_date_range(start_date, end_date)
     else:
         df = mock_expenses(start_date, end_date)
 
@@ -274,6 +314,11 @@ def fetch_and_write(
     updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
     updated_fps = set(exported_fps) | set(new_df[ExportColumns.FINGERPRINT].tolist())
     save_exported_state(updated_ids, updated_fps)
+
+    # Export categories if we're in overwrite mode (not appending)
+    if not append and not mock:
+        LOG.info("Exporting categories due to overwrite mode")
+        export_categories(sheet_key=sheet_key, sheet_name=sheet_name)
 
     return new_df, url
 

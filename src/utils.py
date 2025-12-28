@@ -92,6 +92,13 @@ def compute_import_id(date: str, amount: float, merchant: str) -> str:
     return h
 
 
+def safe_float(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def generate_fingerprint(date_val: str, amount_val: Union[str, float], desc_val: str) -> str:
     """Generate a stable fingerprint for a transaction.
     

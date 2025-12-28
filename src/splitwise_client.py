@@ -20,7 +20,7 @@ from src.constants.splitwise import (
     IMPORTED_ID_MARKER,
     DEFAULT_CURRENCY
 )
-from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint
+from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint, safe_float
 
 load_dotenv("config/credentials.env")
 
@@ -39,26 +39,75 @@ class SplitwiseClient:
     def get_current_user_id(self):
         return self.sObj.getCurrentUser().getId()
 
-    def get_expenses_by_date_range(self, start_date, end_date):
-        expenses = self.sObj.getExpenses(dated_after=start_date.strftime("%Y-%m-%d"),
-                                         dated_before=end_date.strftime("%Y-%m-%d"))
-        my_user_id = self.get_current_user_id()
+    def get_my_expenses_by_date_range(self, start_date, end_date, max_results=1000):
+        """Fetch all expenses within a date range with automatic pagination.
+        
+        Args:
+            start_date: Start date (datetime or date object)
+            end_date: End date (datetime or date object)
+            max_results: Maximum number of results to return (safety limit)
+            
+        Returns:
+            DataFrame containing all matching expenses
+        """
+        all_expenses = []
+        offset = 0
+        page_size = 50  # Maximum allowed by Splitwise API
+        has_more = True
+        
+        while has_more and len(all_expenses) < max_results:
+            try:
+                # Get a page of expenses
+                expenses = self.sObj.getExpenses(
+                    dated_after=start_date.strftime("%Y-%m-%d"),
+                    dated_before=end_date.strftime("%Y-%m-%d"),
+                    limit=page_size,
+                    offset=offset
+                )
+                
+                if not expenses:  # No more expenses
+                    break
+                    
+                all_expenses.extend(expenses)
+                
+                # If we got fewer results than the page size, we've reached the end
+                if len(expenses) < page_size:
+                    has_more = False
+                else:
+                    offset += page_size
+                    
+                LOG.debug(f"Fetched {len(expenses)} expenses (total: {len(all_expenses)})")
+                    
+            except Exception as e:
+                LOG.error(f"Error fetching expenses (offset {offset}): {str(e)}")
+                raise
+        
+        # Process the expenses into a DataFrame
+        data = []
+        
+        for expense in all_expenses:
+            try:
+                users = expense.getUsers() or []
+                sorted_users = sorted(users, key=lambda u: (u.getFirstName() or "").lower())
+                friends_split = [
+                    f"{u.getFirstName()}: paid={safe_float(u.getPaidShare()):.2f} owed={safe_float(u.getOwedShare()):.2f}"
+                    for u in sorted_users
+                ]
 
-        # Filter: keep only expenses where current user is involved (paid share > 0)
-        filtered_expenses = [e for e in expenses if any(u.getId() == my_user_id and float(u.getPaidShare()) > 0 for u in e.getUsers())]
-        data = [
-            {
-                "date": e.getDate(),
-                "amount": e.getCost(),
-                "category": e.getCategory().getName() if e.getCategory() else None,
-                "description": e.getDescription(),
-                "friends_split": [f"{u.getFirstName()}: {u.getPaidShare()}" for u in e.getUsers()],
-                "id": e.getId(),
-            }
-            for e in expenses
-        ]
-        df = pd.DataFrame(data)
-        return df
+                data.append({
+                    "date": expense.getDate(),
+                    "amount": expense.getCost(),
+                    "category": expense.getCategory().getName() if expense.getCategory() else None,
+                    "description": expense.getDescription(),
+                    "friends_split": friends_split,
+                    "id": expense.getId(),
+                })
+            except Exception as e:
+                LOG.warning(f"Error processing expense {getattr(expense, 'id', 'unknown')}: {str(e)}")
+                continue
+        
+        LOG.info(f"Found {len(data)} expenses between {start_date} and {end_date}")
+        return pd.DataFrame(data)
 
     def find_expense_by_import_id(self, import_id: str, merchant: str = None, lookback_days: int = 365):
         """Search recent Splitwise expenses for the import id marker in description.
@@ -70,7 +119,7 @@ class SplitwiseClient:
         end = datetime.now().date()
         start = end - timedelta(days=lookback_days)
 
-        df = self.get_expenses_by_date_range(start, end)
+        df = self.get_my_expenses_by_date_range(start, end)
         if df.empty:
             return None
         # First, try exact marker search in description
@@ -176,5 +225,5 @@ if __name__ == "__main__":
 
     today = datetime.now().date()
     seven_days_ago = today - timedelta(days=25)
-    df = client.get_expenses_by_date_range(seven_days_ago, today)
+    df = client.get_my_expenses_by_date_range(seven_days_ago, today)
     print(df)
