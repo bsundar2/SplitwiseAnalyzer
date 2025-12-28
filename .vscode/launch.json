@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "Splitwise Export (Overwrite)",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
       "console": "integratedTerminal",
@@ -23,7 +23,7 @@
     },
     {
       "name": "Splitwise Export (Append)",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
       "console": "integratedTerminal",
@@ -39,7 +39,7 @@
     },
     {
         "name": "Dry Run",
-        "type": "python",
+        "type": "debugpy",
         "request": "launch",
         "program": "${workspaceFolder}/src/pipeline.py",
         "console": "integratedTerminal",
@@ -54,7 +54,7 @@
     },
     {
       "name": "Run Current Python File",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal"
