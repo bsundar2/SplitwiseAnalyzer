@@ -238,6 +238,8 @@ def fetch_and_write(
         LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
         return pd.DataFrame(), None
 
+    is_overwrite = not append
+
     # Ensure all columns are strings for consistency
     df = df.copy()
     for col in df.columns:
@@ -253,19 +255,24 @@ def fetch_and_write(
         axis=1
     )
 
-    # Load existing exported state
-    exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())
-    # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
-    # cases where the local state file is missing or inconsistent.
-    if dedupe and (sheet_key or sheet_name):
-        sheet_existing_fps = _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name)
-        if sheet_existing_fps:
-            exported_fps = set(exported_fps) | set(sheet_existing_fps)
-            # Persist the discovered fingerprints so future runs don't recompute them each time
-            save_exported_state(exported_ids, exported_fps)
+    # In overwrite mode, we want a full refresh of the worksheet.
+    # That means we should not filter anything out based on prior exported state.
+    if is_overwrite:
+        exported_ids, exported_fps = set(), set()
+    else:
+        # Load existing exported state
+        exported_ids, exported_fps = load_exported_state() if dedupe else (set(), set())
+        # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
+        # cases where the local state file is missing or inconsistent.
+        if dedupe and (sheet_key or sheet_name):
+            sheet_existing_fps = _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name)
+            if sheet_existing_fps:
+                exported_fps = set(exported_fps) | set(sheet_existing_fps)
+                # Persist the discovered fingerprints so future runs don't recompute them each time
+                save_exported_state(exported_ids, exported_fps)
 
     # Filter new rows: not in exported ids and not in exported fingerprints
-    if dedupe:
+    if dedupe and not is_overwrite:
         mask_new = ~((df[ExportColumns.ID].isin(exported_ids)) | (df[ExportColumns.FINGERPRINT].isin(exported_fps)))
         new_df = df[mask_new].reset_index(drop=True)
         skipped_df = df[~mask_new].reset_index(drop=True)
@@ -311,8 +318,12 @@ def fetch_and_write(
         print(new_df.head())
 
     # Update exported state
-    updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
-    updated_fps = set(exported_fps) | set(new_df[ExportColumns.FINGERPRINT].tolist())
+    if is_overwrite:
+        updated_ids = set(new_df[ExportColumns.ID].tolist())
+        updated_fps = set(new_df[ExportColumns.FINGERPRINT].tolist())
+    else:
+        updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
+        updated_fps = set(exported_fps) | set(new_df[ExportColumns.FINGERPRINT].tolist())
     save_exported_state(updated_ids, updated_fps)
 
     # Export categories if we're in overwrite mode (not appending)

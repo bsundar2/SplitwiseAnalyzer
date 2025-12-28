@@ -72,24 +72,24 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
         return
 
     cols = list(write_data.columns)
-    
-    from pygsheets import FormatType
-    
+
+    if not hasattr(worksheet, 'format'):
+        LOG.info("Worksheet object does not support .format(); skipping column formatting")
+        return
+
     # amount -> currency
     if "amount" in cols:
         idx = cols.index("amount") + 1
-        # Format as currency for all rows (skip header)
-        for row in range(2, used_rows + 1):
-            cell = worksheet.cell((row, idx))
-            cell.number_format = FormatType.CURRENCY
-    
-    # date -> US-style date
+        col_a1 = _colnum_to_a1(idx)
+        cell_range = f"{col_a1}2:{col_a1}{used_rows}"
+        worksheet.format(cell_range, {"numberFormat": {"type": "CURRENCY", "pattern": "\"$\"#,##0.00"}})
+
+    # date -> date
     if "date" in cols:
         idx = cols.index("date") + 1
-        # Format as date for all rows (skip header)
-        for row in range(2, used_rows + 1):
-            cell = worksheet.cell((row, idx))
-            cell.number_format = FormatType.DATE
+        col_a1 = _colnum_to_a1(idx)
+        cell_range = f"{col_a1}2:{col_a1}{used_rows}"
+        worksheet.format(cell_range, {"numberFormat": {"type": "DATE", "pattern": "yyyy-mm-dd"}})
 
 
 def write_to_sheets(
