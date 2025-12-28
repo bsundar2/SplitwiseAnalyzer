@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
       "console": "integratedTerminal",
-      "envFile": "${workspaceFolder}/config/credentials.env",
+      "envFile": "${workspaceFolder}/config/.env",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       },
@@ -27,7 +27,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
       "console": "integratedTerminal",
-      "envFile": "${workspaceFolder}/config/credentials.env",
+      "envFile": "${workspaceFolder}/config/.env",
       "args": [
         "--start-date",
         "${env:START_DATE}",
@@ -43,7 +43,7 @@
         "request": "launch",
         "program": "${workspaceFolder}/src/pipeline.py",
         "console": "integratedTerminal",
-        "envFile": "${workspaceFolder}/config/credentials.env",
+        "envFile": "${workspaceFolder}/config/.env",
         "args": [
             "--statement",
             "data/raw/sample_statement.csv",
@@ -59,7 +59,7 @@
       "program": "${file}",
       "console": "integratedTerminal"
       ,
-      "envFile": "${workspaceFolder}/config/credentials.env"
+      "envFile": "${workspaceFolder}/config/.env"
     }
   ]
 }

@@ -22,7 +22,7 @@ from splitwise import Expense, Splitwise
 from src.constants.splitwise import DEFAULT_CURRENCY, SplitwiseUserId
 from src.utils import LOG, parse_float_safe, infer_category
 
-load_dotenv("config/credentials.env")
+load_dotenv("config/.env")
 
 
 # Handles Splitwise API/CSV integration
@@ -34,7 +34,7 @@ class SplitwiseClient:
         # Error handling for missing env vars
         if not all([self.consumer_key, self.consumer_secret, self.api_key]):
             raise ValueError(
-                "One or more Splitwise credentials are missing. Check config/credentials.env and variable names."
+                "One or more Splitwise credentials are missing. Check config/.env and variable names."
             )
         self.sObj = Splitwise(
             self.consumer_key, self.consumer_secret, api_key=self.api_key
