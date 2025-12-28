@@ -18,7 +18,8 @@ from splitwise import Expense, Splitwise
 # Local application
 from src.constants.splitwise import (
     IMPORTED_ID_MARKER,
-    DEFAULT_CURRENCY
+    DEFAULT_CURRENCY,
+    SplitwiseUserId
 )
 from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint, safe_float
 
@@ -93,9 +94,7 @@ class SplitwiseClient:
 
                 def _user_name(u) -> str:
                     first = u.getFirstName() or ""
-                    last = getattr(u, "getLastName", lambda: "")() or ""
-                    name = (first + " " + last).strip()
-                    return name or str(u.getId())
+                    return first.strip() or str(u.getId())
 
                 user_rows = []
                 for u in users:
@@ -117,32 +116,35 @@ class SplitwiseClient:
                 )
 
                 participant_names = ", ".join([r["name"] for r in user_rows_sorted])
-                participant_count = len(user_rows_sorted)
 
                 my_row = next((r for r in user_rows_sorted if r["id"] == my_user_id), None)
                 my_paid = my_row["paid"] if my_row else 0.0
                 my_owed = my_row["owed"] if my_row else 0.0
                 my_net = my_paid - my_owed
 
-                other_nonzero = any(
-                    r["id"] != my_user_id and (r["paid"] > 0 or r["owed"] > 0) for r in user_rows_sorted
-                )
-                is_shared = bool(other_nonzero)
-                split_type = "shared" if is_shared else "self"
+                participant_ids = {r["id"] for r in user_rows_sorted}
 
-                paid_by = ", ".join(sorted({r["name"] for r in user_rows_sorted if r["paid"] > 0}))
+                has_self_user = SplitwiseUserId.SELF_EXPENSE in participant_ids
+                is_partner_only = participant_ids == {my_user_id, SplitwiseUserId.PARTNER_EXPENSE}
+
+                if has_self_user:
+                    split_type = "self"
+                elif is_partner_only:
+                    split_type = "partner"
+                else:
+                    other_nonzero = any(
+                        r["id"] != my_user_id and (r["paid"] > 0 or r["owed"] > 0) for r in user_rows_sorted
+                    )
+                    split_type = "shared" if bool(other_nonzero) else "self"
 
                 data.append({
                     "date": expense.getDate(),
                     "amount": expense.getCost(),
                     "category": expense.getCategory().getName() if expense.getCategory() else None,
                     "description": expense.getDescription(),
-                    "details": expense.getDetails(),
+                    "details": expense.getDetails() or "",
                     "split_type": split_type,
-                    "is_shared": is_shared,
-                    "participant_count": participant_count,
                     "participant_names": participant_names,
-                    "paid_by": paid_by,
                     "my_paid": my_paid,
                     "my_owed": my_owed,
                     "my_net": my_net,
