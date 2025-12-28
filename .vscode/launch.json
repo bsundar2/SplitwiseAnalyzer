@@ -19,7 +19,7 @@
         "--sheet-key",
         "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
         "--worksheet-name",
-        "'Splitwise Expenses'",
+        "Splitwise Expenses",
         "--overwrite"
       ]
     },

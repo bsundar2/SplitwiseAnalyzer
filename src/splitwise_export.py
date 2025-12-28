@@ -32,62 +32,7 @@ from src.utils import (
     parse_date,
 )
 from src.constants.splitwise import ExcludedSplitwiseDescriptions
-
-
-# Column names for the export
-class ExportColumns:
-    """Column names used in the exported data."""
-
-    DATE = "date"
-    AMOUNT = "amount"
-    DESCRIPTION = "description"
-    FINGERPRINT = "fingerprint"
-    ID = "id"
-
-
-def mock_expenses(start_date, end_date):
-    """Generate mock expense data for testing.
-
-    Args:
-        start_date: Start date for mock data
-        end_date: End date for mock data
-
-    Returns:
-        DataFrame with mock expense data
-    """
-    # Small mock DataFrame matching get_expenses_by_date_range shape
-    rows = [
-        {
-            ExportColumns.DATE: start_date.isoformat(),
-            ExportColumns.AMOUNT: "97.01",
-            "category": "Internet",
-            ExportColumns.DESCRIPTION: "Google Fit [Imported]",
-            "friends_split": "Alice: 97.01",
-            ExportColumns.ID: "mock-1",
-        },
-        {
-            ExportColumns.DATE: end_date.isoformat(),
-            ExportColumns.AMOUNT: "2.99",
-            "category": "Entertainment",
-            ExportColumns.DESCRIPTION: "Hulu [Imported]",
-            "friends_split": "Alice: 2.99",
-            ExportColumns.ID: "mock-2",
-        },
-    ]
-    df = pd.DataFrame(rows)
-
-    # Generate fingerprints using the same logic as the client
-    df[ExportColumns.FINGERPRINT] = df.apply(
-        lambda r: compute_import_id(
-            r[ExportColumns.DATE],
-            float(str(r[ExportColumns.AMOUNT]).replace(",", "").replace("$", "") or 0),
-            merchant_slug(
-                r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
-            ),
-        ),
-        axis=1,
-    )
-    return df
+from src.constants.export_columns import ExportColumns
 
 
 def load_exported_state() -> tuple[set, set]:
@@ -220,12 +165,11 @@ def fetch_and_write(
     sheet_key: Optional[str] = None,
     sheet_name: Optional[str] = None,
     worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
-    mock: bool = False,
     append: bool = True,
     dedupe: bool = True,
     show_skipped: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
-    """Fetch expenses (real or mock), de-duplicate, and write to Google Sheets.
+    """Fetch expenses, de-duplicate, and write to Google Sheets.
 
     Args:
         start_date: Start date for expense retrieval
@@ -233,7 +177,6 @@ def fetch_and_write(
         sheet_key: Optional Google Sheet key (takes precedence over sheet_name)
         sheet_name: Optional Google Sheet name (used if sheet_key not provided)
         worksheet_name: Name of the worksheet to write to
-        mock: If True, use mock data instead of real API calls
         append: If True, append to existing sheet; otherwise overwrite
         dedupe: If True, deduplicate expenses based on fingerprint
         show_skipped: If True, include skipped expenses in output
@@ -241,12 +184,9 @@ def fetch_and_write(
     Returns:
         Tuple of (DataFrame with expenses, URL of the updated sheet or None)
     """
-    client = None
-    if not mock:
-        client = SplitwiseClient()
-        df = client.get_my_expenses_by_date_range(start_date, end_date)
-    else:
-        df = mock_expenses(start_date, end_date)
+
+    client = SplitwiseClient()
+    df = client.get_my_expenses_by_date_range(start_date, end_date)
 
     # Filter out Splitwise-generated "Settle all balances" rows which are not useful for budgeting.
     # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
@@ -398,7 +338,7 @@ def fetch_and_write(
     save_exported_state(updated_ids, updated_fps)
 
     # Export categories if we're in overwrite mode (not appending)
-    if not append and not mock:
+    if not append:
         LOG.info("Exporting categories due to overwrite mode")
         export_categories(sheet_key=sheet_key, sheet_name=sheet_name)
 
@@ -434,11 +374,6 @@ def main():
         "--worksheet-name",
         default=SPLITWISE_EXPENSES_WORKSHEET,
         help=f"Worksheet name (default: {SPLITWISE_EXPENSES_WORKSHEET})",
-    )
-    parser.add_argument(
-        "--mock",
-        action="store_true",
-        help="Use mock data instead of making real API calls to Splitwise",
     )
     # --overwrite is an alias for --no-append for backward compatibility
     group = parser.add_mutually_exclusive_group()
@@ -490,7 +425,6 @@ def main():
             sheet_key=args.sheet_key,
             sheet_name=args.sheet_name,
             worksheet_name=args.worksheet_name,
-            mock=args.mock,
             append=args.append,
             dedupe=args.dedupe,
             show_skipped=args.show_skipped,

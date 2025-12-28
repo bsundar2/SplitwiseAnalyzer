@@ -44,13 +44,16 @@ class SplitwiseClient:
     def get_current_user_id(self):
         return self.sObj.getCurrentUser().getId()
 
-    def get_my_expenses_by_date_range(self, start_date, end_date, max_results=1000):
+    def get_my_expenses_by_date_range(self, start_date, end_date):
         """Fetch all expenses within a date range with automatic pagination.
+
+        This will page through the Splitwise API until no more results are
+        returned for the date range. No hard cap is applied here; the function
+        will continue paging until the API indicates the end of results.
 
         Args:
             start_date: Start date (datetime or date object)
             end_date: End date (datetime or date object)
-            max_results: Maximum number of results to return (safety limit)
 
         Returns:
             DataFrame containing all matching expenses
@@ -60,7 +63,7 @@ class SplitwiseClient:
         page_size = 50  # Maximum allowed by Splitwise API
         has_more = True
 
-        while has_more and len(all_expenses) < max_results:
+        while has_more:
             try:
                 # Get a page of expenses
                 expenses = self.sObj.getExpenses(
