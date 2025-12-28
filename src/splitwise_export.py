@@ -234,6 +234,21 @@ def fetch_and_write(
     else:
         df = mock_expenses(start_date, end_date)
 
+    # Filter out Splitwise-generated "Settle all balances" rows which are not useful for budgeting.
+    # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
+    if df is not None and not df.empty and ExportColumns.DESCRIPTION in df.columns:
+        settle_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower() == "settle all balances"
+
+        num_settle = int(settle_mask.sum())
+        if num_settle > 0:
+            LOG.info("Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export", num_settle)
+            # Log up to 3 sample rows (date, amount, description)
+            sample = df[settle_mask].head(3)
+            for _, r in sample.iterrows():
+                LOG.info("  Sample settle-row: %s | %s | %s", r.get(ExportColumns.DATE), r.get(ExportColumns.AMOUNT), (r.get(ExportColumns.DESCRIPTION) or '')[:120])
+            # Drop those rows from the DataFrame
+            df = df[~settle_mask].reset_index(drop=True)
+
     if df is None or df.empty:
         LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
         return pd.DataFrame(), None
