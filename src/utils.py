@@ -46,8 +46,21 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     patterns = merchant_config.get('patterns', [])
     merchants = merchant_config.get('merchants', [])
     
+    # Start with the original description
+    cleaned = description.strip()
+    
+    # Extract first line if configured and there are multiple lines
+    if merchant_config.get('extract_first_line', False) and '\n' in cleaned:
+        # Get the first non-empty line that doesn't look like a transaction ID
+        lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
+        for line in lines:
+            # Skip lines that look like transaction IDs or reference numbers
+            if not (re.match(r'^[0-9a-f]{8,}', line) or re.match(r'^[A-Z0-9]{4,}-[A-Z0-9]{4,}', line)):
+                cleaned = line
+                break
+    
     # Convert to uppercase for case-insensitive matching
-    cleaned = description.upper()
+    cleaned = cleaned.upper()
     
     # Apply patterns
     for pattern_config in patterns:
@@ -66,18 +79,25 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
             cleaned = merchant['name']
             break  # Stop after first match
     
-    # Remove everything after newline if configured
-    if merchant_config.get('remove_after_newline', True):
-        cleaned = cleaned.split('\n')[0].strip()
-    
-    # Clean up whitespace
+    # Clean up whitespace and special characters
     cleaned = ' '.join(cleaned.split())
+    cleaned = re.sub(r'[^\w\s&-]', '', cleaned)  # Keep letters, numbers, spaces, &, and -
     
     # Fall back to legacy merchant_overrides if no match found
     if cleaned == description.upper() and 'merchant_overrides' in (config or {}):
         for pattern, replacement in (config['merchant_overrides'] or {}).items():
             if re.search(pattern, cleaned, re.IGNORECASE):
                 cleaned = replacement
+    
+    # If we ended up with nothing, try to extract a meaningful name
+    if not cleaned.strip() and '\n' in description:
+        # Try to find a line that looks like a merchant name
+        lines = [line.strip() for line in description.split('\n') if line.strip()]
+        for line in lines:
+            # Look for lines with words that are likely to be merchant names
+            if re.search(r'[a-zA-Z]', line) and not re.match(r'^[0-9a-f]{8,}', line):
+                cleaned = line.upper()
+                break
                 break
     
     # Title case the result if it was changed
@@ -227,14 +247,20 @@ def _load_category_config() -> Dict:
         from src.constants.config import CFG_PATHS
         
         try:
+            LOG.info(f"Looking for config files in: {CFG_PATHS}")
             for path in CFG_PATHS:
+                LOG.info(f"Checking if config file exists: {path} - {path.exists()}")
                 if path.exists():
+                    LOG.info(f"Loading config from: {path}")
                     config = load_yaml(path)
+                    LOG.info(f"Loaded config keys: {list(config.keys())}")
                     if 'category_inference' in config:
                         _load_category_config._cached_config = config['category_inference']
+                        LOG.info("Successfully loaded category_inference config")
                         break
             else:
                 # Fallback to default config if no config file found
+                LOG.warning(f"No config file found in any of: {CFG_PATHS}")
                 _load_category_config._cached_config = {
                     'default_category': {
                         'id': 2,  # Uncategorized category
@@ -244,15 +270,14 @@ def _load_category_config() -> Dict:
                     },
                     'patterns': []
                 }
-                LOG.warning("No category_inference config found, using default configuration")
+                LOG.warning("Using default category configuration")
         except Exception as e:
-            LOG.error(f"Error loading category config: {str(e)}")
-            # Return default config on error
+            LOG.error(f"Error loading category config: {str(e)}", exc_info=True)
             _load_category_config._cached_config = {
                 'default_category': {
-                    'id': 2,  # Uncategorized category
+                    'id': 2,
                     'name': 'Uncategorized',
-                    'subcategory_id': 18,  # General subcategory
+                    'subcategory_id': 18,
                     'subcategory_name': 'General'
                 },
                 'patterns': []
@@ -262,46 +287,68 @@ def _load_category_config() -> Dict:
 
 def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
     """Infer the most likely category for a transaction using config patterns.
-    
+
     Args:
         transaction: Dictionary containing transaction details with:
             - description (str): Transaction description
             - merchant (str, optional): Merchant name
             - amount (float): Transaction amount
-    
+
     Returns:
-        dict: Dictionary with 'category_id', 'category_name', 'subcategory_id', 
+        dict: Dictionary with 'category_id', 'category_name', 'subcategory_id',
               'subcategory_name', and 'confidence' if found
     """
     if not transaction:
         return {}
-        
+
+    # Clean the merchant name first
+    merchant = clean_merchant_name(transaction.get('merchant') or transaction.get('description', ''))
     description = (transaction.get('description') or '').lower()
-    merchant = (transaction.get('merchant') or '').lower()
-    
+
     # Get category config
     category_config = _load_category_config()
     default_category = category_config.get('default_category', {})
-    
+
+    # Log the transaction being processed with cleaned merchant
+    LOG.info(f"Processing transaction - Description: '{description}', Cleaned Merchant: '{merchant}'")
+
     # Check for matches in both description and merchant
     for category in category_config.get('patterns', []):
         for subcategory in category.get('subcategories', []):
             for pattern in subcategory.get('patterns', []):
-                if (description and re.search(pattern, description)) or \
-                   (merchant and re.search(pattern, merchant)):
-                    return {
-                        'category_id': category['id'],
-                        'category_name': category['name'],
-                        'subcategory_id': subcategory['id'],
-                        'subcategory_name': subcategory['name'],
-                        'confidence': 'high'
-                    }
-    
-    # If no match found, return the default "Uncategorized" category
+                try:
+                    # Compile pattern with case-insensitive flag
+                    regex = re.compile(pattern, re.IGNORECASE)
+                    desc_match = bool(description and regex.search(description))
+                    merchant_match = bool(merchant and regex.search(merchant.lower()))
+
+                    if desc_match or merchant_match:
+                        match_type = "description" if desc_match else "merchant"
+                        LOG.info(
+                            f"Matched pattern '{pattern}' in {match_type} to category '{category['name']} > {subcategory['name']}'")
+                        return {
+                            'category_id': category['id'],
+                            'category_name': category['name'],
+                            'subcategory_id': subcategory['id'],
+                            'subcategory_name': subcategory['name'],
+                            'confidence': 'high',
+                            'matched_pattern': pattern,
+                            'matched_in': match_type
+                        }
+                except re.error as e:
+                    LOG.warning(f"Invalid regex pattern '{pattern}': {e}")
+                    continue
+
+    # Log when no match is found
+    LOG.info(f"No category match found for transaction. Description: '{description}', Cleaned Merchant: '{merchant}'")
+
+    # Return the default "Uncategorized" category
     return {
-        'category_id': 2,  # Uncategorized category
-        'category_name': 'Uncategorized',
-        'subcategory_id': 18,  # General subcategory
-        'subcategory_name': 'General',
-        'confidence': 'low'
+        'category_id': default_category.get('id', 2),  # Uncategorized category
+        'category_name': default_category.get('name', 'Uncategorized'),
+        'subcategory_id': default_category.get('subcategory_id', 18),  # General subcategory
+        'subcategory_name': default_category.get('subcategory_name', 'General'),
+        'confidence': 'low',
+        'matched_pattern': None,
+        'matched_in': None
     }

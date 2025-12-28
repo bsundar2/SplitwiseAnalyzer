@@ -10,10 +10,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 BASE_DIR = PROJECT_ROOT
 
-# Configuration files
+# Configuration files - check both src/ and project root directories
 CFG_PATHS = [
-    PROJECT_ROOT / "config.yaml",
-    PROJECT_ROOT / "config" / "config.yaml"
+    Path("config.yaml").resolve(),  # Current working directory
+    Path("config/config.yaml").resolve(),  # config/ subdirectory of cwd
+    PROJECT_ROOT / "config.yaml",  # Project root
+    PROJECT_ROOT / "config" / "config.yaml"  # Project config/ directory
 ]
 
 # Data directories

@@ -104,10 +104,6 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
         # create expense (unless dry_run)
         if dry_run:
             entry["status"] = "would_add"
-            LOG.info("DRY RUN: would add txn %s %s %s (%s/%s)", 
-                    date, amount, desc, 
-                    category_info.get('category_name', 'Unknown'),
-                    category_info.get('subcategory_name', 'Unknown'))
             results.append(entry)
             continue
 

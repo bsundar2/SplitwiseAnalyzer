@@ -8,16 +8,22 @@ date_formats:
 merchant_cleaning:
   # Patterns to remove or replace
   patterns:
-    # Remove transaction IDs and reference numbers
-    - pattern: '^\s*\w{8,}\s+'
+    # Remove transaction IDs and reference numbers from the start
+    - pattern: '^\s*[0-9a-f]{8,}(?:[0-9a-f]+)?\s+'
       replacement: ''
-      description: 'Remove alphanumeric IDs at start'
-    - pattern: '\s*\b\d{4,}\b\s*'
-      replacement: ' '
-      description: 'Remove long number sequences'
-    - pattern: '\s*[A-Z0-9]{6,}(?:-[A-Z0-9]{4,})*\s*'
-      replacement: ' '
-      description: 'Remove reference numbers like ABC123-DEF456'
+      description: 'Remove hexadecimal IDs at start'
+    # Remove transaction IDs from the end
+    - pattern: '\s+[0-9a-f]{8,}(?:[0-9a-f]+)?\s*$'
+      replacement: ''
+      description: 'Remove hexadecimal IDs at end'
+    # Remove foreign transaction details
+    - pattern: '(?i)\b(?:foreign spend amount|commission amount|currency exchange rate):.*$'
+      replacement: ''
+      description: 'Remove foreign transaction details'
+    # Remove country codes and locations
+    - pattern: '(?i)\b(?:sg|usa|uk|gb|au|ca|in|fr|de|jp|cn|kr|my|th|vn|id|ph|hk|tw)\b'
+      replacement: ''
+      description: 'Remove country codes'
     
     # Clean up payment processors
     - pattern: '\b(?:PAYPAL|PAYPAL \*|PP|PP\*)\s*'
@@ -39,11 +45,12 @@ merchant_cleaning:
       name: 'Uber'
     - match: 'LYFT'
       name: 'Lyft'
-    - match: 'TAXICAB.*LIMOUSINE'
+    - match: '(?i)(?:TAXICAB.*LIMOUSINE|(?:TAXI|CAB|UBER|LYFT).*SERVICE)'
       name: 'Taxi Service'
 
-  # Remove everything after newline (often contains location/transaction details)
-  remove_after_newline: true
+  # Keep everything on the first line that looks like a merchant name
+  remove_after_newline: false
+  extract_first_line: true
 
 # Legacy merchant overrides (for backward compatibility)
 merchant_overrides:
@@ -68,7 +75,7 @@ category_inference:
         - name: "General"
           id: 0
           patterns:
-            - "\\b(?:uber|lyft|taxi|cab|grab|ride|bolt)\\b"
+            - "(?i)(?:uber|lyft|taxi(?:cab)?|cab|grab|ride|bolt|limousine|car service)"
         - name: "Gas"
           id: 1
           patterns:
