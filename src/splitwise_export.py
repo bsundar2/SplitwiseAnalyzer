@@ -6,11 +6,10 @@ Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints i
 # Standard library
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional, Union
 
 # Third-party
-import dateparser
 import pandas as pd
 import pygsheets
 
@@ -19,7 +18,8 @@ from src.constants.config import STATE_PATH
 from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, SPLITWISE_EXPENSES_WORKSHEET, DEFAULT_SPREADSHEET_NAME
 from src.sheets_sync import write_to_sheets
 from src.splitwise_client import SplitwiseClient
-from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG, generate_fingerprint
+from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG, generate_fingerprint, parse_date
+from src.constants.splitwise import ExcludedSplitwiseDescriptions
 
 # Column names for the export
 class ExportColumns:
@@ -29,10 +29,6 @@ class ExportColumns:
     DESCRIPTION = "description"
     FINGERPRINT = "fingerprint"
     ID = "id"
-
-
-def parse_date(s: str):
-    return dateparser.parse(s).date()
 
 
 def mock_expenses(start_date, end_date):
@@ -144,7 +140,7 @@ def _read_existing_fingerprints(
     return [fp for fp in df[ExportColumns.FINGERPRINT].dropna() if fp]
 
 
-def export_categories(sheet_key: str = None, sheet_name: str = None) -> str:
+def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional[str]:
     """Export all Splitwise categories to a 'Splitwise Categories' worksheet.
     
     Args:
@@ -201,8 +197,8 @@ def export_categories(sheet_key: str = None, sheet_name: str = None) -> str:
 
 
 def fetch_and_write(
-    start_date: Union[datetime, str],
-    end_date: Union[datetime, str],
+    start_date: Union[datetime, date, str],
+    end_date: Union[datetime, date, str],
     sheet_key: Optional[str] = None,
     sheet_name: Optional[str] = None, 
     worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
@@ -237,13 +233,19 @@ def fetch_and_write(
     # Filter out Splitwise-generated "Settle all balances" rows which are not useful for budgeting.
     # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
     if df is not None and not df.empty and ExportColumns.DESCRIPTION in df.columns:
-        settle_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower() == "settle all balances"
+        # explicit exact-match checks using pandas Series.eq for clarity
+        settle_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower().eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
 
         num_settle = int(settle_mask.sum())
         if num_settle > 0:
             LOG.info("Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export", num_settle)
             df = df[~settle_mask].reset_index(drop=True)
 
+        # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses)
+        payment_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower().eq(ExcludedSplitwiseDescriptions.PAYMENT.value.lower())
+        num_pay = int(payment_mask.sum())
+        if num_pay > 0:
+            df = df[~payment_mask].reset_index(drop=True)
     if df is None or df.empty:
         LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
         return pd.DataFrame(), None
@@ -325,6 +327,7 @@ def fetch_and_write(
     if sheet_key or sheet_name:
         url = write_to_sheets(new_df, worksheet_name=worksheet_name, spreadsheet_name=sheet_name or DEFAULT_SPREADSHEET_NAME, spreadsheet_key=sheet_key, append=append)
     else:
+        url = None
         print(new_df.head())
 
     # Update exported state
@@ -342,24 +345,6 @@ def fetch_and_write(
         export_categories(sheet_key=sheet_key, sheet_name=sheet_name)
 
     return new_df, url
-
-
-def parse_date_arg(date_str: str) -> datetime.date:
-    """Parse a date string from command line arguments.
-    
-    Args:
-        date_str: Date string to parse
-        
-    Returns:
-        Parsed date object
-        
-    Raises:
-        ValueError: If date cannot be parsed
-    """
-    parsed = dateparser.parse(date_str)
-    if not parsed:
-        raise ValueError(f"Could not parse date: {date_str}")
-    return parsed.date()
 
 
 def main():
@@ -425,10 +410,10 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Parse dates
-        start_date = parse_date_arg(args.start_date)
-        end_date = parse_date_arg(args.end_date)
-        
+        # Parse dates (use shared parse_date in src.utils)
+        start_date = parse_date(args.start_date)
+        end_date = parse_date(args.end_date)
+
         if start_date > end_date:
             raise ValueError(f"Start date ({start_date}) cannot be after end date ({end_date})")
 

@@ -4,7 +4,7 @@ import pandas as pd
 
 import dateparser
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, date
 import logging
 import yaml
 import hashlib
@@ -193,6 +193,21 @@ def parse_date_safe(s):
     return None
 
 
+def parse_date(s: str) -> date:
+    """Parse a date string and return a datetime.date.
+
+    Raises ValueError if parsing fails. This is a small helper intended for
+    callers that want a date object (unlike parse_date_safe which returns an ISO
+    string or None).
+    """
+    if s is None:
+        raise ValueError("No date string provided")
+    parsed = dateparser.parse(str(s))
+    if not parsed:
+        raise ValueError(f"Could not parse date: {s}")
+    return parsed.date()
+
+
 def parse_float_safe(v) -> float:
     try:
         return float(v)
@@ -352,3 +367,4 @@ def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
         'matched_pattern': None,
         'matched_in': None
     }
+
