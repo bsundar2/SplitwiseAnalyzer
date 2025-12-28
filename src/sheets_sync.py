@@ -106,7 +106,6 @@ def write_to_sheets(
     write_data: pd.DataFrame,
     worksheet_name: str,
     spreadsheet_name: str = DEFAULT_SPREADSHEET_NAME,
-    spreadsheet_key: Optional[str] = None,
     append: bool = False,
 ):
     """Write a DataFrame to a Google Sheets worksheet.
@@ -118,11 +117,8 @@ def write_to_sheets(
     # Inline small steps directly here instead of tiny helpers so flow is explicit
     gc = pygsheets.authorize(service_account_file=SHEETS_AUTHENTICATION_FILE)
 
-    # Open spreadsheet by key or name
-    if spreadsheet_key:
-        sheet = gc.open_by_key(spreadsheet_key)
-    else:
-        sheet = gc.open(spreadsheet_name)
+    # Open spreadsheet by name (project no longer uses spreadsheet keys)
+    sheet = gc.open(spreadsheet_name)
 
     # Ensure worksheet exists: scan existing worksheets, else create
     worksheet = None

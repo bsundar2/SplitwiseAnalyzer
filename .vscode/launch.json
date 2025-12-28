@@ -13,13 +13,11 @@
       },
       "args": [
         "--start-date",
-        "2025-01-01",
+        "${env:START_DATE}",
         "--end-date",
-        "2025-12-31",
-        "--sheet-key",
-        "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
+        "${env:END_DATE}",
         "--worksheet-name",
-        "Splitwise 2025",
+        "${env:WORKSHEET_NAME}",
         "--overwrite"
       ]
     },
@@ -32,13 +30,11 @@
       "envFile": "${workspaceFolder}/config/credentials.env",
       "args": [
         "--start-date",
-        "2025-01-01",
+        "${env:START_DATE}",
         "--end-date",
-        "2025-12-31",
-        "--sheet-key",
-        "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
+        "${env:END_DATE}",
         "--worksheet-name",
-        "'Splitwise 2025'"
+        "${env:WORKSHEET_NAME}"
       ]
     },
     {
@@ -52,10 +48,8 @@
             "--statement",
             "data/raw/sample_statement.csv",
             "--dry-run",
-            "--sheet-key",
-            "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
-            "--worksheet-name",
-            "Splitwise Dry Runs"
+          "--worksheet-name",
+          "${env:DRY_RUN_WORKSHEET_NAME}"
         ]
     },
     {

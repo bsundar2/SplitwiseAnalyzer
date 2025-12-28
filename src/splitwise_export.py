@@ -17,7 +17,7 @@ import pygsheets
 from src.constants.config import STATE_PATH
 from src.constants.gsheets import (
     SHEETS_AUTHENTICATION_FILE,
-    SPLITWISE_EXPENSES_WORKSHEET,
+    DEFAULT_SPREADSHEET_NAME,
     DEFAULT_SPREADSHEET_NAME,
 )
 from src.sheets_sync import write_to_sheets
@@ -66,27 +66,25 @@ def save_exported_state(exported_ids: set, exported_fps: set) -> None:
 
 
 def _read_existing_fingerprints(
-    sheet_key: Optional[str] = None,
     sheet_name: Optional[str] = None,
     worksheet_name: Optional[str] = None,
 ) -> Optional[List[str]]:
     """Read existing fingerprints from a Google Sheet.
 
     Args:
-        sheet_key: Google Sheet key (takes precedence over sheet_name)
-        sheet_name: Google Sheet name (used if sheet_key not provided)
+        sheet_name: Google Sheet name (used for writing and reading)
         worksheet_name: Name of the worksheet to read from
 
     Returns:
         List of fingerprints or None if the sheet couldn't be read
     """
-    if not (sheet_key or sheet_name) or not worksheet_name:
+    if not sheet_name or not worksheet_name:
         return None
 
     gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
 
-    # Open the spreadsheet by key or name
-    sh = gc.open_by_key(sheet_key) if sheet_key else gc.open(sheet_name)
+    # Open the spreadsheet by name (spreadsheet keys removed project-wide)
+    sh = gc.open(sheet_name)
 
     # Get the worksheet
     try:
@@ -103,12 +101,11 @@ def _read_existing_fingerprints(
     return [fp for fp in df[ExportColumns.FINGERPRINT].dropna() if fp]
 
 
-def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional[str]:
+def export_categories(sheet_name: str = None) -> Optional[str]:
     """Export all Splitwise categories to a 'Splitwise Categories' worksheet.
 
     Args:
-        sheet_key: Google Sheet key (takes precedence over sheet_name)
-        sheet_name: Google Sheet name (used if sheet_key not provided)
+        sheet_name: Google Sheet name (used for writing categories)
 
     Returns:
         URL of the updated sheet or None if no categories found
@@ -152,7 +149,6 @@ def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional
         df,
         worksheet_name="Splitwise Categories",
         spreadsheet_name=sheet_name,
-        spreadsheet_key=sheet_key,
         append=False,  # Always overwrite the categories sheet
     )
     LOG.info("Exported %d categories to Google Sheets", len(category_dict))
@@ -162,9 +158,8 @@ def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional
 def fetch_and_write(
     start_date: Union[datetime, date, str],
     end_date: Union[datetime, date, str],
-    sheet_key: Optional[str] = None,
     sheet_name: Optional[str] = None,
-    worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
+    worksheet_name: str = DEFAULT_SPREADSHEET_NAME,
     append: bool = True,
 ) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses, de-duplicate, and write to Google Sheets.
@@ -250,10 +245,8 @@ def fetch_and_write(
         exported_ids, exported_fps = load_exported_state()
         # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
         # cases where the local state file is missing or inconsistent.
-        if sheet_key or sheet_name:
-            sheet_existing_fps = _read_existing_fingerprints(
-                sheet_key, sheet_name, worksheet_name
-            )
+        if sheet_name:
+            sheet_existing_fps = _read_existing_fingerprints(sheet_name, worksheet_name)
             if sheet_existing_fps:
                 exported_fps = set(exported_fps) | set(sheet_existing_fps)
                 # Persist the discovered fingerprints so future runs don't recompute them each time
@@ -290,12 +283,11 @@ def fetch_and_write(
         )
 
     # Write to sheets
-    if sheet_key or sheet_name:
+    if sheet_name:
         url = write_to_sheets(
             new_df,
             worksheet_name=worksheet_name,
             spreadsheet_name=sheet_name or DEFAULT_SPREADSHEET_NAME,
-            spreadsheet_key=sheet_key,
             append=append,
         )
     else:
@@ -316,7 +308,7 @@ def fetch_and_write(
     # Export categories if we're in overwrite mode (not appending)
     if not append:
         LOG.info("Exporting categories due to overwrite mode")
-        export_categories(sheet_key=sheet_key, sheet_name=sheet_name)
+        export_categories(sheet_name=sheet_name)
 
     return new_df, url
 
@@ -337,19 +329,13 @@ def main():
         help="End date (any parseable date string, e.g., '2023-12-31' or 'today')",
     )
     parser.add_argument(
-        "--sheet-key",
-        help="Google Sheet key (takes precedence over --sheet-name). "
-        "Find in the sheet URL: https://docs.google.com/spreadsheets/d/<key>/edit",
-    )
-    parser.add_argument(
         "--sheet-name",
-        help="Google Sheet name (used if --sheet-key not provided). "
-        "Must be unique in your Google Drive.",
+        help="Google Sheet name (used for writing). Must be unique in your Google Drive.",
     )
     parser.add_argument(
         "--worksheet-name",
-        default=SPLITWISE_EXPENSES_WORKSHEET,
-        help=f"Worksheet name (default: {SPLITWISE_EXPENSES_WORKSHEET})",
+        default=DEFAULT_SPREADSHEET_NAME,
+        help=f"Worksheet name (default: {DEFAULT_SPREADSHEET_NAME})",
     )
     # --overwrite is an alias for --no-append for backward compatibility
     group = parser.add_mutually_exclusive_group()
@@ -379,15 +365,14 @@ def main():
                 f"Start date ({start_date}) cannot be after end date ({end_date})"
             )
 
-        # Ensure at least one of sheet_key or sheet_name is provided
-        if not (args.sheet_key or args.sheet_name):
-            raise ValueError("Either --sheet-key or --sheet-name must be provided")
+        # Ensure sheet_name is provided for writes
+        if not args.sheet_name:
+            raise ValueError("--sheet-name must be provided")
 
         LOG.info("Fetching expenses from %s to %s", start_date, end_date)
         new_df, url = fetch_and_write(
             start_date=start_date,
             end_date=end_date,
-            sheet_key=args.sheet_key,
             sheet_name=args.sheet_name,
             worksheet_name=args.worksheet_name,
             append=args.append,

@@ -26,7 +26,6 @@ def process_statement(
     dry_run=True,
     limit=None,
     sheet_name: str = None,
-    sheet_key: str = None,
     worksheet_name: str = "Imported Transactions",
     no_sheet: bool = False,
 ):
@@ -175,19 +174,18 @@ def process_statement(
     LOG.info("Wrote processed output to %s", out_path)
 
     # If requested, push the processed output to Google Sheets
-    if (sheet_name or sheet_key) and not no_sheet:
+    if sheet_name and not no_sheet:
         try:
             target_name = sheet_name or "Splitwise Transactions"
             LOG.info(
                 "Pushing processed output to Google Sheets (name=%s, key=%s)",
                 target_name,
-                sheet_key,
+                "(sheet-key removed)",
             )
             url = write_to_sheets(
                 out_df,
                 worksheet_name=worksheet_name,
                 spreadsheet_name=target_name,
-                spreadsheet_key=sheet_key,
             )
             LOG.info("Wrote processed output to sheet: %s", url)
         except (RuntimeError, ValueError) as e:
@@ -233,12 +231,6 @@ if __name__ == "__main__":
         default="Imported Transactions",
         help="Name of the worksheet/tab to write processed output into",
     )
-    parser.add_argument(
-        "--sheet-key",
-        type=str,
-        default=None,
-        help="Spreadsheet key (preferred) to write processed output to",
-    )
     args = parser.parse_args()
 
     process_statement(
@@ -246,7 +238,6 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         limit=args.limit,
         sheet_name=args.sheet_name,
-        sheet_key=args.sheet_key,
         worksheet_name=args.worksheet_name,
         no_sheet=args.no_sheet,
     )
