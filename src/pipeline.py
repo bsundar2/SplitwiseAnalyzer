@@ -10,7 +10,7 @@ import pandas as pd
 from src.constants.config import CACHE_PATH, PROCESSED_DIR
 from src.parse_statement import parse_statement
 from src.splitwise_client import SplitwiseClient
-from src.utils import LOG, load_state, save_state_atomic, now_iso, mkdir_p
+from src.utils import LOG, load_state, save_state_atomic, now_iso, mkdir_p, infer_category
 from src.sheets_sync import write_to_sheets
 
 
@@ -85,10 +85,29 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
             results.append(entry)
             continue
 
+        # Infer category for the transaction
+        category_info = infer_category({
+            'description': desc,
+            'merchant': merchant,
+            'amount': amount
+        })
+        
+        # Add category info to the entry
+        entry.update({
+            'category_id': category_info.get('category_id'),
+            'category_name': category_info.get('category_name'),
+            'subcategory_id': category_info.get('subcategory_id'),
+            'subcategory_name': category_info.get('subcategory_name'),
+            'confidence': category_info.get('confidence')
+        })
+        
         # create expense (unless dry_run)
         if dry_run:
             entry["status"] = "would_add"
-            LOG.info("DRY RUN: would add txn %s %s %s", date, amount, desc)
+            LOG.info("DRY RUN: would add txn %s %s %s (%s/%s)", 
+                    date, amount, desc, 
+                    category_info.get('category_name', 'Unknown'),
+                    category_info.get('subcategory_name', 'Unknown'))
             results.append(entry)
             continue
 
@@ -107,7 +126,10 @@ def process_statement(path, dry_run=True, limit=None, sheet_name: str = None, sh
                 "added_at": now_iso(),
             }
             save_state_atomic(CACHE_PATH, cache)
-            LOG.info("Added expense to Splitwise id=%s for txn %s", sid, cc_reference_id)
+            LOG.info("Added expense to Splitwise id=%s for txn %s (%s/%s)", 
+                    sid, cc_reference_id,
+                    category_info.get('category_name', 'Unknown'),
+                    category_info.get('subcategory_name', 'Unknown'))
             added += 1
         except (RuntimeError, ValueError) as e:
             entry["status"] = "error"

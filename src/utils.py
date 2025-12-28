@@ -10,7 +10,7 @@ import yaml
 import hashlib
 import re
 import tempfile
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, Any
 
 load_dotenv()
 
@@ -191,30 +191,117 @@ def generate_fingerprint(date_val: str, amount_val: Union[str, float], desc_val:
     Returns:
         A stable fingerprint string for the transaction
     """
-    from datetime import datetime
+    import hashlib
     
-    # Parse and normalize date to YYYY-MM-DD
     try:
-        dt = dateparser.parse(str(date_val))
-        if dt is None:
-            raise ValueError(f"Could not parse date: {date_val}")
-        date_str = dt.strftime("%Y-%m-%d")
-    except Exception as e:
-        raise ValueError(f"Invalid date format: {date_val}") from e
-    
-    # Normalize amount to float
-    try:
-        if isinstance(amount_val, str):
-            # Remove any non-numeric characters except decimal point and negative sign
-            amount_str = re.sub(r'[^\d.-]', '', str(amount_val))
-            amount = float(amount_str)
-        else:
+        # Parse and normalize date
+        date_obj = dateparser.parse(str(date_val))
+        date_str = date_obj.strftime('%Y-%m-%d') if date_obj else 'unknown_date'
+        
+        # Normalize amount to 2 decimal places as string
+        try:
             amount = float(amount_val)
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid amount: {amount_val}") from e
+            amount_str = f"{amount:.2f}"
+        except (ValueError, TypeError):
+            amount_str = str(amount_val).strip()
+        
+        # Normalize description
+        desc = (desc_val or '').strip()
+        
+        # Create fingerprint
+        fingerprint_str = f"{date_str}|{amount_str}|{desc}"
+        return hashlib.sha256(fingerprint_str.encode('utf-8')).hexdigest()
+    except Exception as e:
+        LOG.error(f"Error generating fingerprint: {e}")
+        # Fallback to a less reliable but more robust method
+        return hashlib.sha256(f"{date_val}|{amount_val}|{desc_val}".encode('utf-8')).hexdigest()
+
+
+def _load_category_config() -> Dict:
+    """Load and cache the category configuration from YAML.
     
-    # Generate a slug from the description
-    slug = merchant_slug(desc_val)
+    Returns:
+        Dict containing the category configuration with default values if not found.
+    """
+    if not hasattr(_load_category_config, '_cached_config'):
+        from src.constants.config import CFG_PATHS
+        
+        try:
+            for path in CFG_PATHS:
+                if path.exists():
+                    config = load_yaml(path)
+                    if 'category_inference' in config:
+                        _load_category_config._cached_config = config['category_inference']
+                        break
+            else:
+                # Fallback to default config if no config file found
+                _load_category_config._cached_config = {
+                    'default_category': {
+                        'id': 2,  # Uncategorized category
+                        'name': 'Uncategorized',
+                        'subcategory_id': 18,  # General subcategory
+                        'subcategory_name': 'General'
+                    },
+                    'patterns': []
+                }
+                LOG.warning("No category_inference config found, using default configuration")
+        except Exception as e:
+            LOG.error(f"Error loading category config: {str(e)}")
+            # Return default config on error
+            _load_category_config._cached_config = {
+                'default_category': {
+                    'id': 2,  # Uncategorized category
+                    'name': 'Uncategorized',
+                    'subcategory_id': 18,  # General subcategory
+                    'subcategory_name': 'General'
+                },
+                'patterns': []
+            }
+    return _load_category_config._cached_config
+
+
+def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
+    """Infer the most likely category for a transaction using config patterns.
     
-    # Create a fingerprint using the same logic as compute_import_id
-    return compute_import_id(date_str, amount, slug)
+    Args:
+        transaction: Dictionary containing transaction details with:
+            - description (str): Transaction description
+            - merchant (str, optional): Merchant name
+            - amount (float): Transaction amount
+    
+    Returns:
+        dict: Dictionary with 'category_id', 'category_name', 'subcategory_id', 
+              'subcategory_name', and 'confidence' if found
+    """
+    if not transaction:
+        return {}
+        
+    description = (transaction.get('description') or '').lower()
+    merchant = (transaction.get('merchant') or '').lower()
+    
+    # Get category config
+    category_config = _load_category_config()
+    default_category = category_config.get('default_category', {})
+    
+    # Check for matches in both description and merchant
+    for category in category_config.get('patterns', []):
+        for subcategory in category.get('subcategories', []):
+            for pattern in subcategory.get('patterns', []):
+                if (description and re.search(pattern, description)) or \
+                   (merchant and re.search(pattern, merchant)):
+                    return {
+                        'category_id': category['id'],
+                        'category_name': category['name'],
+                        'subcategory_id': subcategory['id'],
+                        'subcategory_name': subcategory['name'],
+                        'confidence': 'high'
+                    }
+    
+    # If no match found, return the default "Uncategorized" category
+    return {
+        'category_id': 2,  # Uncategorized category
+        'category_name': 'Uncategorized',
+        'subcategory_id': 18,  # General subcategory
+        'subcategory_name': 'General',
+        'confidence': 'low'
+    }

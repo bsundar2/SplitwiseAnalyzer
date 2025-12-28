@@ -22,7 +22,11 @@ from src.constants.splitwise import (
     DEFAULT_CURRENCY,
     SplitwiseUserId
 )
-from src.utils import LOG, merchant_slug, compute_import_id, generate_fingerprint, parse_float_safe
+from src.utils import (
+    LOG,
+    parse_float_safe,
+    infer_category
+)
 
 load_dotenv("config/credentials.env")
 
@@ -251,95 +255,6 @@ class SplitwiseClient:
         LOG.debug("No matching expense found")
         return None
 
-    def _load_category_config(self) -> Dict:
-        """Load and cache the category configuration from YAML.
-        
-        Returns:
-            Dict containing the category configuration with default values if not found.
-        """
-        if not hasattr(self, '_cached_category_config'):
-            try:
-                from src.utils import load_yaml
-                from src.constants.config import CFG_PATHS
-                
-                # Try to load from each config path until we find one with category_inference
-                for path in CFG_PATHS:
-                    if path.exists():
-                        config = load_yaml(path)
-                        if 'category_inference' in config:
-                            self._cached_category_config = config['category_inference']
-                            break
-                else:
-                    # Fallback to default config if no config file found
-                    self._cached_category_config = {
-                        'default_category': {
-                            'id': 18,
-                            'name': 'Other',
-                            'subcategory_id': 0,
-                            'subcategory_name': 'Other'
-                        },
-                        'patterns': []
-                    }
-                    LOG.warning("No category_inference config found, using default configuration")
-            except Exception as e:
-                LOG.error(f"Error loading category config: {str(e)}")
-                # Return default config on error
-                self._cached_category_config = {
-                    'default_category': {
-                        'id': 18,
-                        'name': 'Other',
-                        'subcategory_id': 0,
-                        'subcategory_name': 'Other'
-                    },
-                    'patterns': []
-                }
-        return self._cached_category_config
-
-    def infer_category(self, transaction: Dict[str, Any]) -> Dict[str, Any]:
-        """Infer the most likely Splitwise category for a transaction using config patterns.
-        
-        Args:
-            transaction: Dictionary containing transaction details with:
-                - description (str): Transaction description
-                - merchant (str, optional): Merchant name
-                - amount (float): Transaction amount
-        
-        Returns:
-            dict: Dictionary with 'category_id', 'category_name', 'subcategory_id', 
-                  'subcategory_name', and 'confidence' if found
-        """
-        if not transaction:
-            return {}
-            
-        description = (transaction.get('description') or '').lower()
-        merchant = (transaction.get('merchant') or '').lower()
-        
-        # Get category config
-        category_config = self._load_category_config()
-        default_category = category_config.get('default_category', {})
-        
-        # Check for matches in both description and merchant
-        for category in category_config.get('patterns', []):
-            for subcategory in category.get('subcategories', []):
-                for pattern in subcategory.get('patterns', []):
-                    if (description and re.search(pattern, description)) or \
-                       (merchant and re.search(pattern, merchant)):
-                        return {
-                            'category_id': category['id'],
-                            'category_name': category['name'],
-                            'subcategory_id': subcategory['id'],
-                            'subcategory_name': subcategory['name'],
-                            'confidence': 'high'
-                        }
-        
-        # If no match found, return the default category
-        return {
-            'category_id': default_category.get('id', 18),
-            'category_name': default_category.get('name', 'Other'),
-            'subcategory_id': default_category.get('subcategory_id', 0),
-            'subcategory_name': default_category.get('subcategory_name', 'Other'),
-            'confidence': 'low'
-        }
 
     def add_expense_from_txn(self, txn: Dict[str, Any], cc_reference_id: str, users: Optional[List[Dict]] = None) -> Union[str, int]:
         """Create a Splitwise expense from normalized transaction data.
@@ -373,7 +288,7 @@ class SplitwiseClient:
         currency = txn.get("currency") or DEFAULT_CURRENCY
 
         # Always run category inference for statement imports
-        category_info = self.infer_category(txn)
+        category_info = infer_category(txn)
         if category_info:
             txn.update({
                 'category_id': category_info['category_id'],
@@ -427,11 +342,7 @@ class SplitwiseClient:
         Returns:
             list: List of category dictionaries with 'id', 'name', and 'subcategories'
         """
-        categories = self.sObj.getCategories()
-        LOG.debug("Available Splitwise categories: %s", 
-                 [{"id": c.id, "name": c.name, "subcategories": [{"id": s.id, "name": s.name} for s in c.subcategories]} 
-                  for c in categories])
-        return categories
+        return self.sObj.getCategories()
 
 
 # Example usage:
@@ -439,7 +350,12 @@ if __name__ == "__main__":
     client = SplitwiseClient()
     print(f"User ID: {client.get_current_user_id()}")
 
-    today = datetime.now().date()
-    seven_days_ago = today - timedelta(days=25)
-    df = client.get_my_expenses_by_date_range(seven_days_ago, today)
-    print(df)
+    categories = client.get_categories()
+    print("Available Splitwise categories: %s",
+                 [{"id": c.id, "name": c.name, "subcategories": [{"id": s.id, "name": s.name} for s in c.subcategories]}
+                  for c in categories])
+
+    # today = datetime.now().date()
+    # seven_days_ago = today - timedelta(days=25)
+    # df = client.get_my_expenses_by_date_range(seven_days_ago, today)
+    # print(df)
