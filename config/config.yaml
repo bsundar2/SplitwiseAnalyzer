@@ -1,11 +1,167 @@
-# date config to help parsing & mapping
+# Date formats for parsing
 date_formats:
   - "%Y-%m-%d"
   - "%m/%d/%Y"
   - "%d/%m/%Y"
 
-# bank-specific parsing hints (add patterns for vendor normalization)
+# Merchant cleaning patterns
+merchant_cleaning:
+  # Patterns to remove or replace
+  patterns:
+    # Remove transaction IDs and reference numbers
+    - pattern: '^\s*\w{8,}\s+'
+      replacement: ''
+      description: 'Remove alphanumeric IDs at start'
+    - pattern: '\s*\b\d{4,}\b\s*'
+      replacement: ' '
+      description: 'Remove long number sequences'
+    - pattern: '\s*[A-Z0-9]{6,}(?:-[A-Z0-9]{4,})*\s*'
+      replacement: ' '
+      description: 'Remove reference numbers like ABC123-DEF456'
+    
+    # Clean up payment processors
+    - pattern: '\b(?:PAYPAL|PAYPAL \*|PP|PP\*)\s*'
+      replacement: 'PayPal '
+    - pattern: '\b(?:SQ\s*\*?\s*|\*SQ\*)\s*'
+      replacement: 'Square '
+    - pattern: '\b(?:GOOGLE\s*\*?\s*|\*GOOGLE\*)\s*'
+      replacement: 'Google '
+    - pattern: '\b(?:AMZN\s*MKTP\s*|\*AMZN MKT\*)\s*'
+      replacement: 'Amazon '
+    - pattern: '\b(?:APPLE\s*COM|APPLE\.COM)\s*'
+      replacement: 'Apple '
+
+  # Special handling for known merchants
+  merchants:
+    - match: 'GRAB.*TAXI'
+      name: 'Grab Taxi'
+    - match: 'UBER'
+      name: 'Uber'
+    - match: 'LYFT'
+      name: 'Lyft'
+    - match: 'TAXICAB.*LIMOUSINE'
+      name: 'Taxi Service'
+
+  # Remove everything after newline (often contains location/transaction details)
+  remove_after_newline: true
+
+# Legacy merchant overrides (for backward compatibility)
 merchant_overrides:
   "UBER": "Uber"
   "LYFT": "Lyft"
   "SPOTIFY": "Spotify"
+
+# Category inference configuration
+category_inference:
+  # Default category to use when no match is found
+  default_category:
+    id: 18  # Typically "Other" category ID in Splitwise
+    name: "Other"
+    subcategory_id: 0
+    subcategory_name: "Other"
+  
+  # Category patterns
+  patterns:
+    - name: "Transportation"
+      id: 1
+      subcategories:
+        - name: "General"
+          id: 0
+          patterns:
+            - "\\b(?:uber|lyft|taxi|cab|grab|ride|bolt)\\b"
+        - name: "Gas"
+          id: 1
+          patterns:
+            - "\\b(?:gas|petrol|exxon|shell|chevron|bp|arco)\\b"
+        - name: "Parking"
+          id: 2
+          patterns:
+            - "\\b(?:parking|meter|spothero)\\b"
+        - name: "Public Transit"
+          id: 3
+          patterns:
+            - "\\b(?:public transport|subway|metro|bus|train|mta|barta)\\b"
+    
+    - name: "Food & Drink"
+      id: 2
+      subcategories:
+        - name: "Coffee Shop"
+          id: 0
+          patterns:
+            - "\\b(?:mcdonalds|starbucks|dunkin|peets|coffee|espresso|cafe|deli)\\b"
+        - name: "Restaurant"
+          id: 1
+          patterns:
+            - "\\b(?:restaurant|eatery|grill|steakhouse|sushi|pizza|burger|pasta|ramen|thai|chinese|indian|mexican|italian|japanese)\\b"
+        - name: "Alcohol & Bars"
+          id: 2
+          patterns:
+            - "\\b(?:bar|pub|brewery|wine|beer|alcohol|liquor)\\b"
+        - name: "Groceries"
+          id: 3
+          patterns:
+            - "\\b(?:groceries|whole foods|trader joe|safeway|kroger|publix|aldi|lidl|costco|sams club)\\b"
+    
+    - name: "Shopping"
+      id: 3
+      subcategories:
+        - name: "General"
+          id: 0
+          patterns:
+            - "\\b(?:amazon|amzn|target|walmart|best buy|home depot|lowes|ikea|costco|walmart)\\b"
+        - name: "Clothing"
+          id: 1
+          patterns:
+            - "\\b(?:clothing|apparel|nike|adidas|gap|h&m|zara|uniqlo|nordstrom|macys)\\b"
+    
+    - name: "Bills & Utilities"
+      id: 4
+      subcategories:
+        - name: "Utilities"
+          id: 0
+          patterns:
+            - "\\b(?:electric|power|water|gas|utility|pge|coned|national grid)\\b"
+        - name: "Internet"
+          id: 1
+          patterns:
+            - "\\b(?:internet|xfinity|comcast|spectrum|verizon fios|att)\\b"
+        - name: "Phone"
+          id: 2
+          patterns:
+            - "\\b(?:phone|mobile|verizon|at&t|t-mobile|sprint|tmobile)\\b"
+        - name: "TV/Streaming"
+          id: 3
+          patterns:
+            - "\\b(?:tv|netflix|hulu|disney|spotify|youtube premium|hbo max|peacock|paramount)\\b"
+    
+    - name: "Entertainment"
+      id: 5
+      subcategories:
+        - name: "Movies & TV"
+          id: 0
+          patterns:
+            - "\\b(?:movie|theater|cinema|netflix|hulu|disney|spotify|youtube|hbo|peacock|paramount)\\b"
+        - name: "Music"
+          id: 1
+          patterns:
+            - "\\b(?:music|concert|festival|spotify|apple music|tidal|pandora|sirius)\\b"
+        - name: "Games"
+          id: 2
+          patterns:
+            - "\\b(?:game|steam|playstation|xbox|nintendo|eshop|blizzard|epic games)\\b"
+    
+    - name: "Travel"
+      id: 6
+      subcategories:
+        - name: "Hotel"
+          id: 0
+          patterns:
+            - "\\b(?:hotel|motel|airbnb|vrbo|booking|expedia|priceline|kayak|hotels\\.com)\\b"
+        - name: "Flight"
+          id: 1
+          patterns:
+            - "\\b(?:flight|airline|delta|united|american|southwest|jetblue|spirit|frontier)\\b"
+        - name: "Vacation Rental"
+          id: 2
+          patterns:
+            - "\\b(?:airbnb|vrbo|vacation rental|homeaway)\\b"

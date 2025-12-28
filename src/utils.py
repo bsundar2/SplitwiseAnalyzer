@@ -10,7 +10,7 @@ import yaml
 import hashlib
 import re
 import tempfile
-from typing import Union
+from typing import Union, Optional, Dict
 
 load_dotenv()
 
@@ -26,6 +26,65 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 def load_yaml(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
+    """Clean up and standardize merchant names from transaction descriptions.
+    
+    Args:
+        description: Raw description string from the transaction
+        config: Optional configuration dictionary. If not provided, will use default config.
+        
+    Returns:
+        str: Cleaned and standardized merchant name
+    """
+    if not description or not isinstance(description, str):
+        return description or ""
+        
+    # Get merchant cleaning config, or use empty config if not available
+    merchant_config = (config or {}).get('merchant_cleaning', {})
+    patterns = merchant_config.get('patterns', [])
+    merchants = merchant_config.get('merchants', [])
+    
+    # Convert to uppercase for case-insensitive matching
+    cleaned = description.upper()
+    
+    # Apply patterns
+    for pattern_config in patterns:
+        pattern = pattern_config.get('pattern')
+        replacement = pattern_config.get('replacement', '')
+        if pattern:
+            try:
+                cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
+            except re.error as e:
+                LOG.warning(f"Invalid regex pattern '{pattern}': {e}")
+    
+    # Apply merchant-specific overrides
+    for merchant in merchants:
+        match_pattern = merchant.get('match')
+        if match_pattern and re.search(match_pattern, cleaned, re.IGNORECASE):
+            cleaned = merchant['name']
+            break  # Stop after first match
+    
+    # Remove everything after newline if configured
+    if merchant_config.get('remove_after_newline', True):
+        cleaned = cleaned.split('\n')[0].strip()
+    
+    # Clean up whitespace
+    cleaned = ' '.join(cleaned.split())
+    
+    # Fall back to legacy merchant_overrides if no match found
+    if cleaned == description.upper() and 'merchant_overrides' in (config or {}):
+        for pattern, replacement in (config['merchant_overrides'] or {}).items():
+            if re.search(pattern, cleaned, re.IGNORECASE):
+                cleaned = replacement
+                break
+    
+    # Title case the result if it was changed
+    if cleaned != description.upper():
+        cleaned = ' '.join(word.capitalize() for word in cleaned.split())
+    
+    return cleaned or description
 
 def mkdir_p(path):
     os.makedirs(path, exist_ok=True)
