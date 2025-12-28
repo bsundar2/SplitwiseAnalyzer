@@ -15,15 +15,29 @@ import pygsheets
 
 # Local application
 from src.constants.config import STATE_PATH
-from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE, SPLITWISE_EXPENSES_WORKSHEET, DEFAULT_SPREADSHEET_NAME
+from src.constants.gsheets import (
+    SHEETS_AUTHENTICATION_FILE,
+    SPLITWISE_EXPENSES_WORKSHEET,
+    DEFAULT_SPREADSHEET_NAME,
+)
 from src.sheets_sync import write_to_sheets
 from src.splitwise_client import SplitwiseClient
-from src.utils import load_state, save_state_atomic, compute_import_id, merchant_slug, LOG, generate_fingerprint, parse_date
+from src.utils import (
+    load_state,
+    save_state_atomic,
+    compute_import_id,
+    merchant_slug,
+    LOG,
+    generate_fingerprint,
+    parse_date,
+)
 from src.constants.splitwise import ExcludedSplitwiseDescriptions
+
 
 # Column names for the export
 class ExportColumns:
     """Column names used in the exported data."""
+
     DATE = "date"
     AMOUNT = "amount"
     DESCRIPTION = "description"
@@ -33,11 +47,11 @@ class ExportColumns:
 
 def mock_expenses(start_date, end_date):
     """Generate mock expense data for testing.
-    
+
     Args:
         start_date: Start date for mock data
         end_date: End date for mock data
-        
+
     Returns:
         DataFrame with mock expense data
     """
@@ -49,7 +63,7 @@ def mock_expenses(start_date, end_date):
             "category": "Internet",
             ExportColumns.DESCRIPTION: "Google Fit [Imported]",
             "friends_split": "Alice: 97.01",
-            ExportColumns.ID: "mock-1"
+            ExportColumns.ID: "mock-1",
         },
         {
             ExportColumns.DATE: end_date.isoformat(),
@@ -57,39 +71,43 @@ def mock_expenses(start_date, end_date):
             "category": "Entertainment",
             ExportColumns.DESCRIPTION: "Hulu [Imported]",
             "friends_split": "Alice: 2.99",
-            ExportColumns.ID: "mock-2"
+            ExportColumns.ID: "mock-2",
         },
     ]
     df = pd.DataFrame(rows)
-    
+
     # Generate fingerprints using the same logic as the client
     df[ExportColumns.FINGERPRINT] = df.apply(
         lambda r: compute_import_id(
             r[ExportColumns.DATE],
-            float(str(r[ExportColumns.AMOUNT]).replace(',', '').replace('$', '') or 0),
-            merchant_slug(r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""))
+            float(str(r[ExportColumns.AMOUNT]).replace(",", "").replace("$", "") or 0),
+            merchant_slug(
+                r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
+            ),
         ),
-        axis=1
+        axis=1,
     )
     return df
 
 
 def load_exported_state() -> tuple[set, set]:
     """Load the set of previously exported Splitwise expense IDs and fingerprints.
-    
+
     Returns:
         A tuple of (exported_ids, exported_fingerprints) as sets
     """
     try:
         state = load_state(STATE_PATH)
-        return set(state.get("exported_ids", [])), set(state.get("exported_fingerprints", []))
+        return set(state.get("exported_ids", [])), set(
+            state.get("exported_fingerprints", [])
+        )
     except (FileNotFoundError, json.JSONDecodeError):
         return set(), set()
 
 
 def save_exported_state(exported_ids: set, exported_fps: set) -> None:
     """Save the set of exported Splitwise expense IDs and fingerprints.
-    
+
     Args:
         exported_ids: Set of exported expense IDs
         exported_fps: Set of exported fingerprints
@@ -103,23 +121,23 @@ def save_exported_state(exported_ids: set, exported_fps: set) -> None:
 
 
 def _read_existing_fingerprints(
-    sheet_key: Optional[str] = None, 
-    sheet_name: Optional[str] = None, 
-    worksheet_name: Optional[str] = None
+    sheet_key: Optional[str] = None,
+    sheet_name: Optional[str] = None,
+    worksheet_name: Optional[str] = None,
 ) -> Optional[List[str]]:
     """Read existing fingerprints from a Google Sheet.
-    
+
     Args:
         sheet_key: Google Sheet key (takes precedence over sheet_name)
         sheet_name: Google Sheet name (used if sheet_key not provided)
         worksheet_name: Name of the worksheet to read from
-        
+
     Returns:
         List of fingerprints or None if the sheet couldn't be read
     """
     if not (sheet_key or sheet_name) or not worksheet_name:
         return None
-    
+
     gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
 
     # Open the spreadsheet by key or name
@@ -142,33 +160,33 @@ def _read_existing_fingerprints(
 
 def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional[str]:
     """Export all Splitwise categories to a 'Splitwise Categories' worksheet.
-    
+
     Args:
         sheet_key: Google Sheet key (takes precedence over sheet_name)
         sheet_name: Google Sheet name (used if sheet_key not provided)
-        
+
     Returns:
         URL of the updated sheet or None if no categories found
     """
     client = SplitwiseClient()
     categories = client.get_categories()
-    
+
     # Create a dictionary to hold categories and their subcategories
     category_dict = {}
     for category in categories:
         category_name = category.getName()
         subcategories = []
-        if hasattr(category, 'getSubcategories'):
+        if hasattr(category, "getSubcategories"):
             subcategories = [subcat.getName() for subcat in category.getSubcategories()]
         category_dict[category_name] = subcategories
-    
+
     if not category_dict:
         LOG.warning("No categories found to export")
         return None
-    
+
     # Find the maximum number of subcategories for any category
     max_subs = max(len(subs) for subs in category_dict.values())
-    
+
     # Create a list of dictionaries for the DataFrame
     data = []
     for i in range(max_subs):
@@ -177,20 +195,20 @@ def export_categories(sheet_key: str = None, sheet_name: str = None) -> Optional
             # Get the subcategory at index i, or empty string if none
             row[category] = subcategories[i] if i < len(subcategories) else ""
         data.append(row)
-    
+
     # Create DataFrame from the list of dictionaries
     df = pd.DataFrame(data)
-    
+
     # Reorder columns to match the original category order
     df = df[list(category_dict.keys())]
-    
+
     # Write to Google Sheets
     url = write_to_sheets(
         df,
         worksheet_name="Splitwise Categories",
         spreadsheet_name=sheet_name,
         spreadsheet_key=sheet_key,
-        append=False  # Always overwrite the categories sheet
+        append=False,  # Always overwrite the categories sheet
     )
     LOG.info("Exported %d categories to Google Sheets", len(category_dict))
     return url
@@ -200,12 +218,12 @@ def fetch_and_write(
     start_date: Union[datetime, date, str],
     end_date: Union[datetime, date, str],
     sheet_key: Optional[str] = None,
-    sheet_name: Optional[str] = None, 
+    sheet_name: Optional[str] = None,
     worksheet_name: str = SPLITWISE_EXPENSES_WORKSHEET,
     mock: bool = False,
     append: bool = True,
     dedupe: bool = True,
-    show_skipped: bool = False
+    show_skipped: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses (real or mock), de-duplicate, and write to Google Sheets.
 
@@ -234,15 +252,30 @@ def fetch_and_write(
     # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
     if df is not None and not df.empty and ExportColumns.DESCRIPTION in df.columns:
         # explicit exact-match checks using pandas Series.eq for clarity
-        settle_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower().eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
+        settle_mask = (
+            df[ExportColumns.DESCRIPTION]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
+        )
 
         num_settle = int(settle_mask.sum())
         if num_settle > 0:
-            LOG.info("Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export", num_settle)
+            LOG.info(
+                "Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export",
+                num_settle,
+            )
             df = df[~settle_mask].reset_index(drop=True)
 
         # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses)
-        payment_mask = df[ExportColumns.DESCRIPTION].astype(str).str.strip().str.lower().eq(ExcludedSplitwiseDescriptions.PAYMENT.value.lower())
+        payment_mask = (
+            df[ExportColumns.DESCRIPTION]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .eq(ExcludedSplitwiseDescriptions.PAYMENT.value.lower())
+        )
         num_pay = int(payment_mask.sum())
         if num_pay > 0:
             df = df[~payment_mask].reset_index(drop=True)
@@ -262,9 +295,9 @@ def fetch_and_write(
         lambda r: generate_fingerprint(
             r.get(ExportColumns.DATE),
             r.get(ExportColumns.AMOUNT),
-            r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", "")
+            r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""),
         ),
-        axis=1
+        axis=1,
     )
 
     # In overwrite mode, we want a full refresh of the worksheet.
@@ -277,7 +310,9 @@ def fetch_and_write(
         # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
         # cases where the local state file is missing or inconsistent.
         if dedupe and (sheet_key or sheet_name):
-            sheet_existing_fps = _read_existing_fingerprints(sheet_key, sheet_name, worksheet_name)
+            sheet_existing_fps = _read_existing_fingerprints(
+                sheet_key, sheet_name, worksheet_name
+            )
             if sheet_existing_fps:
                 exported_fps = set(exported_fps) | set(sheet_existing_fps)
                 # Persist the discovered fingerprints so future runs don't recompute them each time
@@ -285,7 +320,10 @@ def fetch_and_write(
 
     # Filter new rows: not in exported ids and not in exported fingerprints
     if dedupe and not is_overwrite:
-        mask_new = ~((df[ExportColumns.ID].isin(exported_ids)) | (df[ExportColumns.FINGERPRINT].isin(exported_fps)))
+        mask_new = ~(
+            (df[ExportColumns.ID].isin(exported_ids))
+            | (df[ExportColumns.FINGERPRINT].isin(exported_fps))
+        )
         new_df = df[mask_new].reset_index(drop=True)
         skipped_df = df[~mask_new].reset_index(drop=True)
     else:
@@ -318,14 +356,24 @@ def fetch_and_write(
         # parse and format as 'YYYY-MM-DD' (date-only) strings so Google Sheets will parse them as dates
         parsed = pd.to_datetime(new_df[ExportColumns.DATE], errors="coerce", utc=True)
         # Format where parse succeeded; otherwise leave the original string
-        new_df[ExportColumns.DATE] = parsed.dt.strftime('%Y-%m-%d').where(parsed.notna(), new_df[ExportColumns.DATE])
+        new_df[ExportColumns.DATE] = parsed.dt.strftime("%Y-%m-%d").where(
+            parsed.notna(), new_df[ExportColumns.DATE]
+        )
 
     if ExportColumns.AMOUNT in new_df.columns:
-        new_df[ExportColumns.AMOUNT] = pd.to_numeric(new_df[ExportColumns.AMOUNT], errors="coerce")
+        new_df[ExportColumns.AMOUNT] = pd.to_numeric(
+            new_df[ExportColumns.AMOUNT], errors="coerce"
+        )
 
     # Write to sheets
     if sheet_key or sheet_name:
-        url = write_to_sheets(new_df, worksheet_name=worksheet_name, spreadsheet_name=sheet_name or DEFAULT_SPREADSHEET_NAME, spreadsheet_key=sheet_key, append=append)
+        url = write_to_sheets(
+            new_df,
+            worksheet_name=worksheet_name,
+            spreadsheet_name=sheet_name or DEFAULT_SPREADSHEET_NAME,
+            spreadsheet_key=sheet_key,
+            append=append,
+        )
     else:
         url = None
         print(new_df.head())
@@ -336,7 +384,9 @@ def fetch_and_write(
         updated_fps = set(new_df[ExportColumns.FINGERPRINT].tolist())
     else:
         updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
-        updated_fps = set(exported_fps) | set(new_df[ExportColumns.FINGERPRINT].tolist())
+        updated_fps = set(exported_fps) | set(
+            new_df[ExportColumns.FINGERPRINT].tolist()
+        )
     save_exported_state(updated_ids, updated_fps)
 
     # Export categories if we're in overwrite mode (not appending)
@@ -349,62 +399,64 @@ def fetch_and_write(
 
 def main():
     """Main entry point for the script."""
-    parser = argparse.ArgumentParser(description="Export Splitwise expenses to Google Sheets")
-    parser.add_argument(
-        "--start-date", 
-        required=True, 
-        help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago')"
+    parser = argparse.ArgumentParser(
+        description="Export Splitwise expenses to Google Sheets"
     )
     parser.add_argument(
-        "--end-date", 
-        required=True, 
-        help="End date (any parseable date string, e.g., '2023-12-31' or 'today')"
+        "--start-date",
+        required=True,
+        help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago')",
     )
     parser.add_argument(
-        "--sheet-key", 
+        "--end-date",
+        required=True,
+        help="End date (any parseable date string, e.g., '2023-12-31' or 'today')",
+    )
+    parser.add_argument(
+        "--sheet-key",
         help="Google Sheet key (takes precedence over --sheet-name). "
-             "Find in the sheet URL: https://docs.google.com/spreadsheets/d/<key>/edit"
+        "Find in the sheet URL: https://docs.google.com/spreadsheets/d/<key>/edit",
     )
     parser.add_argument(
-        "--sheet-name", 
+        "--sheet-name",
         help="Google Sheet name (used if --sheet-key not provided). "
-             "Must be unique in your Google Drive."
+        "Must be unique in your Google Drive.",
     )
     parser.add_argument(
-        "--worksheet-name", 
+        "--worksheet-name",
         default=SPLITWISE_EXPENSES_WORKSHEET,
-        help=f"Worksheet name (default: {SPLITWISE_EXPENSES_WORKSHEET})"
+        help=f"Worksheet name (default: {SPLITWISE_EXPENSES_WORKSHEET})",
     )
     parser.add_argument(
-        "--mock", 
-        action="store_true", 
-        help="Use mock data instead of making real API calls to Splitwise"
+        "--mock",
+        action="store_true",
+        help="Use mock data instead of making real API calls to Splitwise",
     )
     # --overwrite is an alias for --no-append for backward compatibility
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
-        "--no-append", 
-        dest="append", 
+        "--no-append",
+        dest="append",
         action="store_false",
-        help="Overwrite the worksheet instead of appending to it (default: %(default)s)"
+        help="Overwrite the worksheet instead of appending to it (default: %(default)s)",
     )
     group.add_argument(
         "--overwrite",
         dest="append",
         action="store_false",
-        help=argparse.SUPPRESS  # Hidden alias for backward compatibility
+        help=argparse.SUPPRESS,  # Hidden alias for backward compatibility
     )
     parser.add_argument(
-        "--no-dedupe", 
-        dest="dedupe", 
+        "--no-dedupe",
+        dest="dedupe",
         action="store_false",
         default=True,
-        help="Skip deduplication of expenses (not recommended, default: %(default)s)"
+        help="Skip deduplication of expenses (not recommended, default: %(default)s)",
     )
     parser.add_argument(
-        "--show-skipped", 
-        action="store_true", 
-        help="Show skipped expenses in the output"
+        "--show-skipped",
+        action="store_true",
+        help="Show skipped expenses in the output",
     )
 
     args = parser.parse_args()
@@ -415,7 +467,9 @@ def main():
         end_date = parse_date(args.end_date)
 
         if start_date > end_date:
-            raise ValueError(f"Start date ({start_date}) cannot be after end date ({end_date})")
+            raise ValueError(
+                f"Start date ({start_date}) cannot be after end date ({end_date})"
+            )
 
         # Ensure at least one of sheet_key or sheet_name is provided
         if not (args.sheet_key or args.sheet_name):
@@ -431,25 +485,25 @@ def main():
             mock=args.mock,
             append=args.append,
             dedupe=args.dedupe,
-            show_skipped=args.show_skipped
+            show_skipped=args.show_skipped,
         )
 
         if new_df is not None and not new_df.empty:
             print(f"Successfully processed {len(new_df)} expenses")
             if url:
                 print(f"Updated sheet: {url}")
-            
-            if args.show_skipped and 'status' in new_df.columns:
+
+            if args.show_skipped and "status" in new_df.columns:
                 print("\nSummary:")
-                print(new_df['status'].value_counts().to_string())
+                print(new_df["status"].value_counts().to_string())
         else:
             print("No expenses found or processed")
-            
+
     except Exception as e:
         LOG.error("Error: %s", str(e), exc_info=True)
         print(f"Error: {str(e)}")
         return 1
-        
+
     return 0
 
 

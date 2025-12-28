@@ -24,37 +24,41 @@ def _colnum_to_a1(n: int) -> str:
 def _ensure_size_for_append(worksheet, start_row: int, num_rows: int, num_cols: int):
     # Ensure worksheet has enough rows and cols for an append. Use attribute checks instead of catching broad exceptions.
     needed_rows = start_row + num_rows - 1
-    curr_rows = getattr(worksheet, 'rows', None)
+    curr_rows = getattr(worksheet, "rows", None)
     if curr_rows is not None and needed_rows > curr_rows:
         add = needed_rows - curr_rows
         LOG.info("Adding %d rows to worksheet to accommodate append", add)
-        if hasattr(worksheet, 'add_rows'):
+        if hasattr(worksheet, "add_rows"):
             worksheet.add_rows(add)
         else:
             # If add_rows not available, try resize API if present
-            if hasattr(worksheet, 'resize'):
+            if hasattr(worksheet, "resize"):
                 worksheet.resize(rows=needed_rows)
             else:
-                raise RuntimeError("Worksheet does not support add_rows or resize; cannot expand rows")
+                raise RuntimeError(
+                    "Worksheet does not support add_rows or resize; cannot expand rows"
+                )
 
     needed_cols = max(num_cols, 1)
-    curr_cols = getattr(worksheet, 'cols', None)
+    curr_cols = getattr(worksheet, "cols", None)
     if curr_cols is not None and needed_cols > curr_cols:
         addc = needed_cols - curr_cols
         LOG.info("Adding %d cols to worksheet to accommodate columns", addc)
-        if hasattr(worksheet, 'add_cols'):
+        if hasattr(worksheet, "add_cols"):
             worksheet.add_cols(addc)
         else:
-            if hasattr(worksheet, 'resize'):
+            if hasattr(worksheet, "resize"):
                 worksheet.resize(cols=needed_cols)
             else:
-                raise RuntimeError("Worksheet does not support add_cols or resize; cannot expand cols")
+                raise RuntimeError(
+                    "Worksheet does not support add_cols or resize; cannot expand cols"
+                )
 
 
 def _format_header_bold(sheet, worksheet, num_columns: int):
     header_range = f"A1:{_colnum_to_a1(num_columns)}1"
     # Use public API only. If the worksheet doesn't support .format(), log and skip bolding.
-    if not hasattr(worksheet, 'format'):
+    if not hasattr(worksheet, "format"):
         LOG.info("Worksheet object does not support .format(); skipping header bolding")
         return
     worksheet.format(header_range, {"textFormat": {"bold": True}})
@@ -73,8 +77,10 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
 
     cols = list(write_data.columns)
 
-    if not hasattr(worksheet, 'format'):
-        LOG.info("Worksheet object does not support .format(); skipping column formatting")
+    if not hasattr(worksheet, "format"):
+        LOG.info(
+            "Worksheet object does not support .format(); skipping column formatting"
+        )
         return
 
     # amount -> currency
@@ -82,14 +88,18 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
         idx = cols.index("amount") + 1
         col_a1 = _colnum_to_a1(idx)
         cell_range = f"{col_a1}2:{col_a1}{used_rows}"
-        worksheet.format(cell_range, {"numberFormat": {"type": "CURRENCY", "pattern": "\"$\"#,##0.00"}})
+        worksheet.format(
+            cell_range, {"numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0.00'}}
+        )
 
     # date -> date
     if "date" in cols:
         idx = cols.index("date") + 1
         col_a1 = _colnum_to_a1(idx)
         cell_range = f"{col_a1}2:{col_a1}{used_rows}"
-        worksheet.format(cell_range, {"numberFormat": {"type": "DATE", "pattern": "yyyy-mm-dd"}})
+        worksheet.format(
+            cell_range, {"numberFormat": {"type": "DATE", "pattern": "yyyy-mm-dd"}}
+        )
 
 
 def write_to_sheets(
@@ -134,12 +144,21 @@ def write_to_sheets(
         used_rows = len(values) if values else 0
         if used_rows == 0:
             LOG.info("Appending to empty sheet; writing header and data")
-            worksheet.set_dataframe(write_data, (1, 1), copy_index=False, copy_head=True)
+            worksheet.set_dataframe(
+                write_data, (1, 1), copy_index=False, copy_head=True
+            )
         else:
             start_row = used_rows + 1
-            LOG.info("Appending %d rows starting at row %d (existing rows=%d)", len(write_data), start_row, used_rows)
+            LOG.info(
+                "Appending %d rows starting at row %d (existing rows=%d)",
+                len(write_data),
+                start_row,
+                used_rows,
+            )
             _ensure_size_for_append(worksheet, start_row, len(write_data), num_cols)
-            worksheet.set_dataframe(write_data, (start_row, 1), copy_index=False, copy_head=False)
+            worksheet.set_dataframe(
+                write_data, (start_row, 1), copy_index=False, copy_head=False
+            )
     else:
         worksheet.clear()
         LOG.info("Writing to sheet (overwrite)")
@@ -150,7 +169,7 @@ def write_to_sheets(
 
     # Autosize columns if API available (best-effort)
     for i in range(1, num_cols + 1):
-        if hasattr(worksheet, 'adjust_column_width'):
+        if hasattr(worksheet, "adjust_column_width"):
             worksheet.adjust_column_width(i, 200)
 
     _apply_column_formats(worksheet, write_data)

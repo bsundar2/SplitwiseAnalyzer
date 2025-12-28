@@ -3,6 +3,7 @@
 This module contains all the file paths and configuration-related constants
 used throughout the application.
 """
+
 import os
 from pathlib import Path
 
@@ -15,7 +16,7 @@ CFG_PATHS = [
     Path("config.yaml").resolve(),  # Current working directory
     Path("config/config.yaml").resolve(),  # config/ subdirectory of cwd
     PROJECT_ROOT / "config.yaml",  # Project root
-    PROJECT_ROOT / "config" / "config.yaml"  # Project config/ directory
+    PROJECT_ROOT / "config" / "config.yaml",  # Project config/ directory
 ]
 
 # Data directories
