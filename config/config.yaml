@@ -66,16 +66,29 @@ category_inference:
     name: "Other"
     subcategory_id: 0
     subcategory_name: "Other"
+    
+  # Additional patterns that don't fit neatly into categories
+  additional_patterns:
+    - pattern: "(?i)headway"
+      category: "Education"
+      subcategory: "Online Learning"
+    - pattern: "(?i)fitness"
+      category: "Health"
+      subcategory: "Gym"
   
   # Category patterns
   patterns:
-    - name: "Transportation"
+    - name: "Auto & Transport"
       id: 1
       subcategories:
-        - name: "General"
+        - name: "Taxi"
           id: 0
           patterns:
             - "(?i)(?:uber|lyft|taxi(?:cab)?|cab|grab|ride|bolt|limousine|car service)"
+        - name: "Car Service"
+          id: 4
+          patterns:
+            - "\\b(?:auto detail|car wash|car service|detailing|wow auto)\\b"
         - name: "Gas"
           id: 1
           patterns:
@@ -107,7 +120,7 @@ category_inference:
         - name: "Groceries"
           id: 3
           patterns:
-            - "\\b(?:groceries|whole foods|trader joe|safeway|kroger|publix|aldi|lidl|costco|sams club)\\b"
+            - "\\b(?:groceries|whole foods|trader joe|safeway|kroger|publix|aldi|lidl|costco|sams club|circle k|misc food store)\\b"
     
     - name: "Shopping"
       id: 3
@@ -115,11 +128,23 @@ category_inference:
         - name: "General"
           id: 0
           patterns:
-            - "\\b(?:amazon|amzn|target|walmart|best buy|home depot|lowes|ikea|costco|walmart)\\b"
+            - "\\b(?:amazon|amzn|target|walmart|best buy|home depot|lowes|ikea|costco|walmart|duty.?free|the hainan story coffee)\\b"
         - name: "Clothing"
           id: 1
           patterns:
-            - "\\b(?:clothing|apparel|nike|adidas|gap|h&m|zara|uniqlo|nordstrom|macys)\\b"
+            - "\\b(?:clothing|apparel|nike|adidas|gap|h&m|zara|uniqlo|nordstrom|macys|untuckit)\\b"
+        - name: "Health & Beauty"
+          id: 2
+          patterns:
+            - "\\b(?:guardian health|beauty|cosmetics|skincare|haircut|salon|spa|massage)\\b"
+        - name: "Sporting Goods"
+          id: 3
+          patterns:
+            - "\\b(?:wilson|sporting goods|sports equipment|athletic gear)\\b"
+        - name: "Jewelry"
+          id: 4
+          patterns:
+            - "\\b(?:mejuri|jewelry|ring|necklace|bracelet|earring|watch)\\b"
     
     - name: "Bills & Utilities"
       id: 4
@@ -148,6 +173,10 @@ category_inference:
           id: 0
           patterns:
             - "\\b(?:movie|theater|cinema|netflix|hulu|disney|spotify|youtube|hbo|peacock|paramount)\\b"
+        - name: "Classes & Learning"
+          id: 3
+          patterns:
+            - "\\b(?:class|workshop|lesson|course|school|education|gama painting|art class|painting school)\\b"
         - name: "Music"
           id: 1
           patterns:
@@ -163,7 +192,7 @@ category_inference:
         - name: "Hotel"
           id: 0
           patterns:
-            - "\\b(?:hotel|motel|airbnb|vrbo|booking|expedia|priceline|kayak|hotels\\.com)\\b"
+            - "\\b(?:hotel|motel|airbnb|vrbo|booking|expedia|priceline|kayak|hotels\\.com|impiana|como uma|villa|resort|lodging)\\b"
         - name: "Flight"
           id: 1
           patterns:

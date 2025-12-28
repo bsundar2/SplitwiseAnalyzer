@@ -29,6 +29,10 @@ for p in CFG_PATHS:
 def parse_csv(path):
     LOG.info("Parsing CSV: %s", path)
     df = pd.read_csv(path, dtype=str)
+    
+    # Store original row count for logging
+    original_count = len(df)
+    
     # Try to find common columns
     col_map = {}
     for c in df.columns:
@@ -41,6 +45,8 @@ def parse_csv(path):
             col_map["amount"] = c
         if "reference" in low or low == "ref" or "detail" in low:
             col_map["detail"] = c
+        if "category" in low or "type" in low:
+            col_map["category"] = c
 
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
         # fallback: try first three columns
@@ -48,15 +54,89 @@ def parse_csv(path):
         col_map["date"] = col_names[0]
         col_map["description"] = col_names[1]
         col_map["amount"] = col_names[2]
-
+    
+    # Create output dataframe with basic columns
     out = pd.DataFrame()
     out["date"] = df[col_map["date"]].apply(parse_date_safe)
     out["description"] = df[col_map["description"]].astype(str).str.strip()
     out["amount"] = df[col_map["amount"]].apply(parse_amount_safe).abs()
+    
+    # Add category column if it exists in the input
+    if "category" in col_map:
+        out["category"] = df[col_map["category"]].astype(str).str.strip()
+    else:
+        out["category"] = None
+        
     if "detail" in col_map:
         out["detail"] = df[col_map["detail"]].astype(str).str.strip()
+    
     out["raw_line"] = df.apply(lambda r: " | ".join([str(r[c]) for c in df.columns]), axis=1)
+    
+    # Filter out rows with null dates
     out = out.dropna(subset=["date"])
+    
+    # [TEMP] Transaction filtering - can be removed after verification
+    LOG.info("[TEMP] Starting transaction filtering...")
+    
+    # Filter out transactions with null categories (if category column exists)
+    if "category" in out.columns:
+        before_filter = len(out)
+        out = out[~out["category"].isin(["None", "null", "", None, "nan"])]
+        null_filtered = before_filter - len(out)
+        if null_filtered > 0:
+            LOG.info("[TEMP] Filtered out %d transactions with null/empty categories", null_filtered)
+    
+    # Filter out transactions containing "Fees & Adjustments" in description
+    before_fee_filter = len(out)
+    fee_filter = out["description"].str.contains("Fees & Adjustments", case=False, na=False)
+    out = out[~fee_filter]
+    fee_filtered = before_fee_filter - len(out)
+    if fee_filtered > 0:
+        LOG.info("[TEMP] Filtered out %d transactions containing 'Fees & Adjustments' in description", fee_filtered)
+        # Log sample of filtered transactions
+        filtered = out[fee_filter].head(3)
+        if not filtered.empty:
+            LOG.info("[TEMP] Sample of filtered 'Fees & Adjustments' transactions:")
+            for _, row in filtered.iterrows():
+                LOG.info("  [TEMP] %s - %s - $%.2f", 
+                        row["date"], 
+                        (row["description"][:50] + '...') if len(row["description"]) > 50 else row["description"], 
+                        row["amount"])
+
+    # Filter out credits (negative amounts)
+    before_credit_filter = len(out)
+    credit_filter = out["amount"] <= 0
+    out = out[~credit_filter]
+    credit_filtered = before_credit_filter - len(out)
+    if credit_filtered > 0:
+        LOG.info("[TEMP] Filtered out %d credit transactions (amount <= 0)", credit_filtered)
+        # Log sample of filtered credit transactions
+        filtered = out[credit_filter].head(3)
+        if not filtered.empty:
+            LOG.info("[TEMP] Sample of filtered credit transactions:")
+            for _, row in filtered.iterrows():
+                LOG.info("  [TEMP] %s - %s - $%.2f", 
+                        row["date"], 
+                        (row["description"][:50] + '...') if len(row["description"]) > 50 else row["description"], 
+                        row["amount"])
+    
+    # Log final filtering summary
+    filtered_count = original_count - len(out)
+    if filtered_count > 0:
+        LOG.info("[TEMP] Filtered out %d of %d total transactions (%.1f%%)", 
+                filtered_count, original_count, (filtered_count / original_count) * 100)
+    
+    # Log a sample of transactions that made it through filtering
+    if not out.empty:
+        LOG.info("[TEMP] Sample of transactions after filtering (first 3):")
+        for _, row in out.head(3).iterrows():
+            LOG.info("  [TEMP] %s - %s - $%.2f", 
+                    row["date"], 
+                    (row["description"][:50] + '...') if len(row["description"]) > 50 else row["description"], 
+                    row["amount"])
+    
+    LOG.info("[TEMP] Transaction filtering complete")
+    
     return out
 
 
