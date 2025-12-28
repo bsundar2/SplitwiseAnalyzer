@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run splitwise_export.py",
+      "name": "Splitwise Export (Overwrite)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
@@ -12,12 +12,15 @@
         "2025-01-01",
         "--end-date",
         "2025-12-31",
-        "--sheet-name",
-        "MyFinanceSheet"
+        "--sheet-key",
+        "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
+        "--worksheet-name",
+        "'Splitwise Expenses'",
+        "--overwrite"
       ]
     },
     {
-      "name": "splitwise_export (append)",
+      "name": "Splitwise Export (Append)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/splitwise_export.py",
@@ -27,38 +30,27 @@
         "2025-01-01",
         "--end-date",
         "2025-12-31",
-        "--sheet-name",
-        "MyFinanceSheet",
-        "--no-dedupe"
+        "--sheet-key",
+        "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
+        "--worksheet-name",
+        "'Splitwise Expenses'"
       ]
     },
     {
-      "name": "splitwise_export (overwrite)",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/src/splitwise_export.py",
-      "console": "integratedTerminal",
-      "args": [
-        "--start-date",
-        "2025-01-01",
-        "--end-date",
-        "2025-12-31",
-        "--sheet-name",
-        "MyFinanceSheet",
-        "--no-append"
-      ]
-    },
-    {
-      "name": "Run pipeline.py",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/src/pipeline.py",
-      "console": "integratedTerminal",
-      "args": [
-        "--statement",
-        "${workspaceFolder}/data/raw/sample_statement.csv",
-        "--dry-run"
-      ]
+        "name": "Dry Run",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/src/pipeline.py",
+        "console": "integratedTerminal",
+        "args": [
+            "--statement",
+            "data/raw/sample_statement.csv",
+            "--dry-run",
+            "--sheet-key",
+            "16PyxTb34EXWTwgGASX43uayVsQCsUJH1QZhFV-IjW-k",
+            "--worksheet-name",
+            "Splitwise Dry Runs"
+        ]
     },
     {
       "name": "Run Current Python File",
