@@ -8,6 +8,7 @@ import pandas as pd
 import pygsheets
 
 # Local application
+from src.constants.export_columns import ExportColumns
 from src.constants.gsheets import (
     CURRENCY_COLUMNS,
     CURRENCY_FORMAT_PATTERN,
@@ -77,8 +78,8 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
 
     # date -> date (column A)
     cols = list(write_data.columns)
-    if "date" in cols:
-        idx = cols.index("date") + 1
+    if ExportColumns.DATE in cols:
+        idx = cols.index(ExportColumns.DATE) + 1
         col_a1 = _colnum_to_a1(idx)
         cell_range = f"{col_a1}2:{col_a1}"
         worksheet.apply_format(

@@ -176,8 +176,8 @@ def main():
         return
 
     # Ensure amount column is numeric for aggregation and updates
-    if "amount" in df.columns:
-        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+    if ExportColumns.AMOUNT in df.columns:
+        df[ExportColumns.AMOUNT] = pd.to_numeric(df[ExportColumns.AMOUNT], errors="coerce")
     
     # Filter for expenses between current user and SELF_EXPENSE user only
     # These are the 50/50 self-split expenses we want to convert to 100%
@@ -188,10 +188,10 @@ def main():
         """Check if expense is between main user and self-expense user."""
         try:
             # Parse the friends_split field to get participant user IDs
-            if pd.isna(row.get('friends_split', '')):
+            if pd.isna(row.get(ExportColumns.FRIENDS_SPLIT, '')):
                 return False
             
-            participants = row['friends_split'].split('; ')
+            participants = row[ExportColumns.FRIENDS_SPLIT].split('; ')
             user_ids = set()
             
             for p in participants:
@@ -205,13 +205,13 @@ def main():
                     user_ids.add(name)
             
             # Self expenses have exactly 2 entries with the same name (or "Balaji, Balaji" pattern)
-            participant_names = row.get('participant_names', '')
-            return (row.get('split_type') == 'self' and 
+            participant_names = row.get(ExportColumns.PARTICIPANT_NAMES, '')
+            return (row.get(ExportColumns.SPLIT_TYPE) == 'self' and 
                     ',' in participant_names and 
                     len(participant_names.split(',')) == 2 and
                     participant_names.split(',')[0].strip() == participant_names.split(',')[1].strip())
         except Exception as e:
-            LOG.debug(f"Error checking expense {row.get('id', 'unknown')}: {str(e)}")
+            LOG.debug(f"Error checking expense {row.get(ExportColumns.ID, 'unknown')}: {str(e)}")
             return False
     
     self_expenses = df[df.apply(is_self_split_expense, axis=1)].copy()
@@ -228,17 +228,17 @@ def main():
         self_expenses = self_expenses.head(args.limit)
     
     # Show summary
-    total_amount = self_expenses['amount'].sum()
+    total_amount = self_expenses[ExportColumns.AMOUNT].sum()
     LOG.info(f"Total amount in self expenses: ${total_amount:.2f}")
     
     if args.dry_run:
         LOG.info("\n=== DRY RUN MODE - No changes will be made ===\n")
         for _, expense in self_expenses.iterrows():
             LOG.info(
-                f"Would update: ID={expense['id']}, "
-                f"Date={expense['date'][:10]}, "
-                f"Amount=${expense['amount']:.2f}, "
-                f"Description={expense['description']}"
+                f"Would update: ID={expense[ExportColumns.ID]}, "
+                f"Date={expense[ExportColumns.DATE][:10]}, "
+                f"Amount=${expense[ExportColumns.AMOUNT]:.2f}, "
+                f"Description={expense[ExportColumns.DESCRIPTION]}"
             )
         LOG.info(f"\nTotal: {len(self_expenses)} expenses would be updated")
         return
@@ -255,8 +255,8 @@ def main():
     fail_count = 0
     
     for _, expense in self_expenses.iterrows():
-        expense_id = int(expense['id'])
-        amount = float(expense['amount'])
+        expense_id = int(expense[ExportColumns.ID])
+        amount = float(expense[ExportColumns.AMOUNT])
         
         if update_self_expense(client, expense_id, amount, my_user_id):
             success_count += 1

@@ -210,8 +210,8 @@ def fetch_and_write(
         )
         payment_word = desc_series.str.contains(r"\bpayment\b", case=False, na=False)
 
-        if "category" in df.columns:
-            category_general = df["category"].astype(str).str.strip().eq("General")
+        if ExportColumns.CATEGORY in df.columns:
+            category_general = df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
         else:
             category_general = pd.Series(True, index=df.index)
 
@@ -236,7 +236,7 @@ def fetch_and_write(
         lambda r: generate_fingerprint(
             r.get(ExportColumns.DATE),
             r.get(ExportColumns.AMOUNT),
-            r.get(ExportColumns.DESCRIPTION) or r.get("friends_split", ""),
+            r.get(ExportColumns.DESCRIPTION) or r.get(ExportColumns.FRIENDS_SPLIT, ""),
         ),
         axis=1,
     )
@@ -272,15 +272,15 @@ def fetch_and_write(
     # Convert my_paid/my_owed to numeric and filter out expenses where the
     # user has no participation (both my_paid and my_owed are zero).
     # This prevents exporting rows where the current user is not involved.
-    if not new_df.empty and "my_paid" in new_df.columns and "my_owed" in new_df.columns:
+    if not new_df.empty and ExportColumns.MY_PAID in new_df.columns and ExportColumns.MY_OWED in new_df.columns:
         # Coerce to numeric (invalid -> 0.0) then filter
         new_df = new_df.copy()
-        new_df["my_paid"] = pd.to_numeric(new_df["my_paid"], errors="coerce").fillna(0.0)
-        new_df["my_owed"] = pd.to_numeric(new_df["my_owed"], errors="coerce").fillna(0.0)
+        new_df[ExportColumns.MY_PAID] = pd.to_numeric(new_df[ExportColumns.MY_PAID], errors="coerce").fillna(0.0)
+        new_df[ExportColumns.MY_OWED] = pd.to_numeric(new_df[ExportColumns.MY_OWED], errors="coerce").fillna(0.0)
 
         before_count = len(new_df)
         # Keep rows where either my_paid or my_owed is non-zero
-        participation_mask = (new_df["my_paid"] != 0.0) | (new_df["my_owed"] != 0.0)
+        participation_mask = (new_df[ExportColumns.MY_PAID] != 0.0) | (new_df[ExportColumns.MY_OWED] != 0.0)
         new_df = new_df[participation_mask].reset_index(drop=True)
         filtered_count = before_count - len(new_df)
         if filtered_count > 0:

@@ -20,6 +20,7 @@ from splitwise import Expense, Splitwise
 
 # Local application
 from src.constants.splitwise import DEFAULT_CURRENCY, SplitwiseUserId
+from src.constants.export_columns import ExportColumns
 from src.utils import LOG, parse_float_safe, infer_category
 
 load_dotenv("config/.env")
@@ -158,22 +159,22 @@ class SplitwiseClient:
 
                 data.append(
                     {
-                        "date": expense.getDate(),
-                        "amount": expense.getCost(),
-                        "category": (
+                        ExportColumns.DATE: expense.getDate(),
+                        ExportColumns.AMOUNT: expense.getCost(),
+                        ExportColumns.CATEGORY: (
                             expense.getCategory().getName()
                             if expense.getCategory()
                             else None
                         ),
-                        "description": expense.getDescription(),
-                        "details": expense.getDetails() or "",
-                        "split_type": split_type,
-                        "participant_names": participant_names,
-                        "my_paid": my_paid,
-                        "my_owed": my_owed,
-                        "my_net": my_net,
-                        "friends_split": friends_split,
-                        "id": expense.getId(),
+                        ExportColumns.DESCRIPTION: expense.getDescription(),
+                        ExportColumns.DETAILS: expense.getDetails() or "",
+                        ExportColumns.SPLIT_TYPE: split_type,
+                        ExportColumns.PARTICIPANT_NAMES: participant_names,
+                        ExportColumns.MY_PAID: my_paid,
+                        ExportColumns.MY_OWED: my_owed,
+                        ExportColumns.MY_NET: my_net,
+                        ExportColumns.FRIENDS_SPLIT: friends_split,
+                        ExportColumns.ID: expense.getId(),
                     }
                 )
             except Exception as e:
