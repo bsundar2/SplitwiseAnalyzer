@@ -59,7 +59,8 @@ def parse_csv(path):
     out = pd.DataFrame()
     out["date"] = df[col_map["date"]].apply(parse_date_safe)
     out["description"] = df[col_map["description"]].astype(str).str.strip()
-    out["amount"] = df[col_map["amount"]].apply(parse_amount_safe).abs()
+    # Don't take absolute value yet - we need to filter credits first
+    out["amount"] = df[col_map["amount"]].apply(parse_amount_safe)
 
     # Add category column if it exists in the input
     if "category" in col_map:
@@ -119,20 +120,20 @@ def parse_csv(path):
                     row["amount"],
                 )
 
-    # Filter out credits (negative amounts)
+    # Filter out credits (negative amounts) - MUST be done before taking absolute value
     before_credit_filter = len(out)
-    credit_filter = out["amount"] <= 0
+    credit_filter = out["amount"] < 0
+    filtered_credits = out[credit_filter].copy()
     out = out[~credit_filter]
     credit_filtered = before_credit_filter - len(out)
     if credit_filtered > 0:
         LOG.info(
-            "[TEMP] Filtered out %d credit transactions (amount <= 0)", credit_filtered
+            "[TEMP] Filtered out %d credit transactions (amount < 0)", credit_filtered
         )
         # Log sample of filtered credit transactions
-        filtered = out[credit_filter].head(3)
-        if not filtered.empty:
+        if not filtered_credits.empty:
             LOG.info("[TEMP] Sample of filtered credit transactions:")
-            for _, row in filtered.iterrows():
+            for _, row in filtered_credits.head(5).iterrows():
                 LOG.info(
                     "  [TEMP] %s - %s - $%.2f",
                     row["date"],
@@ -143,6 +144,9 @@ def parse_csv(path):
                     ),
                     row["amount"],
                 )
+    
+    # Now take absolute value of remaining amounts (in case there are any edge cases)
+    out["amount"] = out["amount"].abs()
 
     # Filter out payment/autopay transactions
     payment_patterns = [

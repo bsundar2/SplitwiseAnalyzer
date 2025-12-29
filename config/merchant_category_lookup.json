@@ -1,704 +1,718 @@
 {
-  "marufuku ramen redwood city": {
-    "category": "Dining out",
-    "count": 2,
+  "airbnb": {
+    "category": "Hotel",
     "confidence": 1.0,
-    "primary_count": 2
-  },
-  "costco": {
-    "category": "Home",
-    "count": 115,
-    "confidence": 0.391304347826087,
-    "primary_count": 45
-  },
-  "whole foods": {
-    "category": "Groceries",
-    "count": 83,
-    "confidence": 1.0,
-    "primary_count": 83
-  },
-  "uber": {
-    "category": "Taxi",
-    "count": 33,
-    "confidence": 1.0,
-    "primary_count": 33
-  },
-  "maya": {
-    "category": "TV/Phone/Internet",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "putri bali spa dining": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "food court": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "grab": {
-    "category": "Taxi",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "bun mee": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "chipotle mexican grill": {
-    "category": "Dining out",
-    "count": 13,
-    "confidence": 1.0,
-    "primary_count": 13
-  },
-  "the yard coffee": {
-    "category": "Dining out",
     "count": 3,
-    "confidence": 1.0,
     "primary_count": 3
   },
-  "spothero": {
-    "category": "Car",
-    "count": 26,
-    "confidence": 0.7692307692307693,
-    "primary_count": 20
-  },
-  "peets": {
-    "category": "Dining out",
+  "alexanders pattiserie": {
+    "category": "Entertainment - Other",
+    "confidence": 0.5,
     "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "car": {
-    "category": "Car",
-    "count": 14,
-    "confidence": 1.0,
-    "primary_count": 14
-  },
-  "khazana": {
-    "category": "Dining out",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "baywhee": {
-    "category": "Taxi",
-    "count": 37,
-    "confidence": 0.918918918918919,
-    "primary_count": 34
-  },
-  "varam": {
-    "category": "Dining out",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "ayola": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "papa noodle": {
-    "category": "Dining out",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "philz coffee": {
-    "category": "Dining out",
-    "count": 8,
-    "confidence": 1.0,
-    "primary_count": 8
-  },
-  "rent": {
-    "category": "Rent",
-    "count": 13,
-    "confidence": 1.0,
-    "primary_count": 13
+    "primary_count": 1
   },
   "amazon web services": {
     "category": "Life - Other",
-    "count": 11,
     "confidence": 0.9090909090909091,
+    "count": 11,
     "primary_count": 10
   },
   "apni mandi farmers marke": {
     "category": "Groceries",
-    "count": 10,
     "confidence": 1.0,
+    "count": 10,
     "primary_count": 10
   },
-  "mylapore": {
-    "category": "Dining out",
-    "count": 4,
+  "at&t": {
+    "category": "TV/Phone/Internet",
     "confidence": 1.0,
+    "count": 4,
     "primary_count": 4
   },
-  "il cilentano": {
+  "ayola": {
     "category": "Dining out",
+    "confidence": 1.0,
     "count": 2,
-    "confidence": 1.0,
     "primary_count": 2
-  },
-  "fastrak csc tolls": {
-    "category": "Transportation - Other",
-    "count": 17,
-    "confidence": 0.8823529411764706,
-    "primary_count": 15
-  },
-  "ettan": {
-    "category": "Dining out",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "mehfil indian cuisine": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "starbucks": {
-    "category": "Dining out",
-    "count": 7,
-    "confidence": 1.0,
-    "primary_count": 7
-  },
-  "sierra cider": {
-    "category": "Liquor",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "ynp basecamp eatery": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "parantha house": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "safeway": {
-    "category": "Groceries",
-    "count": 14,
-    "confidence": 1.0,
-    "primary_count": 14
-  },
-  "pints of joy": {
-    "category": "Groceries",
-    "count": 3,
-    "confidence": 0.6666666666666666,
-    "primary_count": 2
-  },
-  "crouchingtigerres": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "five guys": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "red hot chilli pepper": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "payment": {
-    "category": "General",
-    "count": 116,
-    "confidence": 1.0,
-    "primary_count": 116
   },
   "badminton": {
     "category": "Sports",
-    "count": 3,
     "confidence": 1.0,
+    "count": 3,
     "primary_count": 3
   },
-  "rockn wraps": {
+  "bang bang cafe": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
-  },
-  "netflix": {
-    "category": "Movies",
-    "count": 15,
-    "confidence": 0.7333333333333333,
-    "primary_count": 11
-  },
-  "uber eats": {
-    "category": "Dining out",
-    "count": 10,
-    "confidence": 1.0,
-    "primary_count": 10
-  },
-  "sacramento convention": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "subway": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "vino santo": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "alexanders pattiserie": {
-    "category": "Entertainment - Other",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "sfmta muni": {
-    "category": "Bus/train",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "idly express": {
-    "category": "Dining out",
-    "count": 10,
-    "confidence": 1.0,
-    "primary_count": 10
-  },
-  "woods lower haight": {
-    "category": "Liquor",
-    "count": 5,
-    "confidence": 0.6,
-    "primary_count": 3
-  },
-  "car wash": {
-    "category": "Car",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "flour & water": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "milagros": {
-    "category": "Dining out",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "eylan": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "mazra": {
-    "category": "Dining out",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "tj maxx": {
-    "category": "Home - Other",
-    "count": 3,
-    "confidence": 0.6666666666666666,
-    "primary_count": 2
-  },
-  "neehees hanover park illinois": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "qamaria yemeni coffee": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "obour foods": {
-    "category": "Groceries",
-    "count": 4,
-    "confidence": 1.0,
-    "primary_count": 4
-  },
-  "curry pizza house": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "target": {
-    "category": "Home",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "the baker next door": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "ice cream": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "lyft": {
-    "category": "Taxi",
-    "count": 6,
-    "confidence": 1.0,
-    "primary_count": 6
   },
   "barebottle brewing": {
     "category": "Liquor",
-    "count": 3,
     "confidence": 1.0,
+    "count": 3,
     "primary_count": 3
   },
-  "ritual coffee at s": {
+  "baywhee": {
+    "category": "Taxi",
+    "confidence": 0.918918918918919,
+    "count": 37,
+    "primary_count": 34
+  },
+  "broadway masala": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   },
-  "ups": {
-    "category": "General",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "costco refund": {
-    "category": "Groceries",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "cocola bakery": {
+  "bun mee": {
     "category": "Dining out",
+    "confidence": 1.0,
     "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "patel brothers": {
-    "category": "Groceries",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "the yellow chilli": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "rad radish": {
-    "category": "Dining out",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "sfmta muni mosan": {
-    "category": "Bus/train",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "car insurance": {
-    "category": "Insurance",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "clipper systems mobi": {
-    "category": "Bus/train",
-    "count": 6,
-    "confidence": 1.0,
-    "primary_count": 6
-  },
-  "madras cafe": {
-    "category": "Dining out",
-    "count": 3,
-    "confidence": 0.6666666666666666,
-    "primary_count": 2
-  },
-  "toll": {
-    "category": "Car",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "gas": {
-    "category": "Gas/fuel",
-    "count": 5,
-    "confidence": 1.0,
-    "primary_count": 5
-  },
-  "suvidha groceries": {
-    "category": "Groceries",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "chai pani": {
-    "category": "Dining out",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "the tamil prince london": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "foreign transaction fee": {
-    "category": "Life - Other",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "sendero nine elms": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "mademoiselle colette": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
     "primary_count": 2
   },
   "cafe venetia": {
     "category": "Dining out",
-    "count": 4,
     "confidence": 1.0,
+    "count": 4,
     "primary_count": 4
   },
-  "pink onion": {
+  "caltrain san carlos": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "car": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 14,
+    "primary_count": 14
+  },
+  "car insurance": {
+    "category": "Insurance",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "car wash": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "chai pani": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
-    "primary_count": 2
-  },
-  "delta air lines": {
-    "category": "Plane",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "impark": {
-    "category": "Parking",
-    "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "spin": {
-    "category": "Sports",
     "count": 3,
-    "confidence": 1.0,
     "primary_count": 3
   },
-  "laz parking": {
-    "category": "Car",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "sanaa cafe": {
+  "chipotle mexican grill": {
     "category": "Dining out",
-    "count": 4,
     "confidence": 1.0,
-    "primary_count": 4
+    "count": 13,
+    "primary_count": 13
   },
-  "saluhall market": {
+  "clipper systems mobi": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 6,
+    "primary_count": 6
+  },
+  "cocola bakery": {
     "category": "Dining out",
+    "confidence": 1.0,
     "count": 2,
-    "confidence": 0.5,
-    "primary_count": 1
-  },
-  "madras groceries": {
-    "category": "Groceries",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "zareens restauran": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "waymo": {
-    "category": "Taxi",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "at&t": {
-    "category": "TV/Phone/Internet",
-    "count": 4,
-    "confidence": 1.0,
-    "primary_count": 4
-  },
-  "san francisco ash": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "pluckys cafe": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "thai soul kitchen": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "broadway masala": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "internet": {
-    "category": "TV/Phone/Internet",
-    "count": 4,
-    "confidence": 1.0,
-    "primary_count": 4
-  },
-  "soma eats": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
     "primary_count": 2
   },
   "coffeebar": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   },
-  "la connessa louie": {
+  "costco": {
+    "category": "Home",
+    "confidence": 0.391304347826087,
+    "count": 115,
+    "primary_count": 45
+  },
+  "costco refund": {
+    "category": "Groceries",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "crouchingtigerres": {
     "category": "Dining out",
-    "count": 5,
     "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "curry pizza house": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "delta air lines": {
+    "category": "Plane",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "ettan": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
     "primary_count": 5
   },
-  "linea caffe": {
+  "eylan": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   },
-  "mount rainier entry": {
-    "category": "Entertainment - Other",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "bang bang cafe": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "airbnb": {
-    "category": "Hotel",
-    "count": 3,
-    "confidence": 1.0,
-    "primary_count": 3
-  },
-  "piccino dogpatch": {
-    "category": "Dining out",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
+  "fastrak csc tolls": {
+    "category": "Transportation - Other",
+    "confidence": 0.8823529411764706,
+    "count": 17,
+    "primary_count": 15
   },
   "fitness sf transbay": {
     "category": "Life",
-    "count": 3,
     "confidence": 1.0,
+    "count": 3,
     "primary_count": 3
   },
-  "hearth t1": {
+  "five guys": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
+  },
+  "flour & water": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "food court": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "foreign transaction fee": {
+    "category": "Life - Other",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "gas": {
+    "category": "Gas/fuel",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "grab": {
+    "category": "Transportation",
+    "subcategory": "Taxi"
   },
   "headway": {
     "category": "Life",
-    "count": 6,
     "confidence": 1.0,
+    "count": 6,
     "primary_count": 6
   },
-  "presto fare": {
-    "category": "Bus/train",
-    "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
-  },
-  "mylapore caterers": {
+  "hearth t1": {
     "category": "Dining out",
-    "count": 2,
     "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   },
-  "thai rhapsody": {
+  "ice cream": {
     "category": "Dining out",
+    "confidence": 0.5,
     "count": 2,
+    "primary_count": 1
+  },
+  "idly express": {
+    "category": "Dining out",
     "confidence": 1.0,
+    "count": 10,
+    "primary_count": 10
+  },
+  "il cilentano": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   },
-  "uber home": {
-    "category": "Taxi",
+  "impark": {
+    "category": "Parking",
+    "confidence": 0.5,
     "count": 2,
-    "confidence": 1.0,
-    "primary_count": 2
+    "primary_count": 1
   },
   "instacart": {
     "category": "Groceries",
-    "count": 3,
     "confidence": 1.0,
+    "count": 3,
     "primary_count": 3
   },
-  "caltrain san carlos": {
-    "category": "Bus/train",
-    "count": 2,
+  "internet": {
+    "category": "TV/Phone/Internet",
     "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "khazana": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "kumulilir": {
+    "category": "Food and drink",
+    "subcategory": "Groceries"
+  },
+  "la connessa louie": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "laz parking": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "linea caffe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "lyft": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 6,
+    "primary_count": 6
+  },
+  "mademoiselle colette": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "madras cafe": {
+    "category": "Dining out",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "madras groceries": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "marufuku ramen redwood city": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "maya": {
+    "category": "TV/Phone/Internet",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "mazra": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "mehfil indian cuisine": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "milagros": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "mount rainier entry": {
+    "category": "Entertainment - Other",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "mylapore": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "mylapore caterers": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "neehees hanover park illinois": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "netflix": {
+    "category": "Movies",
+    "confidence": 0.7333333333333333,
+    "count": 15,
+    "primary_count": 11
+  },
+  "nike": {
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "ny times digital": {
+    "category": "Utilities",
+    "subcategory": "Other"
+  },
+  "obour foods": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "papa noodle": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "parantha house": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "patel brothers": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "payment": {
+    "category": "General",
+    "confidence": 1.0,
+    "count": 116,
+    "primary_count": 116
+  },
+  "peets": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "philz coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 8,
+    "primary_count": 8
+  },
+  "piccino dogpatch": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "pink onion": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "pints of joy": {
+    "category": "Groceries",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "pluckys cafe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "presto fare": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "putri bali spa dining": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "qamaria yemeni coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rad radish": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "red hot chilli pepper": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rent": {
+    "category": "Rent",
+    "confidence": 1.0,
+    "count": 13,
+    "primary_count": 13
+  },
+  "ritual coffee at s": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rockn wraps": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sacramento convention": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "safeway": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 14,
+    "primary_count": 14
+  },
+  "saluhall market": {
+    "category": "Dining out",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "san francisco ash": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sanaa cafe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "sendero nine elms": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sfmta muni": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "sfmta muni mosan": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "sierra cider": {
+    "category": "Liquor",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "soma eats": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "spin": {
+    "category": "Sports",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "spothero": {
+    "category": "Car",
+    "confidence": 0.7692307692307693,
+    "count": 26,
+    "primary_count": 20
+  },
+  "starbucks": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 7,
+    "primary_count": 7
+  },
+  "subway": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "suvidha groceries": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "target": {
+    "category": "Home",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "thai rhapsody": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "thai soul kitchen": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the baker next door": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the clan ho travel": {
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "the tamil prince london": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the yard coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "the yellow chilli": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "tj maxx": {
+    "category": "Home - Other",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "toll": {
+    "category": "Car",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "uber": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 33,
+    "primary_count": 33
+  },
+  "uber eats": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 10,
+    "primary_count": 10
+  },
+  "uber home": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "ups": {
+    "category": "General",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "varam": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "vino santo": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "waymo": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "whole foods": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 83,
+    "primary_count": 83
+  },
+  "woods lower haight": {
+    "category": "Liquor",
+    "confidence": 0.6,
+    "count": 5,
+    "primary_count": 3
+  },
+  "ynp basecamp eatery": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "zareens restauran": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
     "primary_count": 2
   }
 }
