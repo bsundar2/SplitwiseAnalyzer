@@ -8,7 +8,13 @@ import pandas as pd
 import pygsheets
 
 # Local application
-from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE
+from src.constants.gsheets import (
+    CURRENCY_COLUMNS,
+    CURRENCY_FORMAT_PATTERN,
+    DATE_FORMAT_PATTERN,
+    DEFAULT_COLUMN_WIDTH,
+    SHEETS_AUTHENTICATION_FILE,
+)
 from src.utils import LOG
 
 
@@ -65,40 +71,27 @@ def _format_header_bold(sheet, worksheet, num_columns: int):
 
 
 def _apply_column_formats(worksheet, write_data: pd.DataFrame):
-    # Some pygsheets versions accept include_tailing_empty; handle that specific TypeError at call site
-    try:
-        values = worksheet.get_all_values(include_tailing_empty=False)
-    except TypeError:
-        values = worksheet.get_all_values()
-
-    used_rows = len(values) if values else 1
-    if used_rows <= 1:  # Only header or empty
-        return
-
-    cols = list(write_data.columns)
-
     if not hasattr(worksheet, "format"):
         LOG.info(
             "Worksheet object does not support .format(); skipping column formatting"
         )
         return
 
-    # amount -> currency
-    if "amount" in cols:
-        idx = cols.index("amount") + 1
-        col_a1 = _colnum_to_a1(idx)
-        cell_range = f"{col_a1}2:{col_a1}{used_rows}"
-        worksheet.format(
-            cell_range, {"numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0.00'}}
-        )
+    # Format entire columns so formatting persists even if rows are added later.
+    # Columns B, H, I, J are currency fields (amount, my_paid, my_owed, my_net).
+    currency_format = {"numberFormat": {"type": "CURRENCY", "pattern": CURRENCY_FORMAT_PATTERN}}
+    for col_letter in CURRENCY_COLUMNS:
+        cell_range = f"{col_letter}2:{col_letter}"
+        worksheet.format(cell_range, currency_format)
 
-    # date -> date
+    # date -> date (column A)
+    cols = list(write_data.columns)
     if "date" in cols:
         idx = cols.index("date") + 1
         col_a1 = _colnum_to_a1(idx)
-        cell_range = f"{col_a1}2:{col_a1}{used_rows}"
+        cell_range = f"{col_a1}2:{col_a1}"
         worksheet.format(
-            cell_range, {"numberFormat": {"type": "DATE", "pattern": "yyyy-mm-dd"}}
+            cell_range, {"numberFormat": {"type": "DATE", "pattern": DATE_FORMAT_PATTERN}}
         )
 
 
@@ -142,7 +135,7 @@ def write_to_sheets(
             values = worksheet.get_all_values()
         used_rows = len(values) if values else 0
         if used_rows == 0:
-            LOG.info("Appending to empty sheet; writing header and data")
+            LOG.info("Appending to empty sheet; writing header and %d rows", len(write_data))
             worksheet.set_dataframe(
                 write_data, (1, 1), copy_index=False, copy_head=True
             )
@@ -163,7 +156,8 @@ def write_to_sheets(
         worksheet.clear()
         rows_needed = max(1, len(write_data) + 1)
         worksheet.resize(rows=rows_needed, cols=num_cols)
-        LOG.info("Writing to sheet (overwrite)")
+        LOG.info("Resized worksheet to %d rows x %d cols", rows_needed, num_cols)
+        LOG.info("Writing %d rows to sheet (overwrite)", len(write_data))
         worksheet.set_dataframe(write_data, (1, 1), copy_index=False, copy_head=True)
 
     # Post-write formatting: freeze header, autosize and format columns
@@ -172,7 +166,7 @@ def write_to_sheets(
     # Autosize columns if API available (best-effort)
     for i in range(1, num_cols + 1):
         if hasattr(worksheet, "adjust_column_width"):
-            worksheet.adjust_column_width(i, 200)
+            worksheet.adjust_column_width(i, DEFAULT_COLUMN_WIDTH)
 
     _apply_column_formats(worksheet, write_data)
 

@@ -9,3 +9,9 @@ SHEETS_AUTHENTICATION_FILE = os.path.abspath(
         os.path.dirname(__file__), "..", "..", "config", "gsheets_authentication.json"
     )
 )
+
+# Column formatting constants
+CURRENCY_COLUMNS = ["B", "H", "I", "J"]  # amount, my_paid, my_owed, my_net
+CURRENCY_FORMAT_PATTERN = '"$"#,##0.00'
+DATE_FORMAT_PATTERN = "yyyy-mm-dd"
+DEFAULT_COLUMN_WIDTH = 200
