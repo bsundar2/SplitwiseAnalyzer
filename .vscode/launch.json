@@ -12,12 +12,6 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "args": [
-        "--start-date",
-        "${env:START_DATE}",
-        "--end-date",
-        "${env:END_DATE}",
-        "--worksheet-name",
-        "${env:EXPENSES_WORKSHEET_NAME}",
         "--overwrite"
       ]
     },

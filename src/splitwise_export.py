@@ -6,12 +6,17 @@ Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints i
 # Standard library
 import argparse
 import json
+import os
 from datetime import datetime, date
 from typing import List, Optional, Union
 
 # Third-party
 import pandas as pd
 import pygsheets
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv("config/.env")
 
 # Local application
 from src.constants.config import STATE_PATH
@@ -320,22 +325,23 @@ def main():
     )
     parser.add_argument(
         "--start-date",
-        required=True,
-        help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago')",
+        default=os.getenv("START_DATE"),
+        help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago'). Defaults to START_DATE env var.",
     )
     parser.add_argument(
         "--end-date",
-        required=True,
-        help="End date (any parseable date string, e.g., '2023-12-31' or 'today')",
-    )
-    parser.add_argument(
-        "--sheet-name",
-        help="Google Sheet name (used for writing). Must be unique in your Google Drive.",
+        default=os.getenv("END_DATE"),
+        help="End date (any parseable date string, e.g., '2023-12-31' or 'today'). Defaults to END_DATE env var.",
     )
     parser.add_argument(
         "--worksheet-name",
-        default=DEFAULT_SPREADSHEET_NAME,
-        help=f"Worksheet name (default: {DEFAULT_SPREADSHEET_NAME})",
+        default=os.getenv("EXPENSES_WORKSHEET_NAME", DEFAULT_SPREADSHEET_NAME),
+        help=f"Worksheet name (default: EXPENSES_WORKSHEET_NAME env var or {DEFAULT_SPREADSHEET_NAME})",
+    )
+    parser.add_argument(
+        "--sheet-name",
+        default=os.getenv("SPREADSHEET_NAME", DEFAULT_SPREADSHEET_NAME),
+        help=f"Spreadsheet name (default: SPREADSHEET_NAME env var or {DEFAULT_SPREADSHEET_NAME})",
     )
     # --overwrite is an alias for --no-append for backward compatibility
     group = parser.add_mutually_exclusive_group()
@@ -356,6 +362,12 @@ def main():
     args = parser.parse_args()
 
     try:
+        # Validate required arguments
+        if not args.start_date:
+            raise ValueError("--start-date is required (or set START_DATE env var)")
+        if not args.end_date:
+            raise ValueError("--end-date is required (or set END_DATE env var)")
+        
         # Parse dates (use shared parse_date in src.utils)
         start_date = parse_date(args.start_date)
         end_date = parse_date(args.end_date)
