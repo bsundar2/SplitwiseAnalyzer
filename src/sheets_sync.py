@@ -159,7 +159,10 @@ def write_to_sheets(
                 write_data, (start_row, 1), copy_index=False, copy_head=False
             )
     else:
+        # Clear and resize to remove trailing rows from previous exports.
         worksheet.clear()
+        rows_needed = max(1, len(write_data) + 1)
+        worksheet.resize(rows=rows_needed, cols=num_cols)
         LOG.info("Writing to sheet (overwrite)")
         worksheet.set_dataframe(write_data, (1, 1), copy_index=False, copy_head=True)
 
