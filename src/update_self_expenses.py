@@ -36,27 +36,28 @@ def update_self_expense(client: SplitwiseClient, expense_id: int, amount: float,
     try:
         # Get the expense object
         expense_obj = client.sObj.getExpense(expense_id)
-        
-        # Verify this is a self-split expense (between my_user_id and SELF_EXPENSE)
-        user_ids = [u.getId() for u in expense_obj.getUsers()]
-        expected_users = {my_user_id, SplitwiseUserId.SELF_EXPENSE}
-        
-        if set(user_ids) != expected_users:
-            LOG.warning(f"Skipping expense {expense_id}: not a self-split expense (users: {user_ids})")
+
+        # Verify participants include current user and exactly one other
+        users = expense_obj.getUsers() or []
+        user_ids = [u.getId() for u in users]
+        if my_user_id not in user_ids or len(users) != 2:
+            LOG.warning(
+                f"Skipping expense {expense_id}: unexpected participants (users: {user_ids})"
+            )
             return False
-        
-        # Update the existing users' shares:
-        # Main user: paid full amount minus $0.01, owes full amount minus $0.01
-        # Self expense user: paid $0.01, owes $0.01 (kept with minimal amount to stay visible)
-        for user in expense_obj.getUsers():
+
+        # Format amount to two decimals
+        amt_str = f"{amount:.2f}"
+
+        # Set shares so one participant owes the full amount (paid=0.00, owed=amount)
+        # and the other is recorded as having paid the full amount (paid=amount, owed=0.00).
+        for user in users:
             if user.getId() == my_user_id:
-                # Main user: paid nearly full amount and owes nearly full amount
-                user.setPaidShare(str(round(amount - 0.01, 2)))
-                user.setOwedShare(str(round(amount - 0.01, 2)))
-            elif user.getId() == SplitwiseUserId.SELF_EXPENSE:
-                # Self expense user: paid and owes $0.01 to keep them in the transaction
-                user.setPaidShare("0.01")
-                user.setOwedShare("0.01")
+                user.setPaidShare("0.00")
+                user.setOwedShare(amt_str)
+            else:
+                user.setPaidShare(amt_str)
+                user.setOwedShare("0.00")
         
         # Update the expense
         result = client.sObj.updateExpense(expense_obj)
@@ -102,6 +103,12 @@ def main():
         help="Limit number of expenses to update (useful for testing)",
         default=None,
     )
+    parser.add_argument(
+        "--expense-id",
+        type=int,
+        help="Specific Splitwise expense ID to update (updates only this transaction)",
+        default=None,
+    )
     
     args = parser.parse_args()
     
@@ -122,6 +129,39 @@ def main():
         start_date = end_date - timedelta(days=30)
     
     LOG.info(f"Processing expenses from {start_date} to {end_date}")
+
+    # If a specific expense ID was provided, operate only on that expense
+    if args.expense_id:
+        expense_id = int(args.expense_id)
+        LOG.info(f"Fetching expense {expense_id} for single-update mode")
+        try:
+            expense_obj = client.sObj.getExpense(expense_id)
+            amount = float(expense_obj.getCost())
+        except Exception as e:
+            LOG.error(f"Failed to fetch expense {expense_id}: {str(e)}")
+            return
+
+        if args.dry_run:
+            LOG.info(
+                "DRY RUN: would update expense %s to full-share format: Balaji|paid=0.00|owed=%s; Other|paid=%s|owed=0.00",
+                expense_id,
+                f"{amount:.2f}",
+                f"{amount:.2f}",
+            )
+            return
+
+        # Confirm with user before making change
+        response = input(f"\nUpdate expense {expense_id} to full-share format? (yes/no): ")
+        if response.lower() not in ["yes", "y"]:
+            LOG.info("Update cancelled for expense %s", expense_id)
+            return
+
+        success = update_self_expense(client, expense_id, amount, my_user_id)
+        if success:
+            LOG.info("Updated expense %s", expense_id)
+        else:
+            LOG.info("Failed to update expense %s", expense_id)
+        return
     
     # Get expenses
     if args.use_csv:
@@ -134,6 +174,10 @@ def main():
     if df.empty:
         LOG.info("No expenses found in date range")
         return
+
+    # Ensure amount column is numeric for aggregation and updates
+    if "amount" in df.columns:
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     
     # Filter for expenses between current user and SELF_EXPENSE user only
     # These are the 50/50 self-split expenses we want to convert to 100%
