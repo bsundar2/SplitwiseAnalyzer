@@ -37,46 +37,26 @@ merchant_cleaning:
     - pattern: '\b(?:APPLE\s*COM|APPLE\.COM)\s*'
       replacement: 'Apple '
 
-  # Special handling for known merchants
-  merchants:
-    - match: 'GRAB.*TAXI'
-      name: 'Grab Taxi'
-    - match: 'UBER'
-      name: 'Uber'
-    - match: 'LYFT'
-      name: 'Lyft'
-    - match: '(?i)(?:TAXICAB.*LIMOUSINE|(?:TAXI|CAB|UBER|LYFT).*SERVICE)'
-      name: 'Taxi Service'
-
   # Keep everything on the first line that looks like a merchant name
   remove_after_newline: false
   extract_first_line: true
 
-# Legacy merchant overrides (for backward compatibility)
-merchant_overrides:
-  "UBER": "Uber"
-  "LYFT": "Lyft"
-  "SPOTIFY": "Spotify"
-
 # Category inference configuration
+# NOTE: The system uses a three-tier approach:
+#   1. Merchant lookup (from merchant_category_lookup.json) - highest confidence
+#   2. Amex category mapping (from amex_category_mapping.json) - high confidence  
+#   3. Regex patterns (below) - medium confidence fallback
+#   4. Default category - lowest confidence
 category_inference:
   # Default category to use when no match is found
   default_category:
-    id: 18  # Typically "Other" category ID in Splitwise
-    name: "Other"
-    subcategory_id: 0
-    subcategory_name: "Other"
-    
-  # Additional patterns that don't fit neatly into categories
-  additional_patterns:
-    - pattern: "(?i)headway"
-      category: "Education"
-      subcategory: "Online Learning"
-    - pattern: "(?i)fitness"
-      category: "Health"
-      subcategory: "Gym"
+    id: 2  # Uncategorized
+    name: "Uncategorized"
+    subcategory_id: 18  # General
+    subcategory_name: "General"
   
-  # Category patterns
+  # Regex patterns as fallback for transactions not caught by merchant/Amex categories
+  # Keep these minimal since most categorization is handled by merchant_category_lookup.json
   patterns:
     - name: "Auto & Transport"
       id: 1

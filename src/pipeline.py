@@ -17,6 +17,7 @@ from src.utils import (
     now_iso,
     mkdir_p,
     infer_category,
+    clean_description_for_splitwise,
 )
 from src.sheets_sync import write_to_sheets
 
@@ -51,6 +52,10 @@ def process_statement(
         amount = row.get("amount")
         detail = row.get("detail")
         merchant = row.get("description") or ""
+        
+        # Clean description for Splitwise posting (keep raw for sheets)
+        desc_clean = clean_description_for_splitwise(desc)
+        desc_raw = desc
 
         cc_reference_id = None
         if detail is not None:
@@ -64,7 +69,8 @@ def process_statement(
 
         entry = {
             "date": date,
-            "description": desc,
+            "description": desc_clean,  # Clean version for Splitwise
+            "description_raw": desc_raw,  # Raw version for debugging in sheets
             "amount": float(amount),
             "detail": cc_reference_id,
             "cc_reference_id": cc_reference_id,
@@ -111,7 +117,12 @@ def process_statement(
 
         # Infer category for the transaction
         category_info = infer_category(
-            {"description": desc, "merchant": merchant, "amount": amount}
+            {
+                "description": desc,
+                "merchant": merchant,
+                "amount": amount,
+                "category": row.get("category"),  # Pass Amex category if available
+            }
         )
 
         # Add category info to the entry
@@ -136,7 +147,7 @@ def process_statement(
                 {
                     "date": date,
                     "amount": amount,
-                    "description": desc,
+                    "description": desc_clean,  # Use clean description for Splitwise
                     "merchant": merchant,
                     "detail": cc_reference_id,
                 },

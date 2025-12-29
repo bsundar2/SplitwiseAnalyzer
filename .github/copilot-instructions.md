@@ -155,5 +155,6 @@ Tie everything together in main.py with CLI flags.
 Environment / Running Locally
 --------------------------------
 - **Activate virtualenv first:** Always activate the project's Python virtual environment before running scripts or installing packages. Example (typical venv in project root named `.venv`): `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows).
-- **Use the provided VS Code launch configs:** The repository includes `.vscode/launch.json` with entries like "Splitwise Export (Overwrite)" you can use to run scripts with the proper environment variables. These configs set `envFile` to `config/.env` and set `PYTHONPATH` to the workspace.
+- **CRITICAL: Set PYTHONPATH:** When running Python scripts from the terminal, ALWAYS set `PYTHONPATH` to the project root to ensure `src` module imports work correctly. Example: `PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter python src/pipeline.py` or `export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter` before running commands. Without this, you'll get `ModuleNotFoundError: No module named 'src'`.
+- **Use the provided VS Code launch configs:** The repository includes `.vscode/launch.json` with entries like "Splitwise Export (Overwrite)" you can use to run scripts with the proper environment variables. These configs set `envFile` to `config/.env` and set `PYTHONPATH` to the workspace automatically.
 - **Install deps into the venv:** Run `pip install -r requirements.txt` after activating the venv so `pandas`, `pygsheets`, and `splitwise` are available.

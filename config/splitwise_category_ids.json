@@ -1,0 +1,598 @@
+{
+  "category_mapping": {
+    "Utilities > Cleaning": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 48,
+      "subcategory_name": "Cleaning"
+    },
+    "Utilities > Electricity": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 5,
+      "subcategory_name": "Electricity"
+    },
+    "Utilities > Heat/gas": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 6,
+      "subcategory_name": "Heat/gas"
+    },
+    "Utilities > Other": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 11,
+      "subcategory_name": "Other"
+    },
+    "Utilities > Trash": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 37,
+      "subcategory_name": "Trash"
+    },
+    "Utilities > TV/Phone/Internet": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 8,
+      "subcategory_name": "TV/Phone/Internet"
+    },
+    "Utilities > Water": {
+      "category_id": 1,
+      "category_name": "Utilities",
+      "subcategory_id": 7,
+      "subcategory_name": "Water"
+    },
+    "Uncategorized > General": {
+      "category_id": 2,
+      "category_name": "Uncategorized",
+      "subcategory_id": 18,
+      "subcategory_name": "General"
+    },
+    "Entertainment > Games": {
+      "category_id": 19,
+      "category_name": "Entertainment",
+      "subcategory_id": 20,
+      "subcategory_name": "Games"
+    },
+    "Entertainment > Movies": {
+      "category_id": 19,
+      "category_name": "Entertainment",
+      "subcategory_id": 21,
+      "subcategory_name": "Movies"
+    },
+    "Entertainment > Music": {
+      "category_id": 19,
+      "category_name": "Entertainment",
+      "subcategory_id": 22,
+      "subcategory_name": "Music"
+    },
+    "Entertainment > Other": {
+      "category_id": 19,
+      "category_name": "Entertainment",
+      "subcategory_id": 23,
+      "subcategory_name": "Other"
+    },
+    "Entertainment > Sports": {
+      "category_id": 19,
+      "category_name": "Entertainment",
+      "subcategory_id": 24,
+      "subcategory_name": "Sports"
+    },
+    "Food and drink > Dining out": {
+      "category_id": 25,
+      "category_name": "Food and drink",
+      "subcategory_id": 13,
+      "subcategory_name": "Dining out"
+    },
+    "Food and drink > Groceries": {
+      "category_id": 25,
+      "category_name": "Food and drink",
+      "subcategory_id": 12,
+      "subcategory_name": "Groceries"
+    },
+    "Food and drink > Liquor": {
+      "category_id": 25,
+      "category_name": "Food and drink",
+      "subcategory_id": 38,
+      "subcategory_name": "Liquor"
+    },
+    "Food and drink > Other": {
+      "category_id": 25,
+      "category_name": "Food and drink",
+      "subcategory_id": 26,
+      "subcategory_name": "Other"
+    },
+    "Home > Electronics": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 39,
+      "subcategory_name": "Electronics"
+    },
+    "Home > Furniture": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 16,
+      "subcategory_name": "Furniture"
+    },
+    "Home > Household supplies": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 14,
+      "subcategory_name": "Household supplies"
+    },
+    "Home > Maintenance": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 17,
+      "subcategory_name": "Maintenance"
+    },
+    "Home > Mortgage": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 4,
+      "subcategory_name": "Mortgage"
+    },
+    "Home > Other": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 28,
+      "subcategory_name": "Other"
+    },
+    "Home > Pets": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 29,
+      "subcategory_name": "Pets"
+    },
+    "Home > Rent": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 3,
+      "subcategory_name": "Rent"
+    },
+    "Home > Services": {
+      "category_id": 27,
+      "category_name": "Home",
+      "subcategory_id": 30,
+      "subcategory_name": "Services"
+    },
+    "Transportation > Bicycle": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 46,
+      "subcategory_name": "Bicycle"
+    },
+    "Transportation > Bus/train": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 32,
+      "subcategory_name": "Bus/train"
+    },
+    "Transportation > Car": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 15,
+      "subcategory_name": "Car"
+    },
+    "Transportation > Gas/fuel": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 33,
+      "subcategory_name": "Gas/fuel"
+    },
+    "Transportation > Hotel": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 47,
+      "subcategory_name": "Hotel"
+    },
+    "Transportation > Other": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 34,
+      "subcategory_name": "Other"
+    },
+    "Transportation > Parking": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 9,
+      "subcategory_name": "Parking"
+    },
+    "Transportation > Plane": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 35,
+      "subcategory_name": "Plane"
+    },
+    "Transportation > Taxi": {
+      "category_id": 31,
+      "category_name": "Transportation",
+      "subcategory_id": 36,
+      "subcategory_name": "Taxi"
+    },
+    "Life > Childcare": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 50,
+      "subcategory_name": "Childcare"
+    },
+    "Life > Clothing": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 41,
+      "subcategory_name": "Clothing"
+    },
+    "Life > Education": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 49,
+      "subcategory_name": "Education"
+    },
+    "Life > Gifts": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 42,
+      "subcategory_name": "Gifts"
+    },
+    "Life > Insurance": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 10,
+      "subcategory_name": "Insurance"
+    },
+    "Life > Medical expenses": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 43,
+      "subcategory_name": "Medical expenses"
+    },
+    "Life > Other": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 44,
+      "subcategory_name": "Other"
+    },
+    "Life > Taxes": {
+      "category_id": 40,
+      "category_name": "Life",
+      "subcategory_id": 45,
+      "subcategory_name": "Taxes"
+    }
+  },
+  "category_lookup": {
+    "Cleaning": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 48,
+        "full_path": "Utilities > Cleaning"
+      }
+    ],
+    "Electricity": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 5,
+        "full_path": "Utilities > Electricity"
+      }
+    ],
+    "Heat/gas": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 6,
+        "full_path": "Utilities > Heat/gas"
+      }
+    ],
+    "Other": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 11,
+        "full_path": "Utilities > Other"
+      },
+      {
+        "category_id": 19,
+        "category_name": "Entertainment",
+        "subcategory_id": 23,
+        "full_path": "Entertainment > Other"
+      },
+      {
+        "category_id": 25,
+        "category_name": "Food and drink",
+        "subcategory_id": 26,
+        "full_path": "Food and drink > Other"
+      },
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 28,
+        "full_path": "Home > Other"
+      },
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 34,
+        "full_path": "Transportation > Other"
+      },
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 44,
+        "full_path": "Life > Other"
+      }
+    ],
+    "Trash": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 37,
+        "full_path": "Utilities > Trash"
+      }
+    ],
+    "TV/Phone/Internet": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 8,
+        "full_path": "Utilities > TV/Phone/Internet"
+      }
+    ],
+    "Water": [
+      {
+        "category_id": 1,
+        "category_name": "Utilities",
+        "subcategory_id": 7,
+        "full_path": "Utilities > Water"
+      }
+    ],
+    "General": [
+      {
+        "category_id": 2,
+        "category_name": "Uncategorized",
+        "subcategory_id": 18,
+        "full_path": "Uncategorized > General"
+      }
+    ],
+    "Games": [
+      {
+        "category_id": 19,
+        "category_name": "Entertainment",
+        "subcategory_id": 20,
+        "full_path": "Entertainment > Games"
+      }
+    ],
+    "Movies": [
+      {
+        "category_id": 19,
+        "category_name": "Entertainment",
+        "subcategory_id": 21,
+        "full_path": "Entertainment > Movies"
+      }
+    ],
+    "Music": [
+      {
+        "category_id": 19,
+        "category_name": "Entertainment",
+        "subcategory_id": 22,
+        "full_path": "Entertainment > Music"
+      }
+    ],
+    "Sports": [
+      {
+        "category_id": 19,
+        "category_name": "Entertainment",
+        "subcategory_id": 24,
+        "full_path": "Entertainment > Sports"
+      }
+    ],
+    "Dining out": [
+      {
+        "category_id": 25,
+        "category_name": "Food and drink",
+        "subcategory_id": 13,
+        "full_path": "Food and drink > Dining out"
+      }
+    ],
+    "Groceries": [
+      {
+        "category_id": 25,
+        "category_name": "Food and drink",
+        "subcategory_id": 12,
+        "full_path": "Food and drink > Groceries"
+      }
+    ],
+    "Liquor": [
+      {
+        "category_id": 25,
+        "category_name": "Food and drink",
+        "subcategory_id": 38,
+        "full_path": "Food and drink > Liquor"
+      }
+    ],
+    "Electronics": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 39,
+        "full_path": "Home > Electronics"
+      }
+    ],
+    "Furniture": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 16,
+        "full_path": "Home > Furniture"
+      }
+    ],
+    "Household supplies": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 14,
+        "full_path": "Home > Household supplies"
+      }
+    ],
+    "Maintenance": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 17,
+        "full_path": "Home > Maintenance"
+      }
+    ],
+    "Mortgage": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 4,
+        "full_path": "Home > Mortgage"
+      }
+    ],
+    "Pets": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 29,
+        "full_path": "Home > Pets"
+      }
+    ],
+    "Rent": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 3,
+        "full_path": "Home > Rent"
+      }
+    ],
+    "Services": [
+      {
+        "category_id": 27,
+        "category_name": "Home",
+        "subcategory_id": 30,
+        "full_path": "Home > Services"
+      }
+    ],
+    "Bicycle": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 46,
+        "full_path": "Transportation > Bicycle"
+      }
+    ],
+    "Bus/train": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 32,
+        "full_path": "Transportation > Bus/train"
+      }
+    ],
+    "Car": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 15,
+        "full_path": "Transportation > Car"
+      }
+    ],
+    "Gas/fuel": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 33,
+        "full_path": "Transportation > Gas/fuel"
+      }
+    ],
+    "Hotel": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 47,
+        "full_path": "Transportation > Hotel"
+      }
+    ],
+    "Parking": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 9,
+        "full_path": "Transportation > Parking"
+      }
+    ],
+    "Plane": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 35,
+        "full_path": "Transportation > Plane"
+      }
+    ],
+    "Taxi": [
+      {
+        "category_id": 31,
+        "category_name": "Transportation",
+        "subcategory_id": 36,
+        "full_path": "Transportation > Taxi"
+      }
+    ],
+    "Childcare": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 50,
+        "full_path": "Life > Childcare"
+      }
+    ],
+    "Clothing": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 41,
+        "full_path": "Life > Clothing"
+      }
+    ],
+    "Education": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 49,
+        "full_path": "Life > Education"
+      }
+    ],
+    "Gifts": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 42,
+        "full_path": "Life > Gifts"
+      }
+    ],
+    "Insurance": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 10,
+        "full_path": "Life > Insurance"
+      }
+    ],
+    "Medical expenses": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 43,
+        "full_path": "Life > Medical expenses"
+      }
+    ],
+    "Taxes": [
+      {
+        "category_id": 40,
+        "category_name": "Life",
+        "subcategory_id": 45,
+        "full_path": "Life > Taxes"
+      }
+    ]
+  }
+}
