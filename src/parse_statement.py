@@ -144,6 +144,47 @@ def parse_csv(path):
                     row["amount"],
                 )
 
+    # Filter out payment/autopay transactions
+    payment_patterns = [
+        r'\bAUTOPAY\b',
+        r'\bPAYMENT\s*-\s*THANK\s*YOU\b',
+        r'\bAmex\s+Offer\s+Credit\b',
+        r'^\s*Credit\s*$',  # Standalone "Credit"
+        r'\b(?:Entertainment|Digital|Platinum)\s+Credit\b',
+        r'\bREIMBURSEMENT\b',
+        r'\bPOINTS\s+FOR\s+AMEX\b',
+    ]
+    
+    before_payment_filter = len(out)
+    # Combine patterns with non-capturing groups to avoid warning
+    combined_pattern = '|'.join(f'(?:{p})' for p in payment_patterns)
+    payment_filter = out["description"].str.contains(
+        combined_pattern, case=False, na=False, regex=True
+    )
+    filtered_payments = out[payment_filter]
+    out = out[~payment_filter]
+    payment_filtered = before_payment_filter - len(out)
+    
+    if payment_filtered > 0:
+        LOG.info(
+            "[TEMP] Filtered out %d payment/credit/reimbursement transactions",
+            payment_filtered
+        )
+        # Log sample of filtered payment transactions
+        if not filtered_payments.empty:
+            LOG.info("[TEMP] Sample of filtered payment/credit transactions:")
+            for _, row in filtered_payments.head(5).iterrows():
+                LOG.info(
+                    "  [TEMP] %s - %s - $%.2f",
+                    row["date"],
+                    (
+                        (row["description"][:50] + "...")
+                        if len(row["description"]) > 50
+                        else row["description"]
+                    ),
+                    row["amount"],
+                )
+
     # Log final filtering summary
     filtered_count = original_count - len(out)
     if filtered_count > 0:
