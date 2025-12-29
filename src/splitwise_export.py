@@ -165,6 +165,7 @@ def fetch_and_write(
     sheet_key: Optional[str] = None,
     worksheet_name: str = DEFAULT_WORKSHEET_NAME,
     append: bool = True,
+    export_categories_flag: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses, de-duplicate, and write to Google Sheets.
 
@@ -329,9 +330,9 @@ def fetch_and_write(
         )
     save_exported_state(updated_ids, updated_fps)
 
-    # Export categories if we're in overwrite mode (not appending)
-    if not append:
-        LOG.info("Exporting categories due to overwrite mode")
+    # Export categories only when explicitly requested via flag
+    if not append and export_categories_flag:
+        LOG.info("Exporting categories due to --export-categories flag")
         export_categories(sheet_key=sheet_key)
 
     return new_df, url
@@ -356,6 +357,12 @@ def main():
         "--worksheet-name",
         default=os.getenv("EXPENSES_WORKSHEET_NAME", DEFAULT_WORKSHEET_NAME),
         help=f"Worksheet name (default: EXPENSES_WORKSHEET_NAME env var or {DEFAULT_WORKSHEET_NAME})",
+    )
+    parser.add_argument(
+        "--export-categories",
+        dest="export_categories",
+        action="store_true",
+        help="Also export Splitwise categories to the 'Splitwise Categories' worksheet when using --no-append/--overwrite",
     )
     parser.add_argument(
         "--sheet-key",
@@ -407,6 +414,7 @@ def main():
             sheet_key=args.sheet_key,
             worksheet_name=args.worksheet_name,
             append=args.append,
+            export_categories_flag=args.export_categories,
         )
 
         if new_df is not None and not new_df.empty:
