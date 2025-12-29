@@ -22,7 +22,7 @@ from src.utils import (
     now_iso,
     mkdir_p,
     infer_category,
-    clean_description_for_splitwise,
+    clean_merchant_name,
 )
 from src.sheets_sync import write_to_sheets
 
@@ -63,7 +63,7 @@ def process_statement(
         merchant = row.get("description") or ""
 
         # Clean description for Splitwise posting (keep raw for sheets)
-        desc_clean = clean_description_for_splitwise(desc)
+        desc_clean = clean_merchant_name(desc)
         desc_raw = desc
 
         cc_reference_id = None
