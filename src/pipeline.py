@@ -38,7 +38,7 @@ def process_statement(
     # Use default from env vars if not provided
     if worksheet_name is None:
         worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Splitwise Dry Runs")
-    
+
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
     df = parse_statement(path)
     if df is None or df.empty:
@@ -61,7 +61,7 @@ def process_statement(
         amount = row.get("amount")
         detail = row.get("detail")
         merchant = row.get("description") or ""
-        
+
         # Clean description for Splitwise posting (keep raw for sheets)
         desc_clean = clean_description_for_splitwise(desc)
         desc_raw = desc
@@ -250,10 +250,12 @@ if __name__ == "__main__":
         help="Name of the worksheet/tab to write processed output into (default: DRY_RUN_WORKSHEET_NAME env var for dry runs, 'Imported Transactions' otherwise)",
     )
     args = parser.parse_args()
-    
+
     # Validate sheet_key if we're going to write to sheets
     if not args.no_sheet and not args.sheet_key:
-        parser.error("--sheet-key is required (or set SPREADSHEET_KEY env var) unless --no-sheet is used")
+        parser.error(
+            "--sheet-key is required (or set SPREADSHEET_KEY env var) unless --no-sheet is used"
+        )
 
     process_statement(
         args.statement,

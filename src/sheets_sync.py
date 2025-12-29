@@ -19,6 +19,38 @@ from src.constants.gsheets import (
 from src.utils import LOG
 
 
+def read_from_sheets(
+    spreadsheet_key: str,
+    worksheet_name: str,
+    numerize: bool = False,
+) -> Optional[pd.DataFrame]:
+    """Read a DataFrame from a Google Sheets worksheet.
+
+    Args:
+        spreadsheet_key: Google Sheet key/ID
+        worksheet_name: Name of the worksheet to read from
+        numerize: Whether to convert numeric strings to numbers
+
+    Returns:
+        DataFrame with the data, or None if the worksheet doesn't exist
+    """
+    if not spreadsheet_key or not worksheet_name:
+        return None
+
+    try:
+        gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
+        sheet = gc.open_by_key(spreadsheet_key)
+        worksheet = sheet.worksheet_by_title(worksheet_name)
+        df = worksheet.get_as_df(numerize=numerize, empty_value=None)
+        return df if not df.empty else None
+    except pygsheets.WorksheetNotFound:
+        LOG.debug("Worksheet '%s' not found in spreadsheet", worksheet_name)
+        return None
+    except Exception as e:
+        LOG.warning("Error reading worksheet '%s': %s", worksheet_name, str(e))
+        return None
+
+
 def _colnum_to_a1(n: int) -> str:
     # 1 -> A, 27 -> AA
     s = ""

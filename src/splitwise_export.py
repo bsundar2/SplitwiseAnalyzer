@@ -12,7 +12,6 @@ from typing import List, Optional, Union
 
 # Third-party
 import pandas as pd
-import pygsheets
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -20,11 +19,8 @@ load_dotenv("config/.env")
 
 # Local application
 from src.constants.config import STATE_PATH
-from src.constants.gsheets import (
-    SHEETS_AUTHENTICATION_FILE,
-    DEFAULT_WORKSHEET_NAME,
-)
-from src.sheets_sync import write_to_sheets
+from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
+from src.sheets_sync import write_to_sheets, read_from_sheets
 from src.splitwise_client import SplitwiseClient
 from src.utils import (
     load_state,
@@ -85,20 +81,8 @@ def _read_existing_fingerprints(
     if not sheet_key or not worksheet_name:
         return None
 
-    gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
-
-    # Open the spreadsheet by key
-    sh = gc.open_by_key(sheet_key)
-
-    # Get the worksheet
-    try:
-        wks = sh.worksheet_by_title(worksheet_name)
-    except pygsheets.WorksheetNotFound:
-        return None
-
-    # Read the data
-    df = wks.get_as_df(numerize=False, empty_value=None)
-    if df.empty or ExportColumns.FINGERPRINT not in df.columns:
+    df = read_from_sheets(sheet_key, worksheet_name, numerize=False)
+    if df is None or ExportColumns.FINGERPRINT not in df.columns:
         return None
 
     # Return non-empty fingerprints
