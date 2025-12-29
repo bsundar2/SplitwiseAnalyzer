@@ -211,14 +211,19 @@ def fetch_and_write(
         payment_word = desc_series.str.contains(r"\bpayment\b", case=False, na=False)
 
         if ExportColumns.CATEGORY in df.columns:
-            category_general = df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
+            category_general = (
+                df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
+            )
         else:
             category_general = pd.Series(True, index=df.index)
 
         payment_mask = (payment_exact | payment_word) & category_general
         num_pay = int(payment_mask.sum())
         if num_pay > 0:
-            LOG.info("Filtered out %d Splitwise 'Payment' transactions from API export", num_pay)
+            LOG.info(
+                "Filtered out %d Splitwise 'Payment' transactions from API export",
+                num_pay,
+            )
             df = df[~payment_mask].reset_index(drop=True)
     if df is None or df.empty:
         LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
@@ -272,15 +277,25 @@ def fetch_and_write(
     # Convert my_paid/my_owed to numeric and filter out expenses where the
     # user has no participation (both my_paid and my_owed are zero).
     # This prevents exporting rows where the current user is not involved.
-    if not new_df.empty and ExportColumns.MY_PAID in new_df.columns and ExportColumns.MY_OWED in new_df.columns:
+    if (
+        not new_df.empty
+        and ExportColumns.MY_PAID in new_df.columns
+        and ExportColumns.MY_OWED in new_df.columns
+    ):
         # Coerce to numeric (invalid -> 0.0) then filter
         new_df = new_df.copy()
-        new_df[ExportColumns.MY_PAID] = pd.to_numeric(new_df[ExportColumns.MY_PAID], errors="coerce").fillna(0.0)
-        new_df[ExportColumns.MY_OWED] = pd.to_numeric(new_df[ExportColumns.MY_OWED], errors="coerce").fillna(0.0)
+        new_df[ExportColumns.MY_PAID] = pd.to_numeric(
+            new_df[ExportColumns.MY_PAID], errors="coerce"
+        ).fillna(0.0)
+        new_df[ExportColumns.MY_OWED] = pd.to_numeric(
+            new_df[ExportColumns.MY_OWED], errors="coerce"
+        ).fillna(0.0)
 
         before_count = len(new_df)
         # Keep rows where either my_paid or my_owed is non-zero
-        participation_mask = (new_df[ExportColumns.MY_PAID] != 0.0) | (new_df[ExportColumns.MY_OWED] != 0.0)
+        participation_mask = (new_df[ExportColumns.MY_PAID] != 0.0) | (
+            new_df[ExportColumns.MY_OWED] != 0.0
+        )
         new_df = new_df[participation_mask].reset_index(drop=True)
         filtered_count = before_count - len(new_df)
         if filtered_count > 0:
@@ -290,7 +305,9 @@ def fetch_and_write(
             )
 
     if new_df.empty:
-        print("No new Splitwise expenses to export (all rows already exported or no participation).")
+        print(
+            "No new Splitwise expenses to export (all rows already exported or no participation)."
+        )
         return new_df, None
 
     # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
@@ -393,7 +410,7 @@ def main():
             raise ValueError("--start-date is required (or set START_DATE env var)")
         if not args.end_date:
             raise ValueError("--end-date is required (or set END_DATE env var)")
-        
+
         # Parse dates (use shared parse_date in src.utils)
         start_date = parse_date(args.start_date)
         end_date = parse_date(args.end_date)
@@ -405,7 +422,9 @@ def main():
 
         # Ensure sheet_key is provided for writes
         if not args.sheet_key:
-            raise ValueError("--sheet-key must be provided (or set SPREADSHEET_KEY env var)")
+            raise ValueError(
+                "--sheet-key must be provided (or set SPREADSHEET_KEY env var)"
+            )
 
         LOG.info("Fetching expenses from %s to %s", start_date, end_date)
         new_df, url = fetch_and_write(

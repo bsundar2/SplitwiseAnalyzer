@@ -71,7 +71,9 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
 
     # Format entire columns so formatting persists even if rows are added later.
     # Columns B, H, I, J are currency fields (amount, my_paid, my_owed, my_net).
-    currency_format = {"numberFormat": {"type": "CURRENCY", "pattern": CURRENCY_FORMAT_PATTERN}}
+    currency_format = {
+        "numberFormat": {"type": "CURRENCY", "pattern": CURRENCY_FORMAT_PATTERN}
+    }
     for col_letter in CURRENCY_COLUMNS:
         cell_range = f"{col_letter}2:{col_letter}"
         worksheet.apply_format(cell_range, currency_format)
@@ -83,7 +85,8 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
         col_a1 = _colnum_to_a1(idx)
         cell_range = f"{col_a1}2:{col_a1}"
         worksheet.apply_format(
-            cell_range, {"numberFormat": {"type": "DATE", "pattern": DATE_FORMAT_PATTERN}}
+            cell_range,
+            {"numberFormat": {"type": "DATE", "pattern": DATE_FORMAT_PATTERN}},
         )
 
 
@@ -101,7 +104,7 @@ def write_to_sheets(
     """
     if not spreadsheet_key:
         raise ValueError("spreadsheet_key is required")
-    
+
     # Inline small steps directly here instead of tiny helpers so flow is explicit
     gc = pygsheets.authorize(service_account_file=SHEETS_AUTHENTICATION_FILE)
 
@@ -127,7 +130,9 @@ def write_to_sheets(
             values = worksheet.get_all_values()
         used_rows = len(values) if values else 0
         if used_rows == 0:
-            LOG.info("Appending to empty sheet; writing header and %d rows", len(write_data))
+            LOG.info(
+                "Appending to empty sheet; writing header and %d rows", len(write_data)
+            )
             worksheet.set_dataframe(
                 write_data, (1, 1), copy_index=False, copy_head=True
             )
