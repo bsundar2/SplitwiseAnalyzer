@@ -269,8 +269,28 @@ def fetch_and_write(
         new_df = df
         skipped_df = pd.DataFrame()
 
+    # Convert my_paid/my_owed to numeric and filter out expenses where the
+    # user has no participation (both my_paid and my_owed are zero).
+    # This prevents exporting rows where the current user is not involved.
+    if not new_df.empty and "my_paid" in new_df.columns and "my_owed" in new_df.columns:
+        # Coerce to numeric (invalid -> 0.0) then filter
+        new_df = new_df.copy()
+        new_df["my_paid"] = pd.to_numeric(new_df["my_paid"], errors="coerce").fillna(0.0)
+        new_df["my_owed"] = pd.to_numeric(new_df["my_owed"], errors="coerce").fillna(0.0)
+
+        before_count = len(new_df)
+        # Keep rows where either my_paid or my_owed is non-zero
+        participation_mask = (new_df["my_paid"] != 0.0) | (new_df["my_owed"] != 0.0)
+        new_df = new_df[participation_mask].reset_index(drop=True)
+        filtered_count = before_count - len(new_df)
+        if filtered_count > 0:
+            LOG.info(
+                "Filtered out %d expenses where my_paid and my_owed were both zero (no participation)",
+                filtered_count,
+            )
+
     if new_df.empty:
-        print("No new Splitwise expenses to export (all rows already exported).")
+        print("No new Splitwise expenses to export (all rows already exported or no participation).")
         return new_df, None
 
     # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
