@@ -47,6 +47,9 @@ merchant_cleaning:
 #   2. Amex category mapping (from amex_category_mapping.json) - high confidence  
 #   3. Regex patterns (below) - medium confidence fallback
 #   4. Default category - lowest confidence
+#
+# With 58 Amex category mappings and 117 merchant lookups, the regex patterns
+# are rarely needed. They serve as a final fallback for edge cases.
 category_inference:
   # Default category to use when no match is found
   default_category:
@@ -55,9 +58,9 @@ category_inference:
     subcategory_id: 18  # General
     subcategory_name: "General"
   
-  # Regex patterns as fallback for transactions not caught by merchant/Amex categories
-  # Keep these minimal since most categorization is handled by merchant_category_lookup.json
-  patterns:
+  # Minimal regex patterns as final fallback
+  # Most categorization is handled by merchant_category_lookup.json and amex_category_mapping.json
+  patterns: []
     - name: "Auto & Transport"
       id: 1
       subcategories:
