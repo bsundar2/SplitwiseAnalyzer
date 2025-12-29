@@ -1,7 +1,7 @@
 import os
 
-# Default spreadsheet name used by the Google Sheets writer
-DEFAULT_SPREADSHEET_NAME = "test_expenses"
+# Default worksheet name used by the Google Sheets writer
+DEFAULT_WORKSHEET_NAME = "test_expenses"
 
 # Path to service account JSON (resolved relative to this file)
 SHEETS_AUTHENTICATION_FILE = os.path.abspath(

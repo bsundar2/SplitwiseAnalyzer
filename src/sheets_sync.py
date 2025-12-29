@@ -8,7 +8,7 @@ import pandas as pd
 import pygsheets
 
 # Local application
-from src.constants.gsheets import DEFAULT_SPREADSHEET_NAME, SHEETS_AUTHENTICATION_FILE
+from src.constants.gsheets import SHEETS_AUTHENTICATION_FILE
 from src.utils import LOG
 
 
@@ -105,7 +105,7 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
 def write_to_sheets(
     write_data: pd.DataFrame,
     worksheet_name: str,
-    spreadsheet_name: str = DEFAULT_SPREADSHEET_NAME,
+    spreadsheet_key: str = None,
     append: bool = False,
 ):
     """Write a DataFrame to a Google Sheets worksheet.
@@ -114,11 +114,14 @@ def write_to_sheets(
     Otherwise the worksheet is cleared (or created) and rewritten.
     After writing, attempt to format key columns (date, amount) and freeze the header row.
     """
+    if not spreadsheet_key:
+        raise ValueError("spreadsheet_key is required")
+    
     # Inline small steps directly here instead of tiny helpers so flow is explicit
     gc = pygsheets.authorize(service_account_file=SHEETS_AUTHENTICATION_FILE)
 
-    # Open spreadsheet by name (project no longer uses spreadsheet keys)
-    sheet = gc.open(spreadsheet_name)
+    # Open spreadsheet by key
+    sheet = gc.open_by_key(spreadsheet_key)
 
     # Ensure worksheet exists: scan existing worksheets, else create
     worksheet = None
