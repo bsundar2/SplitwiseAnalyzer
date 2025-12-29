@@ -6,8 +6,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv("config/.env")
 
 from src.constants.config import CACHE_PATH, PROCESSED_DIR
+from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
 from src.parse_statement import parse_statement
 from src.splitwise_client import SplitwiseClient
 from src.utils import (
@@ -27,9 +32,13 @@ def process_statement(
     dry_run=True,
     limit=None,
     sheet_key: str = None,
-    worksheet_name: str = "Imported Transactions",
+    worksheet_name: str = None,
     no_sheet: bool = False,
 ):
+    # Use default from env vars if not provided
+    if worksheet_name is None:
+        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Splitwise Dry Runs")
+    
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
     df = parse_statement(path)
     if df is None or df.empty:
@@ -231,16 +240,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sheet-key",
         type=str,
-        default=None,
-        help="Spreadsheet key/ID to write processed output to",
+        default=os.getenv("SPREADSHEET_KEY"),
+        help="Spreadsheet key/ID to write processed output to (default: SPREADSHEET_KEY env var)",
     )
     parser.add_argument(
         "--worksheet-name",
         type=str,
-        default="Imported Transactions",
-        help="Name of the worksheet/tab to write processed output into",
+        default=None,
+        help="Name of the worksheet/tab to write processed output into (default: DRY_RUN_WORKSHEET_NAME env var for dry runs, 'Imported Transactions' otherwise)",
     )
     args = parser.parse_args()
+    
+    # Validate sheet_key if we're going to write to sheets
+    if not args.no_sheet and not args.sheet_key:
+        parser.error("--sheet-key is required (or set SPREADSHEET_KEY env var) unless --no-sheet is used")
 
     process_statement(
         args.statement,
