@@ -265,7 +265,7 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     # Patterns to skip when evaluating candidate lines
     skip_line_patterns = [
         r"^\d{10,}[@A-Z.]+",  # Phone/email patterns
-        r"^\+\d{10,}",  # Phone numbers
+        r"^\+\d{10,}",  # Phone numbers with +
         r"^CH_[A-Z0-9]+\s+\+\d{10,}$",  # Stripe charge with phone like "CH_2SFYNP7Q +18556687574"
         r"^\d{1,3}[\.,]\d{3}[\.,]\d{3}[\.,]\d{2}\s+.*RUPIAH",  # Indonesian rupiah amounts
         r"^FOREIGN SPEND AMOUNT:",
@@ -275,6 +275,15 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         r"^ADDITIONAL INFO\s*:",
         r"^DESCRIPTION\s*:",
         r"^PRICE\s*:",
+        r"^\(?\d{3}\)?[\s\.-]?\d{3}[\s\.-]?\d{4}$",  # Phone numbers: (800)698-4637, 800-806-6453, 415-348-6377
+        r"^1?800\d{7}$",  # Toll-free without dashes: 8006984637, 18002211212 (11 digits)
+        r"^\d{3}-\d{3}-\d{4}$",  # Standard phone format: 415-348-6377
+        r"^\d{10,11}$",  # 10-11 digit numbers (phone/ID): 4158005959, 18002211212
+        r"^\d{8,9}$",  # 8-9 digit numbers (likely phone or ID): 66362100, 9566306007
+        r"^0{2,}\d{1,5}$",  # Numbers with leading zeros: 007093, 000010
+        r"^\d{3,5}$",  # Short numeric codes: 811, 94403
+        r"^\d{15,}$",  # Very long concatenated numbers: 128358141588002383150
+        r"^[A-Z0-9]{5,12}\s+[\d\-\(\)]+$",  # Transaction ID + phone number pattern
     ]
 
     # Category labels that appear in Amex descriptions
@@ -375,6 +384,24 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
             rest = re.sub(r"^[A-Z0-9]{7,}\s+", "", line_upper)
             if rest in category_labels:
                 continue
+        
+        # Skip lines that are NUMBER + category label (like "007093      LODGING")
+        if re.match(r"^\d+\s+", line_upper):
+            rest = re.sub(r"^\d+\s+", "", line_upper)
+            if rest in category_labels:
+                continue
+        
+        # Skip lines with transaction IDs + phone/number patterns (like "1Z6ET73P132800 811 1648")
+        if re.match(r"^[A-Z0-9]{10,}\s+\d+", line_upper):
+            continue
+        
+        # Skip lines that are SHORT_CODE + PHONE (like "JZD 512-487-1630")
+        # But extract the short code as it's likely the merchant
+        phone_with_code = re.match(r"^([A-Z]{2,5})\s+[\d\-\(\)]+$", line_upper)
+        if phone_with_code:
+            # Use the code part as merchant name
+            candidate_lines.append(phone_with_code.group(1))
+            continue
 
         # Skip lines that are just category labels
         if line_upper in category_labels:
@@ -422,6 +449,18 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         cleaned = candidate_lines[0]
     else:
         cleaned = description
+    
+    # CRITICAL RULE: If selected line is just numbers/dashes/parens, skip it and try next candidate
+    # This catches any numeric-only patterns that slipped through
+    if re.match(r'^[\d\s\-\(\)\.]+$', cleaned.strip()):
+        # Try to find a non-numeric candidate
+        for candidate in candidate_lines[1:] + gglpay_lines[1:]:
+            if not re.match(r'^[\d\s\-\(\)\.]+$', candidate.strip()):
+                cleaned = candidate
+                break
+        else:
+            # If all candidates are numeric, use the original description
+            cleaned = description
 
     # Convert to uppercase for processing
     cleaned = cleaned.upper()
