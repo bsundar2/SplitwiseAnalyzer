@@ -61,19 +61,10 @@ def _ensure_size_for_append(worksheet, start_row: int, num_rows: int, num_cols: 
                 )
 
 
-def _format_header_bold(sheet, worksheet, num_columns: int):
-    header_range = f"A1:{_colnum_to_a1(num_columns)}1"
-    # Use public API only. If the worksheet doesn't support .format(), log and skip bolding.
-    if not hasattr(worksheet, "format"):
-        LOG.info("Worksheet object does not support .format(); skipping header bolding")
-        return
-    worksheet.format(header_range, {"textFormat": {"bold": True}})
-
-
 def _apply_column_formats(worksheet, write_data: pd.DataFrame):
-    if not hasattr(worksheet, "format"):
+    if not hasattr(worksheet, "apply_format"):
         LOG.info(
-            "Worksheet object does not support .format(); skipping column formatting"
+            "Worksheet object does not support .apply_format(); skipping column formatting"
         )
         return
 
@@ -82,7 +73,7 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
     currency_format = {"numberFormat": {"type": "CURRENCY", "pattern": CURRENCY_FORMAT_PATTERN}}
     for col_letter in CURRENCY_COLUMNS:
         cell_range = f"{col_letter}2:{col_letter}"
-        worksheet.format(cell_range, currency_format)
+        worksheet.apply_format(cell_range, currency_format)
 
     # date -> date (column A)
     cols = list(write_data.columns)
@@ -90,7 +81,7 @@ def _apply_column_formats(worksheet, write_data: pd.DataFrame):
         idx = cols.index("date") + 1
         col_a1 = _colnum_to_a1(idx)
         cell_range = f"{col_a1}2:{col_a1}"
-        worksheet.format(
+        worksheet.apply_format(
             cell_range, {"numberFormat": {"type": "DATE", "pattern": DATE_FORMAT_PATTERN}}
         )
 
