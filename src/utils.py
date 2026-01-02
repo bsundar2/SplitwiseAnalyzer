@@ -283,9 +283,7 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         r"^0{2,}\d{1,5}$",  # Numbers with leading zeros: 007093, 000010
         r"^\d{3,5}$",  # Short numeric codes: 811, 94403
         r"^\d{15,}$",  # Very long concatenated numbers: 128358141588002383150
-        r"^[A-Z0-9]{5,}\s+[\d\-\(\)+]+$",  # Transaction ID + phone number pattern (any length ID)
-        r"^415-348-6377$",  # Fitness SF phone number
-        r"^\+?16464536777$",  # Headway phone number
+        r"^[A-Z0-9]{5,12}\s+[\d\-\(\)]+$",  # Transaction ID + phone number pattern
     ]
 
     # Category labels that appear in Amex descriptions
@@ -325,11 +323,20 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         # Stripe transaction patterns - extract merchant name after phone
         r"^CH_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove CH_ transaction ID and phone
         r"^NT_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove NT_ transaction ID and phone
-        # Headway - common therapy app with many transaction IDs
-        r"^(?:CH_|NT_)[A-Z0-9]+\s+\+16464536777": "HEADWAY",  # Headway's phone number
-        # Fitness SF - has transaction IDs but consistent phone
-        r"\d{10,}\s+415-348-6377.*FITNESS\s+SF\s+TRANSBAY": "Fitness SF Transbay",
-        r"FITNESS\s+SF\s+TRANSBAY": "Fitness SF Transbay",  # Their phone number
+        # Specific merchant patterns from review corrections
+        r"\bNIKE\.COM\b": "Nike",
+        r"\bPLANTTHERAPY\.COM\b": "Planttherapy",
+        r"\bGOVEE\b": "Govee",
+        # Airlines - extract full name
+        r"\bAMERICAN\s+AIRLINES\b": "American Airlines",
+        r"\bJETBLUE\s+AIRWAYS\b": "JetBlue Airways",
+        r"\bUNITED\s+AIRLINES\b": "United Airlines",
+        r"\bEMIRATES\s+AIRLINES\b": "Emirates",
+        # Amazon - clean up merchandise patterns
+        r"^[A-Z0-9]{7,}\s+MERCHANDISE.*": "",  # Remove transaction ID + merchandise
+        r"\bAMAZON\.COM\b": "Amazon",
+        r"\bAMAZON\s+MARKETPLACE\s+NA\s+PA\b": "Amazon Marketplace",
+        r"\bAMAZON\s+MARKETPLACE\b": "Amazon",
         # Grab - any GRAB* transaction
         r"\bGRAB\s*\*\s*[A-Z0-9-]*": "Grab",  # Matches GRAB*A-8PXHISMWWU9TAV, Grab* A-8OTSU6QGX53TAV
         # Uber patterns
@@ -341,8 +348,6 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         # Google services
         r"\bGOOGLE\s*\*\s*FI\s+[A-Z0-9]+": "Google Fi",  # Google Fi with reference code
         r"\bGOOGLE\s*\*\s*": "Google ",
-        # NY Times - multiple transaction ID patterns
-        r"NYTIMES\.COM\s+NY\s+TIMES\s+DIGITAL": "NY Times",
         # Payment processors
         r"\bGGLPAY\s+": "",  # Remove GglPay prefix entirely
         r"\bPAYPAL\s*\*?\s*": "PayPal ",
@@ -354,8 +359,9 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     # Common city names and location indicators to remove
     location_patterns = [
         r"\b(?:SAN FRANCISCO|SANTA MONICA|NEW YORK|LOS ANGELES|SEATTLE|PORTLAND|"
-        r"CHICAGO|BOSTON|TORONTO|VANCOUVER|LONDON|PARIS|TOKYO)\b",
-        r"\b(?:CA|NY|WA|TX|FL|IL|MA|OR|DC|SG|UK|GB|NA)\s*$",  # State/country codes at end only
+        r"CHICAGO|BOSTON|TORONTO|VANCOUVER|LONDON|PARIS|TOKYO|LONG BEACH|TWIN FALLS|"
+        r"BEAVERTON|TSUEN WAN)\b",
+        r"\b(?:CA|NY|WA|TX|FL|IL|MA|OR|DC|SG|UK|GB|NA|HK|ID)\s*$",  # State/country codes at end only
     ]
 
     # URLs and domains to remove
@@ -365,7 +371,8 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         r"HELP\.UBER\.COM",
         r"AMZN\.COM/BILL",
         r"HULU\.COM/BILL",
-        r"\b[A-Z]+\.COM\b",
+        # Don't remove brand domains - only generic ones
+        # r"\b[A-Z]+\.COM\b",  # Disabled - removes Nike.com, Planttherapy.com etc
     ]
 
     # Foreign transaction details
@@ -446,8 +453,18 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         if any(re.search(pattern, line_upper) for pattern in foreign_patterns):
             continue
 
+        # Prioritize lines with merchant names over emails
+        # Check if this line has an actual business name (not email, not city)
+        has_merchant_name = any([
+            "LEFT DOOR" in line_upper,
+            "GOVEE" in line_upper,
+            "PLANTTHERAPY" in line_upper,
+            "NIKE" in line_upper,
+            "AMAZON" in line_upper,
+        ])
+        
         # Prioritize lines with GglPay or common merchant indicators
-        if "GGLPAY" in line_upper or "GOOGLE" in line_upper or "UBER" in line_upper or "GRAB" in line_upper:
+        if "GGLPAY" in line_upper or "GOOGLE" in line_upper or "UBER" in line_upper or "GRAB" in line_upper or has_merchant_name:
             gglpay_lines.append(line)
         else:
             candidate_lines.append(line)

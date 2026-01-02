@@ -75,17 +75,37 @@
     "count": 3,
     "primary_count": 3
   },
+  "airbnb hm3xnd4ph3": {
+    "canonical_name": "Airbnb Hm3xnd4ph3",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "airbnb hmkeya2bq4": {
+    "canonical_name": "Airbnb Hmkeya2bq4",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
   "alexanders pattiserie": {
     "category": "Entertainment - Other",
     "confidence": 0.5,
     "count": 2,
     "primary_count": 1
   },
+  "amazon": {
+    "canonical_name": "Amazon",
+    "category": "Home",
+    "subcategory": "Other"
+  },
   "amazon web services": {
     "category": "Life - Other",
     "confidence": 0.9090909090909091,
     "count": 11,
     "primary_count": 10
+  },
+  "american airlines": {
+    "canonical_name": "American airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
   },
   "amex fine hotels and resorts": {
     "canonical_name": "Mandarin Oriental",
@@ -137,6 +157,11 @@
     "confidence": 1.0,
     "count": 3,
     "primary_count": 3
+  },
+  "bay padel - dogpatch": {
+    "canonical_name": "Bay Padel - Dogpatch",
+    "category": "Entertainment",
+    "subcategory": "Sports"
   },
   "baywhee": {
     "category": "Taxi",
@@ -439,6 +464,11 @@
     "count": 3,
     "primary_count": 3
   },
+  "gardens by the bay": {
+    "canonical_name": "Gardens by the bay",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
   "gas": {
     "category": "Gas/fuel",
     "confidence": 1.0,
@@ -454,6 +484,11 @@
     "canonical_name": "Google Fi Google Payment",
     "category": "Utilities",
     "subcategory": "TV/Phone/Internet"
+  },
+  "govee": {
+    "canonical_name": "Govee",
+    "category": "Home",
+    "subcategory": "Furniture"
   },
   "grab": {
     "category": "Transportation",
@@ -505,6 +540,11 @@
     "count": 2,
     "primary_count": 1
   },
+  "impiana private villas": {
+    "canonical_name": "Impiana Private Villas",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
   "indonesia": {
     "canonical_name": "Singapore Airlines",
     "category": "Transportation",
@@ -521,6 +561,11 @@
     "confidence": 1.0,
     "count": 4,
     "primary_count": 4
+  },
+  "jetblue airways": {
+    "canonical_name": "Jetblue airways",
+    "category": "Transportation",
+    "subcategory": "Plane"
   },
   "khazana": {
     "category": "Dining out",
@@ -560,6 +605,11 @@
     "count": 2,
     "primary_count": 2
   },
+  "lodge 7465115": {
+    "canonical_name": "Lodge 7465115",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
   "lyft": {
     "category": "Taxi",
     "confidence": 1.0,
@@ -588,6 +638,11 @@
     "confidence": 1.0,
     "count": 2,
     "primary_count": 2
+  },
+  "mandarin oriental singapore": {
+    "canonical_name": "Mandarin Oriental Singapore",
+    "category": "Transportation",
+    "subcategory": "Hotel"
   },
   "marufuku ramen redwood city": {
     "category": "Dining out",
@@ -635,6 +690,11 @@
     "count": 2,
     "primary_count": 2
   },
+  "mount rainier natl park 000009450": {
+    "canonical_name": "Mount Rainier Natl Park 000009450",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
   "mylapore": {
     "category": "Dining out",
     "confidence": 1.0,
@@ -660,6 +720,7 @@
     "primary_count": 11
   },
   "nike": {
+    "canonical_name": "Nike",
     "category": "Life",
     "subcategory": "Clothing"
   },
@@ -731,6 +792,11 @@
     "confidence": 0.6666666666666666,
     "count": 3,
     "primary_count": 2
+  },
+  "planttherapy": {
+    "canonical_name": "Planttherapy",
+    "category": "Home",
+    "subcategory": "Other"
   },
   "pluckys cafe": {
     "category": "Dining out",
@@ -818,10 +884,20 @@
     "count": 14,
     "primary_count": 14
   },
+  "saks direct 689": {
+    "canonical_name": "Saks Direct 689",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
   "saks direct 689 0647": {
     "canonical_name": "David Yurman",
     "category": "Home",
     "subcategory": "Other"
+  },
+  "saluhall": {
+    "canonical_name": "Saluhall",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
   },
   "saluhall market": {
     "category": "Dining out",
@@ -911,6 +987,11 @@
     "confidence": 1.0,
     "count": 5,
     "primary_count": 5
+  },
+  "tennis league network ll": {
+    "canonical_name": "Tennis League Network Ll",
+    "category": "Entertainment",
+    "subcategory": "Sports"
   },
   "thai rhapsody": {
     "category": "Dining out",
@@ -1003,6 +1084,16 @@
     "category": "Transportation",
     "subcategory": "Taxi"
   },
+  "universal tennis": {
+    "canonical_name": "Universal Tennis",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "untuckit": {
+    "canonical_name": "Untuckit",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
   "ups": {
     "category": "General",
     "confidence": 0.5,
@@ -1013,6 +1104,11 @@
     "canonical_name": "Cinemark",
     "category": "Entertainment",
     "subcategory": "Movies"
+  },
+  "usta norcal": {
+    "canonical_name": "Usta Norcal",
+    "category": "Entertainment",
+    "subcategory": "Sports"
   },
   "varam": {
     "category": "Dining out",

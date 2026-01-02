@@ -107,7 +107,7 @@ def display_transaction(row: pd.Series, index: int, total: int):
     if len(row['description_raw']) > 200:
         print("... (truncated)")
     print(f"\n{'─'*80}")
-    print(f"Extracted Merchant:  {row['expected_merchant']}")
+    print(f"Extracted Merchant:  {row['description']}")
     print(f"Current Category:    {row['category_name']}")
     print(f"Current Subcategory: {row['subcategory_name']}")
     
@@ -220,9 +220,9 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
             print("\nProvide corrections (press Enter to keep current value):")
             
             corrected_merchant = get_user_input(
-                f"Merchant name [{row['expected_merchant']}]: "
+                f"Merchant name [{row['description']}]: "
             )
-            corrected_merchant = corrected_merchant or row["expected_merchant"]
+            corrected_merchant = corrected_merchant or row["description"]
             
             corrected_category = get_user_input(
                 f"Category [{row['category_name']}]: "

@@ -51,6 +51,8 @@ def save_merchant_lookup(lookup: Dict):
 
 def normalize_merchant_key(merchant: str) -> str:
     """Normalize merchant name for use as lookup key."""
+    if not merchant or not isinstance(merchant, str):
+        return ""
     return merchant.lower().strip()
 
 
@@ -75,7 +77,12 @@ def apply_corrections(feedback: Dict, dry_run: bool = False) -> Dict:
     
     # Process approved entries - add them as-is
     for entry in feedback["approved"]:
-        key = normalize_merchant_key(entry["expected_merchant"])
+        merchant_name = entry.get("expected_merchant") or entry.get("description")
+        if not merchant_name:
+            continue
+        key = normalize_merchant_key(merchant_name)
+        if not key:
+            continue
         
         if key not in lookup:
             lookup[key] = {
@@ -96,8 +103,13 @@ def apply_corrections(feedback: Dict, dry_run: bool = False) -> Dict:
     
     # Process corrected entries - update with corrections
     for entry in feedback["corrected"]:
-        # Use the ORIGINAL extracted name as the key, but map to corrected values
-        key = normalize_merchant_key(entry["expected_merchant"])
+        # Use the corrected merchant name as the key
+        merchant_name = entry.get("corrected_merchant") or entry.get("description")
+        if not merchant_name:
+            continue
+        key = normalize_merchant_key(merchant_name)
+        if not key:
+            continue
         
         old_entry = lookup.get(key, {})
         new_entry = {
