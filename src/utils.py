@@ -266,7 +266,7 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     skip_line_patterns = [
         r"^\d{10,}[@A-Z.]+",  # Phone/email patterns
         r"^\+\d{10,}",  # Phone numbers with +
-        r"^CH_[A-Z0-9]+\s+\+\d{10,}$",  # Stripe charge with phone like "CH_2SFYNP7Q +18556687574"
+        r"^(?:CH|NT)_[A-Z0-9]+\s+\+\d{10,}$",  # Stripe/payment charge with phone like "CH_2SFYNP7Q +18556687574"
         r"^\d{1,3}[\.,]\d{3}[\.,]\d{3}[\.,]\d{2}\s+.*RUPIAH",  # Indonesian rupiah amounts
         r"^FOREIGN SPEND AMOUNT:",
         r"^COMMISSION AMOUNT:",
@@ -283,7 +283,9 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         r"^0{2,}\d{1,5}$",  # Numbers with leading zeros: 007093, 000010
         r"^\d{3,5}$",  # Short numeric codes: 811, 94403
         r"^\d{15,}$",  # Very long concatenated numbers: 128358141588002383150
-        r"^[A-Z0-9]{5,12}\s+[\d\-\(\)]+$",  # Transaction ID + phone number pattern
+        r"^[A-Z0-9]{5,}\s+[\d\-\(\)+]+$",  # Transaction ID + phone number pattern (any length ID)
+        r"^415-348-6377$",  # Fitness SF phone number
+        r"^\+?16464536777$",  # Headway phone number
     ]
 
     # Category labels that appear in Amex descriptions
@@ -320,6 +322,14 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
 
     # Payment processor prefixes and special merchants
     payment_processors = {
+        # Stripe transaction patterns - extract merchant name after phone
+        r"^CH_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove CH_ transaction ID and phone
+        r"^NT_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove NT_ transaction ID and phone
+        # Headway - common therapy app with many transaction IDs
+        r"^(?:CH_|NT_)[A-Z0-9]+\s+\+16464536777": "HEADWAY",  # Headway's phone number
+        # Fitness SF - has transaction IDs but consistent phone
+        r"\d{10,}\s+415-348-6377.*FITNESS\s+SF\s+TRANSBAY": "Fitness SF Transbay",
+        r"FITNESS\s+SF\s+TRANSBAY": "Fitness SF Transbay",  # Their phone number
         # Grab - any GRAB* transaction
         r"\bGRAB\s*\*\s*[A-Z0-9-]*": "Grab",  # Matches GRAB*A-8PXHISMWWU9TAV, Grab* A-8OTSU6QGX53TAV
         # Uber patterns
@@ -331,14 +341,14 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         # Google services
         r"\bGOOGLE\s*\*\s*FI\s+[A-Z0-9]+": "Google Fi",  # Google Fi with reference code
         r"\bGOOGLE\s*\*\s*": "Google ",
+        # NY Times - multiple transaction ID patterns
+        r"NYTIMES\.COM\s+NY\s+TIMES\s+DIGITAL": "NY Times",
         # Payment processors
         r"\bGGLPAY\s+": "",  # Remove GglPay prefix entirely
         r"\bPAYPAL\s*\*?\s*": "PayPal ",
         r"\bSQ\s*\*\s*": "Square ",
         r"\bAMZN\s+": "Amazon ",
         r"\bSP\s+": "",  # Remove SP prefix
-        # Misc patterns
-        r"\bCH_[A-Z0-9]+\s+": "",  # Remove Stripe charge IDs like CH_2SFYNP7Q
     }
 
     # Common city names and location indicators to remove
