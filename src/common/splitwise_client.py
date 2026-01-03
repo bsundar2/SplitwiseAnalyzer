@@ -5,9 +5,11 @@ including expense management, search, and data export.
 """
 
 # Standard library
+import json
 import os
 from datetime import datetime, timedelta
 from functools import cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 # Third-party
@@ -137,20 +139,52 @@ class SplitwiseClient:
         LOG.info(f"Retrieved {len(all_expenses)} expenses")
         return all_expenses
 
-    @cache
-    def fetch_expenses_with_details(self, start_date_str: str, end_date_str: str):
+    def _get_expense_cache_path(self, start_date_str: str, end_date_str: str) -> Path:
+        """Get the path to the disk cache file for a date range."""
+        # Extract year from date range for cache file naming
+        start_year = start_date_str.split("-")[0]
+        end_year = end_date_str.split("-")[0]
+        if start_year == end_year:
+            cache_name = f"splitwise_expense_details_{start_year}.json"
+        else:
+            cache_name = f"splitwise_expense_details_{start_year}_{end_year}.json"
+        
+        cache_dir = Path(__file__).parent.parent.parent / "data"
+        cache_dir.mkdir(exist_ok=True)
+        return cache_dir / cache_name
+
+    def fetch_expenses_with_details(
+        self, start_date_str: str, end_date_str: str, use_cache: bool = True
+    ):
         """Fetch all expenses within a date range with full details populated.
 
         This fetches the expense list first, then calls getExpense(id) for each
-        one to populate the details field. Results are cached using @cache.
+        one to populate the details field. Results are cached to disk and reused
+        on subsequent runs.
 
         Args:
             start_date_str: Start date as string (YYYY-MM-DD)
             end_date_str: End date as string (YYYY-MM-DD)
+            use_cache: If True, use disk cache if available (default: True)
 
         Returns:
             dict: Mapping of expense_id -> expense dict with details field populated
         """
+        cache_path = self._get_expense_cache_path(start_date_str, end_date_str)
+        
+        # Try to load from disk cache first
+        if use_cache and cache_path.exists():
+            try:
+                with open(cache_path, "r") as f:
+                    cached_data = json.load(f)
+                LOG.info(
+                    f"Loaded {len(cached_data)} expenses from disk cache: {cache_path.name}"
+                )
+                return cached_data
+            except Exception as e:
+                LOG.warning(f"Failed to load cache from {cache_path}: {e}")
+        
+        # Fetch from API if cache miss or disabled
         all_expenses = self._fetch_expenses_paginated(
             start_date_str, end_date_str, fetch_full_details=True
         )
@@ -170,7 +204,16 @@ class SplitwiseClient:
                 ),
             }
 
-        LOG.info(f"Cached {len(expenses_with_details)} expenses with details")
+        # Save to disk cache
+        try:
+            with open(cache_path, "w") as f:
+                json.dump(expenses_with_details, f, indent=2)
+            LOG.info(
+                f"Cached {len(expenses_with_details)} expenses to disk: {cache_path.name}"
+            )
+        except Exception as e:
+            LOG.warning(f"Failed to save cache to {cache_path}: {e}")
+        
         return expenses_with_details
 
     def get_my_expenses_by_date_range(self, start_date, end_date):
@@ -293,8 +336,10 @@ class SplitwiseClient:
         amount: float = None,
         date: str = None,
         merchant: str = None,
-        lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+        lookback_days: int = None,
         use_detailed_search: bool = False,
+        start_date: str = None,
+        end_date: str = None,
     ) -> Optional[Dict]:
         """Find an expense by its cc_reference_id or by matching transaction details.
 
@@ -307,7 +352,9 @@ class SplitwiseClient:
             amount: Transaction amount (required for fuzzy matching)
             date: Transaction date in YYYY-MM-DD format (required for fuzzy matching)
             merchant: Merchant name (optional, improves fuzzy matching)
-            lookback_days: Number of days to look back for matching expenses
+            lookback_days: Number of days to look back (deprecated, use start_date/end_date)
+            start_date: Start date for search range (YYYY-MM-DD), defaults to 2025-01-01
+            end_date: End date for search range (YYYY-MM-DD), defaults to 2025-12-31
 
         Returns:
             dict: The matching expense as a dictionary, or None if not found
@@ -324,13 +371,21 @@ class SplitwiseClient:
 
         # Use detailed search if requested (fetches full details for each expense)
         if use_detailed_search and cc_reference_id:
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=lookback_days)
+            # Use provided date range or default to 2025
+            if not start_date or not end_date:
+                if lookback_days:
+                    # Legacy behavior with lookback_days
+                    end_date_obj = datetime.now().date()
+                    start_date_obj = end_date_obj - timedelta(days=lookback_days)
+                    start_date = start_date_obj.strftime("%Y-%m-%d")
+                    end_date = end_date_obj.strftime("%Y-%m-%d")
+                else:
+                    # Default to full 2025 year
+                    start_date = "2025-01-01"
+                    end_date = "2025-12-31"
 
             # Call cached method with string dates
-            expense_cache = self.fetch_expenses_with_details(
-                start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
-            )
+            expense_cache = self.fetch_expenses_with_details(start_date, end_date)
 
             # Search in the cache
             cc_ref_clean = cc_reference_id.strip().strip("'\"")

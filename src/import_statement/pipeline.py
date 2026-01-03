@@ -35,6 +35,8 @@ def process_statement(
     sheet_key: str = None,
     worksheet_name: str = None,
     no_sheet: bool = False,
+    start_date: str = "2025-01-01",
+    end_date: str = "2025-12-31",
 ):
     # Use default from env vars if not provided
     if worksheet_name is None:
@@ -52,6 +54,12 @@ def process_statement(
 
     if not dry_run:
         client = SplitwiseClient()
+        
+        # Pre-fetch expenses for the specified date range to build disk cache
+        # This ensures we can detect duplicates across the entire period
+        LOG.info(f"Pre-fetching expenses from {start_date} to {end_date} to build disk cache...")
+        client.fetch_expenses_with_details(start_date, end_date, use_cache=True)
+        LOG.info("Disk cache ready for duplicate detection")
 
     results = []
     added = 0
@@ -106,6 +114,8 @@ def process_statement(
                     date=date,
                     merchant=merchant,
                     use_detailed_search=True,
+                    start_date=start_date,
+                    end_date=end_date,
                 )
             except (RuntimeError, ValueError) as e:
                 LOG.warning(
@@ -286,6 +296,18 @@ if __name__ == "__main__":
         default=None,
         help="Name of the worksheet/tab to write processed output into (default: DRY_RUN_WORKSHEET_NAME env var for dry runs, 'Imported Transactions' otherwise)",
     )
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        default="2025-01-01",
+        help="Start date for duplicate detection range (YYYY-MM-DD, default: 2025-01-01)",
+    )
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default="2025-12-31",
+        help="End date for duplicate detection range (YYYY-MM-DD, default: 2025-12-31)",
+    )
     args = parser.parse_args()
 
     # Validate sheet_key if we're going to write to sheets
@@ -301,4 +323,6 @@ if __name__ == "__main__":
         sheet_key=args.sheet_key,
         worksheet_name=args.worksheet_name,
         no_sheet=args.no_sheet,
+        start_date=args.start_date,
+        end_date=args.end_date,
     )
