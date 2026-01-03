@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
+from splitwise.category import Category
+from splitwise.user import ExpenseUser
 
 # Local application
 from src.constants.splitwise import DEFAULT_CURRENCY, SplitwiseUserId
@@ -44,6 +46,83 @@ class SplitwiseClient:
     @cache
     def get_current_user_id(self):
         return self.sObj.getCurrentUser().getId()
+
+    @cache
+    def fetch_expenses_with_details(self, start_date_str: str, end_date_str: str):
+        """Fetch all expenses within a date range with full details populated.
+        
+        This fetches the expense list first, then calls getExpense(id) for each
+        one to populate the details field. Results are cached using @lru_cache.
+        
+        Args:
+            start_date_str: Start date as string (YYYY-MM-DD)
+            end_date_str: End date as string (YYYY-MM-DD)
+            
+        Returns:
+            dict: Mapping of expense_id -> expense dict with details field populated
+        """
+        from datetime import datetime
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        
+        LOG.info(f"Fetching expenses with full details from {start_date} to {end_date}")
+        all_expenses = []
+        offset = 0
+        page_size = 50
+        has_more = True
+        
+        # First, get the list of expense IDs
+        while has_more:
+            try:
+                expenses = self.sObj.getExpenses(
+                    dated_after=start_date_str,
+                    dated_before=end_date_str,
+                    limit=page_size,
+                    offset=offset,
+                )
+                
+                if not expenses:
+                    break
+                    
+                all_expenses.extend(expenses)
+                
+                if len(expenses) < page_size:
+                    has_more = False
+                else:
+                    offset += page_size
+                    
+            except Exception as e:
+                LOG.error(f"Error fetching expense list (offset {offset}): {str(e)}")
+                raise
+        
+        LOG.info(f"Fetched {len(all_expenses)} expenses, now getting full details for each")
+        
+        # Now fetch each expense individually to get the details field
+        expenses_with_details = {}
+        for i, exp in enumerate(all_expenses):
+            try:
+                expense_id = exp.getId()
+                # Fetch full expense details
+                full_expense = self.sObj.getExpense(expense_id)
+                
+                expenses_with_details[expense_id] = {
+                    'id': expense_id,
+                    'date': full_expense.getDate(),
+                    'description': full_expense.getDescription(),
+                    'cost': full_expense.getCost(),
+                    'details': full_expense.getDetails() or '',
+                    'category': full_expense.getCategory().getName() if full_expense.getCategory() else None,
+                }
+                
+                if (i + 1) % 20 == 0:
+                    LOG.info(f"Processed {i + 1}/{len(all_expenses)} expenses")
+                    
+            except Exception as e:
+                LOG.warning(f"Error fetching details for expense {expense_id}: {str(e)}")
+                continue
+        
+        LOG.info(f"Cached {len(expenses_with_details)} expenses with details")
+        return expenses_with_details
 
     def get_my_expenses_by_date_range(self, start_date, end_date):
         """Fetch all expenses within a date range with automatic pagination.
@@ -177,6 +256,9 @@ class SplitwiseClient:
                         ExportColumns.ID: expense.getId(),
                     }
                 )
+                # Debug: Print details for recent expenses
+                if len(data) <= 3:
+                    print(f"[DEBUG] Expense {expense.getId()}: getDetails()={repr(expense.getDetails())}")
             except Exception as e:
                 LOG.warning(
                     f"Error processing expense {getattr(expense, 'id', 'unknown')}: {str(e)}"
@@ -193,6 +275,7 @@ class SplitwiseClient:
         date: str = None,
         merchant: str = None,
         lookback_days: int = 30,
+        use_detailed_search: bool = False,
     ) -> Optional[Dict]:
         """Find an expense by its cc_reference_id or by matching transaction details.
 
@@ -220,7 +303,27 @@ class SplitwiseClient:
             if not cc_reference_id:
                 cc_reference_id = None
 
-        # Fetch recent expenses
+        # Use detailed search if requested (fetches full details for each expense)
+        if use_detailed_search and cc_reference_id:
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=lookback_days)
+            
+            # Call cached method with string dates
+            expense_cache = self.fetch_expenses_with_details(
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d")
+            )
+            
+            # Search in the cache
+            cc_ref_clean = cc_reference_id.strip().strip("'\"")
+            for exp_id, exp_data in expense_cache.items():
+                details_clean = str(exp_data.get('details', '')).strip().strip("'\"")
+                if details_clean == cc_ref_clean:
+                    LOG.info(f"Found expense {exp_id} matching cc_reference_id: {cc_reference_id}")
+                    return exp_data
+            return None
+        
+        # Fallback: Fetch from API (legacy behavior, doesn't have details field)
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=lookback_days)
 
@@ -229,11 +332,25 @@ class SplitwiseClient:
             return None
 
         # First, try exact match by cc_reference_id in details if provided
-        if cc_reference_id and "details" in df.columns:
-            details_matches = df["details"].astype(str).str.strip() == cc_reference_id
+        print(f"[SEARCH DEBUG] cc_reference_id={cc_reference_id}, checking if should search details")
+        details_col = "Details"  # Column name from ExportColumns.DETAILS
+        if cc_reference_id and details_col in df.columns:
+            # Strip quotes and whitespace from both sides for comparison
+            # (Splitwise SDK may wrap details in DOUBLE quotes like ''value'')
+            df_details_clean = df[details_col].astype(str).str.strip()
+            # Strip multiple layers of quotes (Splitwise returns ''value'' with double quotes)
+            for _ in range(3):
+                df_details_clean = df_details_clean.str.strip("'\"")
+            
+            cc_ref_clean = str(cc_reference_id).strip()
+            for _ in range(3):
+                cc_ref_clean = cc_ref_clean.strip("'\"")
+            
+            details_matches = df_details_clean == cc_ref_clean
             matches = df[details_matches]
 
             if len(matches) == 1:
+                LOG.info(f"Found exact match for cc_reference_id: {cc_reference_id}")
                 return matches.iloc[0].to_dict()
             elif len(matches) > 1:
                 LOG.warning(
@@ -244,6 +361,8 @@ class SplitwiseClient:
                     .iloc[0]
                     .to_dict()
                 )
+            else:
+                LOG.debug(f"No exact details match found for '{cc_ref_clean}'")
 
         # If we have amount and date, try fuzzy matching
         if amount is not None and date:
@@ -330,60 +449,122 @@ class SplitwiseClient:
         date = txn.get("date")
         currency = txn.get("currency") or DEFAULT_CURRENCY
 
-        # Always run category inference for statement imports
-        category_info = infer_category(txn)
-        if category_info:
-            txn.update(
-                {
-                    "category_id": category_info["category_id"],
-                    "subcategory_id": category_info.get("subcategory_id", 0),
-                    "category_name": category_info.get("category_name"),
-                    "subcategory_name": category_info.get("subcategory_name"),
-                }
-            )
-            LOG.info(
-                f"Assigned category: {category_info.get('category_name')} / {category_info.get('subcategory_name')}"
-            )
+        # Only run category inference if not already provided
+        if txn.get("category_id") is None:
+            LOG.info("Category not provided, running inference")
+            category_info = infer_category(txn)
+            if category_info:
+                txn.update(
+                    {
+                        "category_id": category_info["category_id"],
+                        "subcategory_id": category_info.get("subcategory_id", 0),
+                        "category_name": category_info.get("category_name"),
+                        "subcategory_name": category_info.get("subcategory_name"),
+                    }
+                )
+                LOG.info(
+                    f"Assigned category: {category_info.get('category_name')} / {category_info.get('subcategory_name')}"
+                )
+            else:
+                LOG.warning("No category could be inferred, using default category")
+                txn.update(
+                    {
+                        "category_id": 18,  # Default "Other" category
+                        "subcategory_id": 0,
+                        "category_name": "Other",
+                        "subcategory_name": "Other",
+                    }
+                )
         else:
-            LOG.warning("No category could be inferred, using default category")
-            txn.update(
-                {
-                    "category_id": 18,  # Default "Other" category
-                    "subcategory_id": 0,
-                    "category_name": "Other",
-                    "subcategory_name": "Other",
-                }
+            LOG.info(
+                f"Using provided category: {txn.get('category_name')} / {txn.get('subcategory_name')} "
+                f"(ID: {txn.get('category_id')}, Subcategory ID: {txn.get('subcategory_id')})"
             )
 
         # Use SDK Expense objects
         expense = Expense()
         expense.setCost(str(cost))
         expense.setDescription(desc)
-        expense.setDetails(cc_reference_id)
+        expense.setDetails(str(cc_reference_id))  # Ensure it's a plain string without quotes
         expense.setDate(date)
         expense.setCurrencyCode(currency)
 
-        # Always set the category (we've ensured it exists above)
-        expense.setCategoryId(txn["category_id"])
-        if txn.get("subcategory_id") is not None:
-            expense.setSubcategoryId(txn["subcategory_id"])
+        # Set the category - fail if None (no default fallback)
+        category_id = txn.get("category_id")
+        subcategory_id = txn.get("subcategory_id")
+        
+        LOG.info(
+            f"Setting category: ID={category_id}, Subcategory ID={subcategory_id}, "
+            f"Name={txn.get('category_name')}/{txn.get('subcategory_name')}"
+        )
+        
+        if category_id is None or category_id == 0:
+            error_msg = (
+                f"Cannot add expense without valid category. "
+                f"Merchant: {desc}, "
+                f"Category from inference: {txn.get('category_name')} / {txn.get('subcategory_name')}"
+            )
+            LOG.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Create category object with ID and subcategory
+        category = Category()
+        category.id = category_id
+        if subcategory_id is not None and subcategory_id != 0:
+            # Try setting subcategory properly
+            LOG.info(f"Setting subcategory ID: {subcategory_id}")
+            # The Category object may need subcategory set differently
+            try:
+                category.subcategory_id = subcategory_id
+            except AttributeError:
+                LOG.warning(f"Could not set subcategory_id as attribute, trying subcategories list")
+                category.subcategories = [{"id": subcategory_id}]
+        
+        LOG.info(f"Category object created: id={category.id}, has subcategory={hasattr(category, 'subcategory_id')}")
+        expense.setCategory(category)
         LOG.debug(
             f"Set category: {txn.get('category_name')} / {txn.get('subcategory_name')}"
         )
 
         # Handle user shares if provided
         if users:
-            for user in users:
-                user_id = user.get("user_id")
-                paid_share = str(user.get("paid_share", "0.0"))
-                owed_share = str(user.get("owed_share", "0.0"))
-                expense.addUser(user_id, paid_share=paid_share, owed_share=owed_share)
+            for user_data in users:
+                user = ExpenseUser()
+                user.setId(user_data.get("user_id"))
+                user.setPaidShare(str(user_data.get("paid_share", "0.0")))
+                user.setOwedShare(str(user_data.get("owed_share", "0.0")))
+                expense.addUser(user)
 
         # Create the expense and return the ID
         try:
             created = self.sObj.createExpense(expense)
-            return created.getId() if hasattr(created, "getId") else created
+            
+            # Handle tuple return (success, expense_object) or direct Expense object
+            if isinstance(created, tuple):
+                if len(created) >= 2 and created[1] is not None:
+                    created = created[1]  # Get the expense object from tuple
+                elif len(created) >= 1:
+                    created = created[0]
+            
+            # Extract ID using various methods
+            expense_id = None
+            if hasattr(created, 'getId') and callable(created.getId):
+                expense_id = created.getId()
+            elif hasattr(created, 'id'):
+                expense_id = created.id
+            elif isinstance(created, (int, str)):
+                expense_id = created
+            
+            if expense_id is None:
+                LOG.error(f"Could not extract expense ID. Type: {type(created)}, Dir: {dir(created) if hasattr(created, '__dict__') else 'N/A'}")
+                raise RuntimeError("Failed to get expense ID from created expense")
+            
+            LOG.info(f"Successfully created expense with ID: {expense_id}")
+            return int(expense_id)
+        except RuntimeError:
+            raise
         except Exception as e:
+            LOG.error(f"Error creating expense: {str(e)}", exc_info=True)
             raise RuntimeError(f"Failed to create expense: {str(e)}")
 
     @cache

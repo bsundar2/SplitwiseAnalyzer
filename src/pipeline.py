@@ -48,14 +48,18 @@ def process_statement(
     mkdir_p(PROCESSED_DIR)
     cache = load_state(CACHE_PATH)
     client = None
+    
     if not dry_run:
         client = SplitwiseClient()
 
     results = []
     added = 0
+    attempted = 0
     for idx, row in df.reset_index(drop=True).iterrows():
-        if limit and added >= limit:
+        if limit and attempted >= limit:
+            LOG.info(f"Reached limit of {limit} transactions, stopping")
             break
+        attempted += 1
         date = row.get("date")
         desc = row.get("description")
         amount = row.get("amount")
@@ -96,7 +100,7 @@ def process_statement(
         if client:
             try:
                 remote_found = client.find_expense_by_cc_reference(
-                    cc_reference_id, merchant=merchant
+                    cc_reference_id, amount=amount, date=date, merchant=merchant, use_detailed_search=True
                 )
             except (RuntimeError, ValueError) as e:
                 LOG.warning(
@@ -121,6 +125,7 @@ def process_statement(
                 "description": remote_found.get("description"),
                 "added_at": now_iso(),
             }
+            save_state_atomic(CACHE_PATH, cache)  # Save cache immediately
             results.append(entry)
             continue
 
@@ -152,15 +157,42 @@ def process_statement(
             continue
 
         try:
-            sid = client.add_expense_from_txn(
+            from src.constants.splitwise import SplitwiseUserId
+            
+            # Get current user ID
+            current_user_id = client.get_current_user_id()
+            
+            # Create split: SELF_EXPENSE paid everything, current user owes everything
+            users = [
                 {
-                    "date": date,
-                    "amount": amount,
-                    "description": desc_clean,  # Use clean description for Splitwise
-                    "merchant": merchant,
-                    "detail": cc_reference_id,
+                    "user_id": SplitwiseUserId.SELF_EXPENSE,
+                    "paid_share": float(amount),
+                    "owed_share": 0.0,
                 },
+                {
+                    "user_id": current_user_id,
+                    "paid_share": 0.0,
+                    "owed_share": float(amount),
+                },
+            ]
+            
+            # Build transaction dict with category info
+            txn_dict = {
+                "date": date,
+                "amount": amount,
+                "description": desc_clean,  # Use clean description for Splitwise
+                "merchant": merchant,
+                "detail": cc_reference_id,
+                "category_id": entry.get("category_id"),
+                "subcategory_id": entry.get("subcategory_id"),
+                "category_name": entry.get("category_name"),
+                "subcategory_name": entry.get("subcategory_name"),
+            }
+            
+            sid = client.add_expense_from_txn(
+                txn_dict,
                 cc_reference_id,
+                users=users,
             )
             entry["status"] = "added"
             entry["splitwise_id"] = sid
