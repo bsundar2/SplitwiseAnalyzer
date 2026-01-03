@@ -1,30 +1,31 @@
-# Orchestrates the ETL pipeline
+"""Orchestrates the ETL pipeline for importing credit card statements to Splitwise."""
 
+# Standard library
 import argparse
 import os
-from pathlib import Path
-from typing import Dict, List, Optional
 
+# Third-party
 import pandas as pd
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv("config/.env")
 
+# Local application
 from src.constants.config import CACHE_PATH, PROCESSED_DIR
 from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
 from src.parse_statement import parse_statement
+from src.sheets_sync import write_to_sheets
 from src.splitwise_client import SplitwiseClient
 from src.utils import (
     LOG,
-    load_state,
-    save_state_atomic,
-    now_iso,
-    mkdir_p,
-    infer_category,
     clean_merchant_name,
+    infer_category,
+    load_state,
+    mkdir_p,
+    now_iso,
+    save_state_atomic,
 )
-from src.sheets_sync import write_to_sheets
 
 
 def process_statement(
@@ -48,7 +49,7 @@ def process_statement(
     mkdir_p(PROCESSED_DIR)
     cache = load_state(CACHE_PATH)
     client = None
-    
+
     if not dry_run:
         client = SplitwiseClient()
 
@@ -100,7 +101,11 @@ def process_statement(
         if client:
             try:
                 remote_found = client.find_expense_by_cc_reference(
-                    cc_reference_id, amount=amount, date=date, merchant=merchant, use_detailed_search=True
+                    cc_reference_id,
+                    amount=amount,
+                    date=date,
+                    merchant=merchant,
+                    use_detailed_search=True,
                 )
             except (RuntimeError, ValueError) as e:
                 LOG.warning(
@@ -158,10 +163,10 @@ def process_statement(
 
         try:
             from src.constants.splitwise import SplitwiseUserId
-            
+
             # Get current user ID
             current_user_id = client.get_current_user_id()
-            
+
             # Create split: SELF_EXPENSE paid everything, current user owes everything
             users = [
                 {
@@ -175,7 +180,7 @@ def process_statement(
                     "owed_share": float(amount),
                 },
             ]
-            
+
             # Build transaction dict with category info
             txn_dict = {
                 "date": date,
@@ -188,7 +193,7 @@ def process_statement(
                 "category_name": entry.get("category_name"),
                 "subcategory_name": entry.get("subcategory_name"),
             }
-            
+
             sid = client.add_expense_from_txn(
                 txn_dict,
                 cc_reference_id,

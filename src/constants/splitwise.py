@@ -12,6 +12,12 @@ IMPORTED_ID_MARKER = "[ImportedID:"
 # Default currency code used for transactions
 DEFAULT_CURRENCY = "USD"
 
+# Splitwise API pagination settings
+SPLITWISE_PAGE_SIZE = 50  # Maximum allowed by Splitwise API
+DEFAULT_LOOKBACK_DAYS = (
+    30  # Default number of days to look back for duplicate detection
+)
+
 
 class SplitwiseUserId(IntEnum):
     SELF_EXPENSE = 113553156

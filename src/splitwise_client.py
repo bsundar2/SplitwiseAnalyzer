@@ -6,14 +6,12 @@ including expense management, search, and data export.
 
 # Standard library
 import os
-import re
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, Union, List
 from functools import cache
-
-import numpy as np
+from typing import Any, Dict, List, Optional, Union
 
 # Third-party
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
@@ -21,9 +19,14 @@ from splitwise.category import Category
 from splitwise.user import ExpenseUser
 
 # Local application
-from src.constants.splitwise import DEFAULT_CURRENCY, SplitwiseUserId
 from src.constants.export_columns import ExportColumns
-from src.utils import LOG, parse_float_safe, infer_category
+from src.constants.splitwise import (
+    DEFAULT_CURRENCY,
+    DEFAULT_LOOKBACK_DAYS,
+    SPLITWISE_PAGE_SIZE,
+    SplitwiseUserId,
+)
+from src.utils import LOG, infer_category, parse_float_safe
 
 load_dotenv("config/.env")
 
@@ -47,30 +50,29 @@ class SplitwiseClient:
     def get_current_user_id(self):
         return self.sObj.getCurrentUser().getId()
 
-    @cache
-    def fetch_expenses_with_details(self, start_date_str: str, end_date_str: str):
-        """Fetch all expenses within a date range with full details populated.
-        
-        This fetches the expense list first, then calls getExpense(id) for each
-        one to populate the details field. Results are cached using @lru_cache.
-        
+    def _fetch_expenses_paginated(
+        self, start_date_str: str, end_date_str: str, fetch_full_details: bool = False
+    ):
+        """Core method to fetch expenses with pagination and optional full details.
+
         Args:
             start_date_str: Start date as string (YYYY-MM-DD)
             end_date_str: End date as string (YYYY-MM-DD)
-            
+            fetch_full_details: If True, fetches each expense individually to populate
+                              the details field (slower but necessary for duplicate detection)
+
         Returns:
-            dict: Mapping of expense_id -> expense dict with details field populated
+            list: List of expense objects from Splitwise API
         """
-        from datetime import datetime
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-        
-        LOG.info(f"Fetching expenses with full details from {start_date} to {end_date}")
+        LOG.info(
+            f"Fetching expenses from {start_date_str} to {end_date_str}"
+            + (" with full details" if fetch_full_details else "")
+        )
         all_expenses = []
         offset = 0
-        page_size = 50
+        page_size = SPLITWISE_PAGE_SIZE
         has_more = True
-        
+
         # First, get the list of expense IDs
         while has_more:
             try:
@@ -80,47 +82,87 @@ class SplitwiseClient:
                     limit=page_size,
                     offset=offset,
                 )
-                
+
                 if not expenses:
                     break
-                    
+
                 all_expenses.extend(expenses)
-                
+
                 if len(expenses) < page_size:
                     has_more = False
                 else:
                     offset += page_size
-                    
+
+                LOG.debug(
+                    f"Fetched {len(expenses)} expenses (total: {len(all_expenses)})"
+                )
+
             except Exception as e:
                 LOG.error(f"Error fetching expense list (offset {offset}): {str(e)}")
                 raise
-        
-        LOG.info(f"Fetched {len(all_expenses)} expenses, now getting full details for each")
-        
-        # Now fetch each expense individually to get the details field
+
+        # If requested, fetch full details for each expense
+        if fetch_full_details:
+            LOG.info(
+                f"Fetched {len(all_expenses)} expenses, now getting full details for each"
+            )
+            detailed_expenses = []
+            for i, exp in enumerate(all_expenses):
+                try:
+                    expense_id = exp.getId()
+                    # Fetch full expense details (includes the details field)
+                    full_expense = self.sObj.getExpense(expense_id)
+                    detailed_expenses.append(full_expense)
+
+                    if (i + 1) % 20 == 0:
+                        LOG.info(f"Processed {i + 1}/{len(all_expenses)} expenses")
+
+                except Exception as e:
+                    LOG.warning(
+                        f"Error fetching details for expense {expense_id}: {str(e)}"
+                    )
+                    # Keep the original expense without full details
+                    detailed_expenses.append(exp)
+                    continue
+
+            all_expenses = detailed_expenses
+
+        LOG.info(f"Retrieved {len(all_expenses)} expenses")
+        return all_expenses
+
+    @cache
+    def fetch_expenses_with_details(self, start_date_str: str, end_date_str: str):
+        """Fetch all expenses within a date range with full details populated.
+
+        This fetches the expense list first, then calls getExpense(id) for each
+        one to populate the details field. Results are cached using @cache.
+
+        Args:
+            start_date_str: Start date as string (YYYY-MM-DD)
+            end_date_str: End date as string (YYYY-MM-DD)
+
+        Returns:
+            dict: Mapping of expense_id -> expense dict with details field populated
+        """
+        all_expenses = self._fetch_expenses_paginated(
+            start_date_str, end_date_str, fetch_full_details=True
+        )
+
+        # Convert to dict format for duplicate detection
         expenses_with_details = {}
-        for i, exp in enumerate(all_expenses):
-            try:
-                expense_id = exp.getId()
-                # Fetch full expense details
-                full_expense = self.sObj.getExpense(expense_id)
-                
-                expenses_with_details[expense_id] = {
-                    'id': expense_id,
-                    'date': full_expense.getDate(),
-                    'description': full_expense.getDescription(),
-                    'cost': full_expense.getCost(),
-                    'details': full_expense.getDetails() or '',
-                    'category': full_expense.getCategory().getName() if full_expense.getCategory() else None,
-                }
-                
-                if (i + 1) % 20 == 0:
-                    LOG.info(f"Processed {i + 1}/{len(all_expenses)} expenses")
-                    
-            except Exception as e:
-                LOG.warning(f"Error fetching details for expense {expense_id}: {str(e)}")
-                continue
-        
+        for expense in all_expenses:
+            expense_id = expense.getId()
+            expenses_with_details[expense_id] = {
+                "id": expense_id,
+                "date": expense.getDate(),
+                "description": expense.getDescription(),
+                "cost": expense.getCost(),
+                "details": expense.getDetails() or "",
+                "category": (
+                    expense.getCategory().getName() if expense.getCategory() else None
+                ),
+            }
+
         LOG.info(f"Cached {len(expenses_with_details)} expenses with details")
         return expenses_with_details
 
@@ -138,39 +180,12 @@ class SplitwiseClient:
         Returns:
             DataFrame containing all matching expenses
         """
-        all_expenses = []
-        offset = 0
-        page_size = 50  # Maximum allowed by Splitwise API
-        has_more = True
-
-        while has_more:
-            try:
-                # Get a page of expenses
-                expenses = self.sObj.getExpenses(
-                    dated_after=start_date.strftime("%Y-%m-%d"),
-                    dated_before=end_date.strftime("%Y-%m-%d"),
-                    limit=page_size,
-                    offset=offset,
-                )
-
-                if not expenses:  # No more expenses
-                    break
-
-                all_expenses.extend(expenses)
-
-                # If we got fewer results than the page size, we've reached the end
-                if len(expenses) < page_size:
-                    has_more = False
-                else:
-                    offset += page_size
-
-                LOG.debug(
-                    f"Fetched {len(expenses)} expenses (total: {len(all_expenses)})"
-                )
-
-            except Exception as e:
-                LOG.error(f"Error fetching expenses (offset {offset}): {str(e)}")
-                raise
+        # Use the core pagination method (without full details for performance)
+        all_expenses = self._fetch_expenses_paginated(
+            start_date.strftime("%Y-%m-%d"),
+            end_date.strftime("%Y-%m-%d"),
+            fetch_full_details=False,
+        )
 
         # Process the expenses into a DataFrame
         my_user_id = self.get_current_user_id()
@@ -258,7 +273,9 @@ class SplitwiseClient:
                 )
                 # Debug: Print details for recent expenses
                 if len(data) <= 3:
-                    print(f"[DEBUG] Expense {expense.getId()}: getDetails()={repr(expense.getDetails())}")
+                    print(
+                        f"[DEBUG] Expense {expense.getId()}: getDetails()={repr(expense.getDetails())}"
+                    )
             except Exception as e:
                 LOG.warning(
                     f"Error processing expense {getattr(expense, 'id', 'unknown')}: {str(e)}"
@@ -274,7 +291,7 @@ class SplitwiseClient:
         amount: float = None,
         date: str = None,
         merchant: str = None,
-        lookback_days: int = 30,
+        lookback_days: int = DEFAULT_LOOKBACK_DAYS,
         use_detailed_search: bool = False,
     ) -> Optional[Dict]:
         """Find an expense by its cc_reference_id or by matching transaction details.
@@ -307,22 +324,23 @@ class SplitwiseClient:
         if use_detailed_search and cc_reference_id:
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=lookback_days)
-            
+
             # Call cached method with string dates
             expense_cache = self.fetch_expenses_with_details(
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
+                start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
             )
-            
+
             # Search in the cache
             cc_ref_clean = cc_reference_id.strip().strip("'\"")
             for exp_id, exp_data in expense_cache.items():
-                details_clean = str(exp_data.get('details', '')).strip().strip("'\"")
+                details_clean = str(exp_data.get("details", "")).strip().strip("'\"")
                 if details_clean == cc_ref_clean:
-                    LOG.info(f"Found expense {exp_id} matching cc_reference_id: {cc_reference_id}")
+                    LOG.info(
+                        f"Found expense {exp_id} matching cc_reference_id: {cc_reference_id}"
+                    )
                     return exp_data
             return None
-        
+
         # Fallback: Fetch from API (legacy behavior, doesn't have details field)
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=lookback_days)
@@ -332,7 +350,9 @@ class SplitwiseClient:
             return None
 
         # First, try exact match by cc_reference_id in details if provided
-        print(f"[SEARCH DEBUG] cc_reference_id={cc_reference_id}, checking if should search details")
+        print(
+            f"[SEARCH DEBUG] cc_reference_id={cc_reference_id}, checking if should search details"
+        )
         details_col = "Details"  # Column name from ExportColumns.DETAILS
         if cc_reference_id and details_col in df.columns:
             # Strip quotes and whitespace from both sides for comparison
@@ -341,11 +361,11 @@ class SplitwiseClient:
             # Strip multiple layers of quotes (Splitwise returns ''value'' with double quotes)
             for _ in range(3):
                 df_details_clean = df_details_clean.str.strip("'\"")
-            
+
             cc_ref_clean = str(cc_reference_id).strip()
             for _ in range(3):
                 cc_ref_clean = cc_ref_clean.strip("'\"")
-            
+
             details_matches = df_details_clean == cc_ref_clean
             matches = df[details_matches]
 
@@ -485,19 +505,21 @@ class SplitwiseClient:
         expense = Expense()
         expense.setCost(str(cost))
         expense.setDescription(desc)
-        expense.setDetails(str(cc_reference_id))  # Ensure it's a plain string without quotes
+        expense.setDetails(
+            str(cc_reference_id)
+        )  # Ensure it's a plain string without quotes
         expense.setDate(date)
         expense.setCurrencyCode(currency)
 
         # Set the category - fail if None (no default fallback)
         category_id = txn.get("category_id")
         subcategory_id = txn.get("subcategory_id")
-        
+
         LOG.info(
             f"Setting category: ID={category_id}, Subcategory ID={subcategory_id}, "
             f"Name={txn.get('category_name')}/{txn.get('subcategory_name')}"
         )
-        
+
         if category_id is None or category_id == 0:
             error_msg = (
                 f"Cannot add expense without valid category. "
@@ -506,7 +528,7 @@ class SplitwiseClient:
             )
             LOG.error(error_msg)
             raise ValueError(error_msg)
-        
+
         # Create category object with ID and subcategory
         category = Category()
         category.id = category_id
@@ -517,10 +539,14 @@ class SplitwiseClient:
             try:
                 category.subcategory_id = subcategory_id
             except AttributeError:
-                LOG.warning(f"Could not set subcategory_id as attribute, trying subcategories list")
+                LOG.warning(
+                    f"Could not set subcategory_id as attribute, trying subcategories list"
+                )
                 category.subcategories = [{"id": subcategory_id}]
-        
-        LOG.info(f"Category object created: id={category.id}, has subcategory={hasattr(category, 'subcategory_id')}")
+
+        LOG.info(
+            f"Category object created: id={category.id}, has subcategory={hasattr(category, 'subcategory_id')}"
+        )
         expense.setCategory(category)
         LOG.debug(
             f"Set category: {txn.get('category_name')} / {txn.get('subcategory_name')}"
@@ -538,27 +564,29 @@ class SplitwiseClient:
         # Create the expense and return the ID
         try:
             created = self.sObj.createExpense(expense)
-            
+
             # Handle tuple return (success, expense_object) or direct Expense object
             if isinstance(created, tuple):
                 if len(created) >= 2 and created[1] is not None:
                     created = created[1]  # Get the expense object from tuple
                 elif len(created) >= 1:
                     created = created[0]
-            
+
             # Extract ID using various methods
             expense_id = None
-            if hasattr(created, 'getId') and callable(created.getId):
+            if hasattr(created, "getId") and callable(created.getId):
                 expense_id = created.getId()
-            elif hasattr(created, 'id'):
+            elif hasattr(created, "id"):
                 expense_id = created.id
             elif isinstance(created, (int, str)):
                 expense_id = created
-            
+
             if expense_id is None:
-                LOG.error(f"Could not extract expense ID. Type: {type(created)}, Dir: {dir(created) if hasattr(created, '__dict__') else 'N/A'}")
+                LOG.error(
+                    f"Could not extract expense ID. Type: {type(created)}, Dir: {dir(created) if hasattr(created, '__dict__') else 'N/A'}"
+                )
                 raise RuntimeError("Failed to get expense ID from created expense")
-            
+
             LOG.info(f"Successfully created expense with ID: {expense_id}")
             return int(expense_id)
         except RuntimeError:
