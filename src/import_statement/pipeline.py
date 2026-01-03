@@ -37,6 +37,8 @@ def process_statement(
     no_sheet: bool = False,
     start_date: str = "2025-01-01",
     end_date: str = "2025-12-31",
+    append_to_sheet: bool = False,
+    offset: int = 0,
 ):
     # Use default from env vars if not provided
     if worksheet_name is None:
@@ -64,7 +66,13 @@ def process_statement(
     results = []
     added = 0
     attempted = 0
+    skipped = 0
     for idx, row in df.reset_index(drop=True).iterrows():
+        # Skip transactions before offset
+        if skipped < offset:
+            skipped += 1
+            continue
+        
         if limit and attempted >= limit:
             LOG.info(f"Reached limit of {limit} transactions, stopping")
             break
@@ -243,16 +251,31 @@ def process_statement(
     # If requested, push the processed output to Google Sheets
     if sheet_key and not no_sheet:
         try:
-            LOG.info(
-                "Pushing processed output to Google Sheets (key=%s)",
-                sheet_key,
-            )
-            url = write_to_sheets(
-                out_df,
-                worksheet_name=worksheet_name,
-                spreadsheet_key=sheet_key,
-            )
-            LOG.info("Wrote processed output to sheet: %s", url)
+            # If appending, only include non-cached entries (new additions from this batch)
+            sheet_df = out_df
+            if append_to_sheet:
+                sheet_df = out_df[out_df["status"] != "cached"].copy()
+                if sheet_df.empty:
+                    LOG.info("No new transactions to append to sheet (all were cached)")
+                else:
+                    LOG.info(
+                        "Appending %d new transactions to sheet (filtered out %d cached)",
+                        len(sheet_df),
+                        len(out_df) - len(sheet_df),
+                    )
+            
+            if not sheet_df.empty or not append_to_sheet:
+                LOG.info(
+                    "Pushing processed output to Google Sheets (key=%s)",
+                    sheet_key,
+                )
+                url = write_to_sheets(
+                    sheet_df,
+                    worksheet_name=worksheet_name,
+                    spreadsheet_key=sheet_key,
+                    append=append_to_sheet,
+                )
+                LOG.info("Wrote processed output to sheet: %s", url)
         except (RuntimeError, ValueError) as e:
             LOG.exception(
                 "Failed to write processed output to Google Sheets: %s", str(e)
@@ -279,10 +302,21 @@ if __name__ == "__main__":
         help="Do not write processed output to Google Sheets (useful for dry runs)",
     )
     parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append to existing Google Sheet instead of overwriting (useful for batch imports)",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
         help="Limit number of expenses to add in a run",
+    )
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help="Skip the first N transactions (useful for batch processing)",
     )
     parser.add_argument(
         "--sheet-key",
@@ -325,4 +359,6 @@ if __name__ == "__main__":
         no_sheet=args.no_sheet,
         start_date=args.start_date,
         end_date=args.end_date,
+        append_to_sheet=args.append,
+        offset=args.offset,
     )
