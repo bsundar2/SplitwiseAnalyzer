@@ -23,6 +23,7 @@ from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import (
     DEFAULT_CURRENCY,
     DEFAULT_LOOKBACK_DAYS,
+    DETAILS_COLUMN_NAME,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
@@ -271,11 +272,6 @@ class SplitwiseClient:
                         ExportColumns.ID: expense.getId(),
                     }
                 )
-                # Debug: Print details for recent expenses
-                if len(data) <= 3:
-                    print(
-                        f"[DEBUG] Expense {expense.getId()}: getDetails()={repr(expense.getDetails())}"
-                    )
             except Exception as e:
                 LOG.warning(
                     f"Error processing expense {getattr(expense, 'id', 'unknown')}: {str(e)}"
@@ -350,14 +346,10 @@ class SplitwiseClient:
             return None
 
         # First, try exact match by cc_reference_id in details if provided
-        print(
-            f"[SEARCH DEBUG] cc_reference_id={cc_reference_id}, checking if should search details"
-        )
-        details_col = "Details"  # Column name from ExportColumns.DETAILS
-        if cc_reference_id and details_col in df.columns:
+        if cc_reference_id and DETAILS_COLUMN_NAME in df.columns:
             # Strip quotes and whitespace from both sides for comparison
             # (Splitwise SDK may wrap details in DOUBLE quotes like ''value'')
-            df_details_clean = df[details_col].astype(str).str.strip()
+            df_details_clean = df[DETAILS_COLUMN_NAME].astype(str).str.strip()
             # Strip multiple layers of quotes (Splitwise returns ''value'' with double quotes)
             for _ in range(3):
                 df_details_clean = df_details_clean.str.strip("'\"")

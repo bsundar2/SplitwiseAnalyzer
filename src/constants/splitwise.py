@@ -18,6 +18,9 @@ DEFAULT_LOOKBACK_DAYS = (
     30  # Default number of days to look back for duplicate detection
 )
 
+# Column name for transaction details/notes field in exported data
+DETAILS_COLUMN_NAME = "Details"
+
 
 class SplitwiseUserId(IntEnum):
     SELF_EXPENSE = 113553156
