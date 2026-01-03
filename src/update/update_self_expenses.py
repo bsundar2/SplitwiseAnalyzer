@@ -14,11 +14,11 @@ from splitwise import Expense
 from splitwise.user import ExpenseUser
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from splitwise_client import SplitwiseClient
-from constants.splitwise import SplitwiseUserId
-from utils import LOG
+from src.common.splitwise_client import SplitwiseClient
+from src.constants.splitwise import SplitwiseUserId
+from src.common.utils import LOG
 
 
 def update_self_expense(

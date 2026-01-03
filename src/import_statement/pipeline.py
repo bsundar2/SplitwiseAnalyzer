@@ -14,10 +14,10 @@ load_dotenv("config/.env")
 # Local application
 from src.constants.config import CACHE_PATH, PROCESSED_DIR
 from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
-from src.parse_statement import parse_statement
-from src.sheets_sync import write_to_sheets
-from src.splitwise_client import SplitwiseClient
-from src.utils import (
+from src.import_statement.parse_statement import parse_statement
+from src.common.sheets_sync import write_to_sheets
+from src.common.splitwise_client import SplitwiseClient
+from src.common.utils import (
     LOG,
     clean_merchant_name,
     infer_category,

@@ -27,7 +27,7 @@ from src.constants.splitwise import (
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
-from src.utils import LOG, infer_category, parse_float_safe
+from src.common.utils import LOG, infer_category, parse_float_safe
 
 load_dotenv("config/.env")
 

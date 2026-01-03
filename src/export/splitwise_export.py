@@ -20,9 +20,9 @@ load_dotenv("config/.env")
 # Local application
 from src.constants.config import STATE_PATH
 from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
-from src.sheets_sync import write_to_sheets, read_from_sheets
-from src.splitwise_client import SplitwiseClient
-from src.utils import (
+from src.common.sheets_sync import write_to_sheets, read_from_sheets
+from src.common.splitwise_client import SplitwiseClient
+from src.common.utils import (
     load_state,
     save_state_atomic,
     compute_import_id,

@@ -22,7 +22,7 @@ handler.setFormatter(formatter)
 LOG.addHandler(handler)
 LOG.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 
 def load_yaml(path):

@@ -17,7 +17,7 @@ import json
 import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
-from src.utils import LOG, PROJECT_ROOT
+from src.common.utils import LOG, PROJECT_ROOT
 
 # File paths
 REVIEW_FILE = Path(PROJECT_ROOT) / "data" / "processed" / "merchant_names_for_review.csv"

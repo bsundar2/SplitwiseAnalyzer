@@ -5,7 +5,7 @@
       "name": "Splitwise Export (Overwrite)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/src/splitwise_export.py",
+      "program": "${workspaceFolder}/src/export/splitwise_export.py",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/config/.env",
       "env": {
@@ -19,7 +19,7 @@
       "name": "Splitwise Export (Append)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/src/splitwise_export.py",
+      "program": "${workspaceFolder}/src/export/splitwise_export.py",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/config/.env",
       "args": [
@@ -35,7 +35,7 @@
         "name": "Dry Run",
         "type": "debugpy",
         "request": "launch",
-        "program": "${workspaceFolder}/src/pipeline.py",
+        "program": "${workspaceFolder}/src/import_statement/pipeline.py",
         "console": "integratedTerminal",
         "envFile": "${workspaceFolder}/config/.env",
         "args": [

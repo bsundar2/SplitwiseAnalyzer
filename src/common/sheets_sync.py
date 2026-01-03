@@ -16,7 +16,7 @@ from src.constants.gsheets import (
     DEFAULT_COLUMN_WIDTH,
     SHEETS_AUTHENTICATION_FILE,
 )
-from src.utils import LOG
+from src.common.utils import LOG
 
 
 def read_from_sheets(

@@ -14,7 +14,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List
 from collections import defaultdict
-from src.utils import LOG, PROJECT_ROOT
+from src.common.utils import LOG, PROJECT_ROOT
 
 # File paths
 FEEDBACK_FILE = Path(PROJECT_ROOT) / "data" / "processed" / "merchant_review_feedback.json"

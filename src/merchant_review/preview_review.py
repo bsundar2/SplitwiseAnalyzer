@@ -5,7 +5,7 @@ Show sample merchants from the review file to preview what needs reviewing.
 
 import pandas as pd
 from pathlib import Path
-from src.utils import PROJECT_ROOT
+from src.common.utils import PROJECT_ROOT
 
 REVIEW_FILE = Path(PROJECT_ROOT) / "data" / "processed" / "merchant_names_for_review.csv"
 
