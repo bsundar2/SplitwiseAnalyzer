@@ -936,26 +936,34 @@ def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
     if merchant_key in merchant_lookup:
         merchant_info = merchant_lookup[merchant_key]
         category_name = merchant_info["category"]
+        subcategory_name = merchant_info.get("subcategory")
         confidence_score = merchant_info.get("confidence", 1.0)
+        
+        # Construct full category path if subcategory exists
+        if subcategory_name and " > " not in category_name:
+            category_path = f"{category_name} > {subcategory_name}"
+        else:
+            category_path = category_name
+            
         LOG.info(
-            f"Merchant lookup match: '{merchant}' → {category_name} "
+            f"Merchant lookup match: '{merchant}' → {category_path} "
             f"(confidence: {confidence_score:.2f}, occurrences: {merchant_info.get('count', 0)})"
         )
 
-        # Try to resolve to IDs (category_name might be a full path or just a name)
-        if " > " not in category_name:
-            # Old format - try to find the category
-            category_ids = _resolve_category_ids(f"Food and drink > {category_name}")
+        # Try to resolve to IDs (category_path might be a full path or just a name)
+        if " > " not in category_path:
+            # Old format without subcategory - try to find the category
+            category_ids = _resolve_category_ids(f"Food and drink > {category_path}")
             if not category_ids:
                 category_ids = _resolve_category_ids(
-                    f"Transportation > {category_name}"
+                    f"Transportation > {category_path}"
                 )
             if not category_ids:
-                category_ids = _resolve_category_ids(f"Home > {category_name}")
+                category_ids = _resolve_category_ids(f"Home > {category_path}")
             # Add more categories as needed
         else:
             # New format with full path
-            category_ids = _resolve_category_ids(category_name)
+            category_ids = _resolve_category_ids(category_path)
 
         if category_ids:
             return {

@@ -113,6 +113,12 @@ class SplitwiseClient:
                     expense_id = exp.getId()
                     # Fetch full expense details (includes the details field)
                     full_expense = self.sObj.getExpense(expense_id)
+                    
+                    # Skip deleted expenses
+                    if hasattr(full_expense, 'deleted_at') and full_expense.deleted_at:
+                        LOG.debug(f"Skipping deleted expense {expense_id}")
+                        continue
+                    
                     detailed_expenses.append(full_expense)
 
                     if (i + 1) % 20 == 0:
@@ -521,23 +527,20 @@ class SplitwiseClient:
             LOG.error(error_msg)
             raise ValueError(error_msg)
 
-        # Create category object with ID and subcategory
+        # Create category object
+        # Note: Splitwise expects the category.id to be the SUBCATEGORY id, not the parent category id
         category = Category()
-        category.id = category_id
         if subcategory_id is not None and subcategory_id != 0:
-            # Try setting subcategory properly
-            LOG.info(f"Setting subcategory ID: {subcategory_id}")
-            # The Category object may need subcategory set differently
-            try:
-                category.subcategory_id = subcategory_id
-            except AttributeError:
-                LOG.warning(
-                    f"Could not set subcategory_id as attribute, trying subcategories list"
-                )
-                category.subcategories = [{"id": subcategory_id}]
+            # Use subcategory ID as the category ID
+            LOG.info(f"Setting category ID to subcategory: {subcategory_id}")
+            category.id = subcategory_id
+        else:
+            # No subcategory, use the parent category ID
+            LOG.info(f"Setting category ID to parent category: {category_id}")
+            category.id = category_id
 
         LOG.info(
-            f"Category object created: id={category.id}, has subcategory={hasattr(category, 'subcategory_id')}"
+            f"Category object created: id={category.id}"
         )
         expense.setCategory(category)
         LOG.debug(
