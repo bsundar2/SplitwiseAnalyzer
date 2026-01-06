@@ -297,7 +297,8 @@ def fetch_and_write(
     # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
     if ExportColumns.DATE in new_df.columns:
         # parse and format as 'YYYY-MM-DD' (date-only) strings so Google Sheets will parse them as dates
-        parsed = pd.to_datetime(new_df[ExportColumns.DATE], errors="coerce", utc=True)
+        # Don't use utc=True to avoid timezone shifts - Splitwise dates are already in the correct format
+        parsed = pd.to_datetime(new_df[ExportColumns.DATE], errors="coerce")
         # Format where parse succeeded; otherwise leave the original string
         new_df[ExportColumns.DATE] = parsed.dt.strftime("%Y-%m-%d").where(
             parsed.notna(), new_df[ExportColumns.DATE]
