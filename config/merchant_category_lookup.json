@@ -94,7 +94,7 @@
   "amazon": {
     "canonical_name": "Amazon",
     "category": "Home",
-    "subcategory": "Other"
+    "subcategory": "Household supplies"
   },
   "amazon web services": {
     "category": "Life - Other",
@@ -367,7 +367,9 @@
     "subcategory": "Hotel"
   },
   "costco": {
+    "canonical_name": "Costco",
     "category": "Home",
+    "subcategory": "Household supplies",
     "confidence": 0.391304347826087,
     "count": 115,
     "primary_count": 45
