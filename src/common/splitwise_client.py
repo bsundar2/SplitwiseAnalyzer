@@ -21,15 +21,16 @@ from splitwise.category import Category
 from splitwise.user import ExpenseUser
 
 # Local application
+from src.common.utils import LOG, infer_category, parse_float_safe
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import (
     DEFAULT_CURRENCY,
     DEFAULT_LOOKBACK_DAYS,
+    DELETED_AT_FIELD,
     DETAILS_COLUMN_NAME,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
-from src.common.utils import LOG, infer_category, parse_float_safe
 
 load_dotenv("config/.env")
 
@@ -89,7 +90,17 @@ class SplitwiseClient:
                 if not expenses:
                     break
 
-                all_expenses.extend(expenses)
+                # Filter out deleted expenses from the basic list
+                non_deleted = [
+                    exp
+                    for exp in expenses
+                    if not (
+                        hasattr(exp, DELETED_AT_FIELD)
+                        and getattr(exp, DELETED_AT_FIELD)
+                    )
+                ]
+
+                all_expenses.extend(non_deleted)
 
                 if len(expenses) < page_size:
                     has_more = False
@@ -115,13 +126,13 @@ class SplitwiseClient:
                     expense_id = exp.getId()
                     # Fetch full expense details (includes the details field)
                     full_expense = self.sObj.getExpense(expense_id)
-                    
+
                     # Skip deleted expenses
-                    if hasattr(full_expense, 'deleted_at') and full_expense.deleted_at:
-                        LOG.debug(f"Skipping deleted expense {expense_id}")
-                        continue
-                    
-                    detailed_expenses.append(full_expense)
+                    if not (
+                        hasattr(full_expense, DELETED_AT_FIELD)
+                        and getattr(full_expense, DELETED_AT_FIELD)
+                    ):
+                        detailed_expenses.append(full_expense)
 
                     if (i + 1) % 20 == 0:
                         LOG.info(f"Processed {i + 1}/{len(all_expenses)} expenses")
@@ -148,7 +159,7 @@ class SplitwiseClient:
             cache_name = f"splitwise_expense_details_{start_year}.json"
         else:
             cache_name = f"splitwise_expense_details_{start_year}_{end_year}.json"
-        
+
         cache_dir = Path(__file__).parent.parent.parent / "data"
         cache_dir.mkdir(exist_ok=True)
         return cache_dir / cache_name
@@ -171,7 +182,7 @@ class SplitwiseClient:
             dict: Mapping of expense_id -> expense dict with details field populated
         """
         cache_path = self._get_expense_cache_path(start_date_str, end_date_str)
-        
+
         # Try to load from disk cache first
         if use_cache and cache_path.exists():
             try:
@@ -183,7 +194,7 @@ class SplitwiseClient:
                 return cached_data
             except Exception as e:
                 LOG.warning(f"Failed to load cache from {cache_path}: {e}")
-        
+
         # Fetch from API if cache miss or disabled
         all_expenses = self._fetch_expenses_paginated(
             start_date_str, end_date_str, fetch_full_details=True
@@ -213,7 +224,7 @@ class SplitwiseClient:
             )
         except Exception as e:
             LOG.warning(f"Failed to save cache to {cache_path}: {e}")
-        
+
         return expenses_with_details
 
     def get_my_expenses_by_date_range(self, start_date, end_date):
@@ -230,11 +241,11 @@ class SplitwiseClient:
         Returns:
             DataFrame containing all matching expenses
         """
-        # Use the core pagination method (with full details to check for deleted expenses)
+        # Use the core pagination method (without full details for performance)
         all_expenses = self._fetch_expenses_paginated(
             start_date.strftime("%Y-%m-%d"),
             end_date.strftime("%Y-%m-%d"),
-            fetch_full_details=True,
+            fetch_full_details=False,
         )
 
         # Process the expenses into a DataFrame
@@ -561,14 +572,14 @@ class SplitwiseClient:
         expense.setDetails(
             str(cc_reference_id)
         )  # Ensure it's a plain string without quotes
-        
+
         # Convert date to ISO 8601 format with explicit time at noon to avoid timezone issues
         # Splitwise API expects dates in format like "2025-12-12T12:00:00Z"
         # Using noon ensures the date shows correctly regardless of timezone
-        if isinstance(date, str) and 'T' not in date:
+        if isinstance(date, str) and "T" not in date:
             # Add time component if not present to avoid timezone interpretation issues
             date = f"{date}T12:00:00Z"
-        
+
         expense.setDate(date)
         expense.setCurrencyCode(currency)
 
@@ -602,9 +613,7 @@ class SplitwiseClient:
             LOG.info(f"Setting category ID to parent category: {category_id}")
             category.id = category_id
 
-        LOG.info(
-            f"Category object created: id={category.id}"
-        )
+        LOG.info(f"Category object created: id={category.id}")
         expense.setCategory(category)
         LOG.debug(
             f"Set category: {txn.get('category_name')} / {txn.get('subcategory_name')}"

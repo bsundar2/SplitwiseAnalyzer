@@ -21,6 +21,9 @@ DEFAULT_LOOKBACK_DAYS = (
 # Column name for transaction details/notes field in exported data
 DETAILS_COLUMN_NAME = "Details"
 
+# Field name for deleted expense timestamp in Splitwise API response
+DELETED_AT_FIELD = "deleted_at"
+
 
 class SplitwiseUserId(IntEnum):
     SELF_EXPENSE = 113553156
