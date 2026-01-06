@@ -162,6 +162,30 @@ SplitwiseImporter/
 
 ## Common Workflows
 
+### Monthly Expense Processing Pipeline
+
+**IMPORTANT:** Follow this order to ensure proper data flow and chronological sorting:
+
+1. **Import credit card statements to Splitwise**
+   ```bash
+   # Parse and add new transactions to Splitwise
+   python src/import_statement/pipeline.py --statement data/raw/amex_jan2026.csv
+   ```
+
+2. **Export Splitwise to Google Sheets** (use overwrite mode)
+   ```bash
+   # Export with overwrite to maintain chronological sorting
+   python src/export/splitwise_export.py --start-date 2026-01-01 --end-date 2026-12-31 --overwrite
+   ```
+
+**Why this order matters:**
+- Credit card statements may contain retroactive/backdated transactions (e.g., processing delays)
+- Splitwise must be updated first with all transactions for the period
+- Overwrite mode re-sorts all expenses chronologically, placing backdated entries in correct position
+- Append mode would place retroactive expenses at the bottom, breaking chronological order
+
+**Note:** Always use `--overwrite` when exporting after importing statements to maintain proper sorting.
+
 ### First-Time Statement Import
 1. Place your CSV statement in `data/raw/`
 2. Run dry-run to preview: `python src/import_statement/pipeline.py --statement data/raw/statement.csv --dry-run`
@@ -232,6 +256,27 @@ DRY_RUN_WORKSHEET_NAME=Splitwise Dry Runs
 - **Process large statements in batches** to handle API rate limits gracefully
 - **Use --overwrite for exports** to get a clean dataset with deleted transactions filtered out
 - **Check logs** in terminal output for detailed processing information
+- **Follow the processing pipeline order**: Import statements to Splitwise first, then export to sheets with `--overwrite`
+- **Update config/.env dates** at the start of each year (START_DATE, END_DATE, EXPENSES_WORKSHEET_NAME)
+
+## Automation Considerations
+
+The expense processing workflow can be automated with these steps:
+
+1. **Statement Download**: Automate CSV download from credit card provider (or manual upload to `data/raw/`)
+2. **Import to Splitwise**: Run `pipeline.py` with new statement
+3. **Export to Sheets**: Run `splitwise_export.py --overwrite` after import completes
+4. **Verification**: Check logs for import/export counts and any errors
+
+**Recommended schedule:**
+- Run pipeline monthly after credit card statement is available
+- Use `--overwrite` mode to handle any retroactive transactions
+- Monitor merchant review file for new merchants needing categorization
+
+**Future enhancements:**
+- Cron job or GitHub Actions for scheduled execution
+- Email/Slack notifications on completion or errors
+- Automatic merchant review aggregation and reporting
 
 ## Troubleshooting
 

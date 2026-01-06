@@ -176,6 +176,25 @@ This summary provides everything Copilot needs.
 - Consider adding budget vs actual tracking visualization
 - Potential future: Plaid integration (deferred for now)
 
+📋 Processing Pipeline Workflow
+
+**Critical order for data integrity:**
+
+1. **Import statements to Splitwise** - Parse CSV and add transactions using pipeline.py
+2. **Export Splitwise to Sheets** - Always use --overwrite mode after importing statements
+
+**Why this order:**
+- Credit card statements may contain backdated transactions (processing delays, corrections)
+- Splitwise must be updated with all transactions first
+- Overwrite mode re-fetches and re-sorts all expenses chronologically
+- Append mode would break sorting by placing backdated entries at the bottom
+
+**Automation potential:**
+- Monthly scheduled runs after statement availability
+- Automatic merchant review aggregation
+- Email/Slack notifications for completion/errors
+- GitHub Actions or cron-based execution
+
 Environment / Running Locally
 --------------------------------
 - **Activate virtualenv first:** Always activate the project's Python virtual environment before running scripts or installing packages. Example (typical venv in project root named `.venv`): `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows).
