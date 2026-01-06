@@ -382,11 +382,11 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         r"CURRENCY EXCHANGE RATE:.*$",
     ]
 
-    #Process lines to find the best merchant name
+    # Process lines to find the best merchant name
     # Strategy: Prefer lines with GglPay or actual merchant names
     candidate_lines = []
     gglpay_lines = []
-    
+
     for line in lines:
         line_upper = line.upper()
 
@@ -401,17 +401,17 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
             rest = re.sub(r"^[A-Z0-9]{7,}\s+", "", line_upper)
             if rest in category_labels:
                 continue
-        
+
         # Skip lines that are NUMBER + category label (like "007093      LODGING")
         if re.match(r"^\d+\s+", line_upper):
             rest = re.sub(r"^\d+\s+", "", line_upper)
             if rest in category_labels:
                 continue
-        
+
         # Skip lines with transaction IDs + phone/number patterns (like "1Z6ET73P132800 811 1648")
         if re.match(r"^[A-Z0-9]{10,}\s+\d+", line_upper):
             continue
-        
+
         # Skip lines that are SHORT_CODE + PHONE (like "JZD 512-487-1630")
         # But extract the short code as it's likely the merchant
         phone_with_code = re.match(r"^([A-Z]{2,5})\s+[\d\-\(\)]+$", line_upper)
@@ -455,16 +455,24 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
 
         # Prioritize lines with merchant names over emails
         # Check if this line has an actual business name (not email, not city)
-        has_merchant_name = any([
-            "LEFT DOOR" in line_upper,
-            "GOVEE" in line_upper,
-            "PLANTTHERAPY" in line_upper,
-            "NIKE" in line_upper,
-            "AMAZON" in line_upper,
-        ])
-        
+        has_merchant_name = any(
+            [
+                "LEFT DOOR" in line_upper,
+                "GOVEE" in line_upper,
+                "PLANTTHERAPY" in line_upper,
+                "NIKE" in line_upper,
+                "AMAZON" in line_upper,
+            ]
+        )
+
         # Prioritize lines with GglPay or common merchant indicators
-        if "GGLPAY" in line_upper or "GOOGLE" in line_upper or "UBER" in line_upper or "GRAB" in line_upper or has_merchant_name:
+        if (
+            "GGLPAY" in line_upper
+            or "GOOGLE" in line_upper
+            or "UBER" in line_upper
+            or "GRAB" in line_upper
+            or has_merchant_name
+        ):
             gglpay_lines.append(line)
         else:
             candidate_lines.append(line)
@@ -476,13 +484,13 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         cleaned = candidate_lines[0]
     else:
         cleaned = description
-    
+
     # CRITICAL RULE: If selected line is just numbers/dashes/parens, skip it and try next candidate
     # This catches any numeric-only patterns that slipped through
-    if re.match(r'^[\d\s\-\(\)\.]+$', cleaned.strip()):
+    if re.match(r"^[\d\s\-\(\)\.]+$", cleaned.strip()):
         # Try to find a non-numeric candidate
         for candidate in candidate_lines[1:] + gglpay_lines[1:]:
-            if not re.match(r'^[\d\s\-\(\)\.]+$', candidate.strip()):
+            if not re.match(r"^[\d\s\-\(\)\.]+$", candidate.strip()):
                 cleaned = candidate
                 break
         else:
@@ -538,25 +546,31 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     # Remove trailing store/location IDs (like -1110104105, BAL0313, 0215)
     cleaned = re.sub(r"-\d{10,}$", "", cleaned)  # -1110104105
     cleaned = re.sub(r"\s+\d{10,}$", "", cleaned)  # 000000126458
-    cleaned = re.sub(r"\s+[A-Z]{3,}\d{4,}\s+\w+$", "", cleaned, flags=re.IGNORECASE)  # BAL0313 CAMPUH
+    cleaned = re.sub(
+        r"\s+[A-Z]{3,}\d{4,}\s+\w+$", "", cleaned, flags=re.IGNORECASE
+    )  # BAL0313 CAMPUH
     cleaned = re.sub(r"\s+\d{4}$", "", cleaned)  # Trailing 4-digit codes like 0215
     cleaned = re.sub(r"-\d{7,}$", "", cleaned)  # -1119108
-    
+
     # Remove trailing location phrases
     cleaned = re.sub(r"\s+BADUNG - BALI\s+LODGING$", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+SINGAPORE\s+-\s*FO$", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+NGEE ANN CITY$", "", cleaned, flags=re.IGNORECASE)
-    
+
     # Remove company suffixes
-    cleaned = re.sub(r"\s+(?:SINGAPORE\s+)?PTE\.?\s+LTD\.?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\s+(?:SINGAPORE\s+)?PTE\.?\s+LTD\.?", "", cleaned, flags=re.IGNORECASE
+    )
     cleaned = re.sub(r"\s+\(SINGAPORE\)", "", cleaned, flags=re.IGNORECASE)
-    
+
     # Remove phone numbers that slipped through
     cleaned = re.sub(r"^\+?\d{10,}\s+", "", cleaned)  # Phone at start
     cleaned = re.sub(r"\s+\+?\d{10,}$", "", cleaned)  # Phone at end
     cleaned = re.sub(r"\s+\(\d{3}\)\d{3}-\d{4}", "", cleaned)  # (800)698-4637 format
-    cleaned = re.sub(r"^\d{10,}\s+", "", cleaned)  # Long numbers at start like 18556687574
-    
+    cleaned = re.sub(
+        r"^\d{10,}\s+", "", cleaned
+    )  # Long numbers at start like 18556687574
+
     # Remove "HO" suffix (head office marker in some names)
     # But be careful - "HO" can be part of name like "MEXICOLA HO"
     # Only remove if it looks like a suffix
@@ -938,13 +952,13 @@ def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
         category_name = merchant_info["category"]
         subcategory_name = merchant_info.get("subcategory")
         confidence_score = merchant_info.get("confidence", 1.0)
-        
+
         # Construct full category path if subcategory exists
         if subcategory_name and " > " not in category_name:
             category_path = f"{category_name} > {subcategory_name}"
         else:
             category_path = category_name
-            
+
         LOG.info(
             f"Merchant lookup match: '{merchant}' → {category_path} "
             f"(confidence: {confidence_score:.2f}, occurrences: {merchant_info.get('count', 0)})"

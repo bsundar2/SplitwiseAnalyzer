@@ -142,6 +142,60 @@ Rule 7 — Document fallback behavior
 -----------------------------------
 If you implement best-effort fallbacks (e.g., try `worksheet.format` and fall back to an alternative), document the steps in a short comment and still log both success and failure cases.
 
+Rule 8 — Group related constants and utilities in classes
+----------------------------------------------------------
+When you have multiple related constants or utilities that work together (e.g., mappings and their reverse lookups, ID-to-name conversions), consider grouping them in a simple class rather than using module-level functions and dictionaries.
+
+Benefits:
+- Encapsulates related data and behavior
+- Makes initialization explicit and testable
+- Provides clear namespace for related functionality
+- Easier to extend with additional methods
+
+Bad:
+```python
+def get_subcategory_ids():
+    import json  # Import inside function
+    # ... load from file ...
+    return mapping
+
+SUBCATEGORY_IDS = get_subcategory_ids()
+SUBCATEGORY_NAMES = {v: k for k, v in SUBCATEGORY_IDS.items()}
+```
+
+Good:
+```python
+# Standard library imports at top
+import json
+from pathlib import Path
+from typing import Dict
+
+class SubcategoryMapper:
+    """Manages Splitwise subcategory ID mappings."""
+    
+    def __init__(self):
+        self._ids: Dict[str, int] = {}
+        self._names: Dict[int, str] = {}
+        self._load_mappings()
+    
+    def _load_mappings(self):
+        """Load subcategory mappings from configuration file."""
+        # ... load from file ...
+    
+    @property
+    def ids(self) -> Dict[str, int]:
+        """Get mapping of names to IDs."""
+        return self._ids.copy()
+    
+    def get_id(self, name: str) -> int:
+        """Get ID by name."""
+        return self._ids[name]
+
+# Global instance for convenience
+_subcategory_mapper = SubcategoryMapper()
+SUBCATEGORY_IDS = _subcategory_mapper.ids  # For backward compatibility
+```
+
 Examples (bad -> good)
 ----------------------
 Bad:

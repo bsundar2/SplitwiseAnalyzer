@@ -78,6 +78,39 @@ python src/update/update_self_expenses.py --expense-id 1234567890
 python src/update/update_self_expenses.py --start-date 2025-01-01 --limit 10
 ```
 
+### Bulk Category Updates
+
+Update categories for existing Splitwise expenses in bulk by merchant name or current category:
+
+```bash
+# Update all SpotHero expenses to Transportation > Parking
+python src/update/bulk_update_categories.py --merchant "SpotHero" --subcategory parking
+
+# Update Amazon (excluding AWS) to Household supplies
+python src/update/bulk_update_categories.py --merchant "Amazon" --exclude "AWS" --subcategory household_supplies
+
+# Update Costco expenses currently in "Home - Other" to Household supplies
+python src/update/bulk_update_categories.py --merchant "Costco" --current-category "Home - Other" --subcategory-id 14
+
+# Dry run to preview changes
+python src/update/bulk_update_categories.py --merchant "SpotHero" --subcategory parking --dry-run
+
+# Skip confirmation prompt
+python src/update/bulk_update_categories.py --merchant "Costco" --subcategory household_supplies --yes
+```
+
+**Common Subcategory Options:**
+- `parking` (ID: 9) - Transportation > Parking
+- `household_supplies` (ID: 14) - Home > Household supplies
+- `home_other` (ID: 28) - Home > Other
+- `medical` (ID: 38) - Life > Medical expenses
+- `groceries` (ID: 1) - Food and drink > Groceries
+- `dining_out` (ID: 2) - Food and drink > Dining out
+
+See `src/constants/splitwise.py` (SUBCATEGORY_IDS) for the full list of available subcategories.
+
+Or use `--subcategory-id` with any Splitwise subcategory ID.
+
 ## Project Structure
 
 ```
@@ -90,7 +123,8 @@ SplitwiseImporter/
 │   ├── export/                 # Splitwise data export
 │   │   └── splitwise_export.py # Fetch and export Splitwise expenses
 │   ├── update/                 # Bulk update utilities
-│   │   └── update_self_expenses.py # Fix self-expense splits
+│   │   ├── update_self_expenses.py # Fix self-expense splits
+│   │   └── bulk_update_categories.py # Bulk category updates
 │   ├── merchant_review/        # Interactive merchant review workflow
 │   │   ├── review_merchants.py # Interactive review tool
 │   │   └── apply_review_feedback.py # Apply corrections
@@ -170,14 +204,25 @@ Maps merchant names to Splitwise categories. Auto-updated through merchant revie
 ```
 
 ### Environment Variables (.env)
-Required API credentials:
+Required API credentials and default settings:
 
 ```env
+# Splitwise API
 SPLITWISE_CONSUMER_KEY=your_key_here
 SPLITWISE_CONSUMER_SECRET=your_secret_here
 SPLITWISE_API_KEY=your_api_key_here
-GSHEETS_KEY=your_google_sheets_key
+
+# Google Sheets
+SPREADSHEET_KEY=your_google_sheets_key
+
+# Default date range and worksheet (change for new year)
+START_DATE=2026-01-01
+END_DATE=2026-12-31
+EXPENSES_WORKSHEET_NAME=Expenses 2026
+DRY_RUN_WORKSHEET_NAME=Splitwise Dry Runs
 ```
+
+**Note:** Update `START_DATE`, `END_DATE`, and `EXPENSES_WORKSHEET_NAME` at the start of each year to automatically target the new year's data.
 
 ## Tips & Best Practices
 
@@ -193,5 +238,15 @@ GSHEETS_KEY=your_google_sheets_key
 **Import fails with "ModuleNotFoundError"**: Set PYTHONPATH to project root  
 **Duplicate expenses created**: Check cache in `data/splitwise_expense_details_*.json`  
 **Wrong categories**: Review and correct in `config/merchant_category_lookup.json`  
-**Deleted expenses appearing**: Use `--overwrite` flag when exporting to filter them out
+**Deleted expenses appearing**: Use `--overwrite` flag when exporting to filter them out  
+**Date mismatch (one day off)**: Fixed in export - dates no longer use UTC conversion  
+**Category updates not reflected**: Run export with `--overwrite` after bulk updates  
+**Wrong year data**: Update `START_DATE`, `END_DATE`, and `EXPENSES_WORKSHEET_NAME` in `config/.env`
+
+## Recent Updates (Jan 2026)
+
+- ✅ Fixed date timezone issue causing one-day discrepancy between Splitwise UI and sheets
+- ✅ Updated merchant categories: SpotHero → Transportation/Parking, Amazon → Home/Household supplies, Costco → Home/Household supplies
+- ✅ Switched to 2026 tracking (config/.env updated with new dates and "Expenses 2026" worksheet)
+- ✅ Added bulk category update workflow documentation
 

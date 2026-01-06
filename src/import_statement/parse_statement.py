@@ -144,35 +144,35 @@ def parse_csv(path):
                     ),
                     row["amount"],
                 )
-    
+
     # Now take absolute value of remaining amounts (in case there are any edge cases)
     out["amount"] = out["amount"].abs()
 
     # Filter out payment/autopay transactions
     payment_patterns = [
-        r'\bAUTOPAY\b',
-        r'\bPAYMENT\s*-\s*THANK\s*YOU\b',
-        r'\bAmex\s+Offer\s+Credit\b',
-        r'^\s*Credit\s*$',  # Standalone "Credit"
-        r'\b(?:Entertainment|Digital|Platinum)\s+Credit\b',
-        r'\bREIMBURSEMENT\b',
-        r'\bPOINTS\s+FOR\s+AMEX\b',
+        r"\bAUTOPAY\b",
+        r"\bPAYMENT\s*-\s*THANK\s*YOU\b",
+        r"\bAmex\s+Offer\s+Credit\b",
+        r"^\s*Credit\s*$",  # Standalone "Credit"
+        r"\b(?:Entertainment|Digital|Platinum)\s+Credit\b",
+        r"\bREIMBURSEMENT\b",
+        r"\bPOINTS\s+FOR\s+AMEX\b",
     ]
-    
+
     before_payment_filter = len(out)
     # Combine patterns with non-capturing groups to avoid warning
-    combined_pattern = '|'.join(f'(?:{p})' for p in payment_patterns)
+    combined_pattern = "|".join(f"(?:{p})" for p in payment_patterns)
     payment_filter = out["description"].str.contains(
         combined_pattern, case=False, na=False, regex=True
     )
     filtered_payments = out[payment_filter]
     out = out[~payment_filter]
     payment_filtered = before_payment_filter - len(out)
-    
+
     if payment_filtered > 0:
         LOG.info(
             "[TEMP] Filtered out %d payment/credit/reimbursement transactions",
-            payment_filtered
+            payment_filtered,
         )
         # Log sample of filtered payment transactions
         if not filtered_payments.empty:

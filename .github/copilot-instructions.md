@@ -82,30 +82,37 @@ Sheet will update from local script execution.
 
 5. Project Structure
 
-A recommended layout (already discussed):
+Current structure (updated Jan 2026):
 
-project/
-│
-├── README.md
-├── SUMMARY.md        # This file
-│
-├── data/
-│   ├── raw_statements/
-│   ├── processed/
-│   └── splitwise_cache.json
-│
-├── config/
-│   ├── credentials.json
-│   └── budget_2025.json
-│
+SplitwiseImporter/
 ├── src/
-│   ├── splitwise_client.py
-│   ├── csv_parser.py
-│   ├── expense_classifier.py
-│   ├── google_sheets_sync.py
-│   └── main.py
-│
-└── requirements.txt
+│   ├── import_statement/       # CSV statement parsing and import pipeline
+│   │   ├── pipeline.py         # Main ETL orchestrator
+│   │   ├── parse_statement.py  # CSV parsing
+│   │   └── categorization.py   # Transaction categorization
+│   ├── export/
+│   │   └── splitwise_export.py # Fetch and export Splitwise expenses
+│   ├── update/
+│   │   ├── update_self_expenses.py # Fix self-expense splits
+│   │   └── bulk_update_categories.py # Bulk category updates
+│   ├── merchant_review/        # Interactive merchant review workflow
+│   │   ├── review_merchants.py
+│   │   └── apply_review_feedback.py
+│   ├── common/                 # Shared utilities
+│   │   ├── splitwise_client.py # Splitwise API wrapper
+│   │   ├── sheets_sync.py      # Google Sheets integration
+│   │   └── utils.py
+│   └── constants/              # Configuration constants
+├── config/
+│   ├── .env                    # API keys & default settings
+│   ├── merchant_category_lookup.json  # 216+ merchant mappings
+│   ├── amex_category_mapping.json
+│   └── gsheets_authentication.json
+├── data/
+│   ├── raw/                    # Raw CSV statements
+│   ├── processed/              # Processed outputs
+│   └── splitwise_expense_details_*.json  # Expense cache
+└── docs/
 
 🤖 AI Workflow
 You are using:
@@ -118,39 +125,56 @@ Goal is to feed Copilot/Windsurf the context so it can help you write the code.
 
 This summary provides everything Copilot needs.
 
-📝 Current Status (What You Have Done)
+📝 Current Status (What Has Been Completed)
 
-Set up a development environment on a Chromebook using Linux/Pycharm.
+✅ **Core Infrastructure**
+- Set up development environment on Chromebook using Linux/PyCharm
+- Created modular project structure with `src/` subdirectories (import_statement, export, update, common, constants)
+- Implemented SplitwiseClient wrapper with API integration, caching, and deleted expense filtering
+- Built Google Sheets sync functionality with gspread
+- CSV parsing and normalization for credit card statements
 
-Fixed symlink for PyCharm.
+✅ **Import Pipeline**
+- Full ETL pipeline for importing credit card statements to Splitwise
+- Batch processing support (`--limit`, `--offset`, `--append`)
+- Merchant filtering for selective reprocessing (`--merchant-filter`)
+- Duplicate detection using local cache and remote API checks
+- Auto-categorization using merchant lookup with 216+ merchants configured
+- Interactive merchant review workflow for improving extraction accuracy
 
-Decided to avoid VS Code.
+✅ **Export & Sync**
+- Export Splitwise expenses to Google Sheets with filtering
+- Deleted transaction filtering (DELETED_AT_FIELD constant)
+- Payment and settlement filtering (excludes "Settle all balances", "Payment")
+- Zero-participation filtering (excludes expenses where user not involved)
+- Date formatting fixed (removed UTC timezone conversion to prevent date shifts)
+- Support for both append and overwrite modes
 
-Attached free AI (Windsurf SWE-1).
+✅ **Bulk Updates**
+- Bulk category updates script (src/update/bulk_update_categories.py) for updating expenses by merchant/category
+- Self-expense split fixing (50/50 → 100% owed) via update_self_expenses.py
+- Category reassignment workflows (SpotHero → Parking, Amazon → Household supplies, Costco → Household supplies)
+- Support for predefined subcategory names (parking, household_supplies, medical, etc.)
 
-Decided not to begin with Plaid.
+✅ **Configuration & Data**
+- Merchant category lookup with 216+ merchants
+- Category mappings: Transportation/Parking, Home/Household supplies, etc.
+- 2025 data fully imported (386 Amex transactions, 1,459 total Splitwise expenses)
+- Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-Decided not to do PDF parsing.
+🔧 **Recent Session Changes (Jan 5, 2026)**
+- Updated SpotHero (15 expenses) → Transportation > Parking (subcategory ID: 9)
+- Updated Amazon marketplace (19 expenses, excluding AWS) → Home > Household supplies (subcategory ID: 14)
+- Updated Costco (17 expenses, only Home/Home - Other) → Home > Household supplies
+- Fixed date timezone issue in export (removed `utc=True` from pandas date parsing)
+- Updated config/.env: START_DATE=2026-01-01, END_DATE=2026-12-31, EXPENSES_WORKSHEET_NAME=Expenses 2026
 
-Established high-level architecture.
+🚀 Next Steps for Future Development
 
-Requested project scaffolding (provided earlier).
-
-🚀 Next Steps for Copilot
-
-Ask Copilot to:
-
-Generate the splitwise_client.py wrapper (OAuth + basic API calls).
-
-Implement csv_parser.py to read & normalize transactions.
-
-Design the expense classification system (simple mapping → category).
-
-Create a dataframe merge process to combine CSV + Splitwise data.
-
-Create the Google Sheets sync function.
-
-Tie everything together in main.py with CLI flags.
+- Monitor 2026 expense imports and continue merchant review workflow
+- Add more merchants to lookup as new transactions are processed
+- Consider adding budget vs actual tracking visualization
+- Potential future: Plaid integration (deferred for now)
 
 Environment / Running Locally
 --------------------------------

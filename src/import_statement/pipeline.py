@@ -57,10 +57,12 @@ def process_statement(
 
     if not dry_run:
         client = SplitwiseClient()
-        
+
         # Pre-fetch expenses for the specified date range to build disk cache
         # This ensures we can detect duplicates across the entire period
-        LOG.info(f"Pre-fetching expenses from {start_date} to {end_date} to build disk cache...")
+        LOG.info(
+            f"Pre-fetching expenses from {start_date} to {end_date} to build disk cache..."
+        )
         client.fetch_expenses_with_details(start_date, end_date, use_cache=True)
         LOG.info("Disk cache ready for duplicate detection")
 
@@ -73,7 +75,7 @@ def process_statement(
         if skipped < offset:
             skipped += 1
             continue
-        
+
         if limit and attempted >= limit:
             LOG.info(f"Reached limit of {limit} transactions, stopping")
             break
@@ -87,17 +89,26 @@ def process_statement(
         # Check merchant filter if specified
         if merchant_filter:
             if merchant_filter.lower() not in merchant.lower():
-                LOG.debug(f"Skipping transaction (merchant filter '{merchant_filter}' not in '{merchant}')")
+                LOG.debug(
+                    f"Skipping transaction (merchant filter '{merchant_filter}' not in '{merchant}')"
+                )
                 continue
 
         # Check date filter if specified (filter transactions by date range)
         if date:
             from datetime import datetime
-            txn_date = datetime.strptime(date, "%Y-%m-%d").date() if isinstance(date, str) else date
+
+            txn_date = (
+                datetime.strptime(date, "%Y-%m-%d").date()
+                if isinstance(date, str)
+                else date
+            )
             start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
             end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
             if txn_date < start_date_obj or txn_date > end_date_obj:
-                LOG.debug(f"Skipping transaction outside date range: {date} (range: {start_date} to {end_date})")
+                LOG.debug(
+                    f"Skipping transaction outside date range: {date} (range: {start_date} to {end_date})"
+                )
                 continue
 
         # Clean description for Splitwise posting (keep raw for sheets)
@@ -280,7 +291,7 @@ def process_statement(
                         len(sheet_df),
                         len(out_df) - len(sheet_df),
                     )
-            
+
             if not sheet_df.empty or not append_to_sheet:
                 LOG.info(
                     "Pushing processed output to Google Sheets (key=%s)",
