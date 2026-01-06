@@ -230,11 +230,11 @@ class SplitwiseClient:
         Returns:
             DataFrame containing all matching expenses
         """
-        # Use the core pagination method (without full details for performance)
+        # Use the core pagination method (with full details to check for deleted expenses)
         all_expenses = self._fetch_expenses_paginated(
             start_date.strftime("%Y-%m-%d"),
             end_date.strftime("%Y-%m-%d"),
-            fetch_full_details=False,
+            fetch_full_details=True,
         )
 
         # Process the expenses into a DataFrame
@@ -561,6 +561,14 @@ class SplitwiseClient:
         expense.setDetails(
             str(cc_reference_id)
         )  # Ensure it's a plain string without quotes
+        
+        # Convert date to ISO 8601 format with explicit time at noon to avoid timezone issues
+        # Splitwise API expects dates in format like "2025-12-12T12:00:00Z"
+        # Using noon ensures the date shows correctly regardless of timezone
+        if isinstance(date, str) and 'T' not in date:
+            # Add time component if not present to avoid timezone interpretation issues
+            date = f"{date}T12:00:00Z"
+        
         expense.setDate(date)
         expense.setCurrencyCode(currency)
 

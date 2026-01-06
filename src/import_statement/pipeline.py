@@ -39,6 +39,7 @@ def process_statement(
     end_date: str = "2025-12-31",
     append_to_sheet: bool = False,
     offset: int = 0,
+    merchant_filter: str = None,
 ):
     # Use default from env vars if not provided
     if worksheet_name is None:
@@ -82,6 +83,22 @@ def process_statement(
         amount = row.get("amount")
         detail = row.get("detail")
         merchant = row.get("description") or ""
+
+        # Check merchant filter if specified
+        if merchant_filter:
+            if merchant_filter.lower() not in merchant.lower():
+                LOG.debug(f"Skipping transaction (merchant filter '{merchant_filter}' not in '{merchant}')")
+                continue
+
+        # Check date filter if specified (filter transactions by date range)
+        if date:
+            from datetime import datetime
+            txn_date = datetime.strptime(date, "%Y-%m-%d").date() if isinstance(date, str) else date
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+            if txn_date < start_date_obj or txn_date > end_date_obj:
+                LOG.debug(f"Skipping transaction outside date range: {date} (range: {start_date} to {end_date})")
+                continue
 
         # Clean description for Splitwise posting (keep raw for sheets)
         desc_clean = clean_merchant_name(desc)
@@ -319,6 +336,12 @@ if __name__ == "__main__":
         help="Skip the first N transactions (useful for batch processing)",
     )
     parser.add_argument(
+        "--merchant-filter",
+        type=str,
+        default=None,
+        help="Only process transactions matching this merchant name (case-insensitive substring match)",
+    )
+    parser.add_argument(
         "--sheet-key",
         type=str,
         default=os.getenv("SPREADSHEET_KEY"),
@@ -361,4 +384,5 @@ if __name__ == "__main__":
         end_date=args.end_date,
         append_to_sheet=args.append,
         offset=args.offset,
+        merchant_filter=args.merchant_filter,
     )

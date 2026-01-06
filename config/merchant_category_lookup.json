@@ -500,7 +500,9 @@
     "subcategory": "Medical expenses"
   },
   "headway": {
+    "canonical_name": "Headway",
     "category": "Life",
+    "subcategory": "Medical expenses",
     "confidence": 1.0,
     "count": 6,
     "primary_count": 6
@@ -725,6 +727,12 @@
     "subcategory": "Clothing"
   },
   "ny times digital": {
+    "canonical_name": "NY Times Digital",
+    "category": "Utilities",
+    "subcategory": "Other"
+  },
+  "nytimescom ny times digital": {
+    "canonical_name": "NY Times Digital",
     "category": "Utilities",
     "subcategory": "Other"
   },
@@ -1045,7 +1053,9 @@
     "subcategory": "Plane"
   },
   "tj maxx": {
-    "category": "Home - Other",
+    "canonical_name": "TJ Maxx",
+    "category": "Home",
+    "subcategory": "Other",
     "confidence": 0.6666666666666666,
     "count": 3,
     "primary_count": 2
