@@ -243,7 +243,7 @@ SPREADSHEET_KEY=your_google_sheets_key
 START_DATE=2026-01-01
 END_DATE=2026-12-31
 EXPENSES_WORKSHEET_NAME=Expenses 2026
-DRY_RUN_WORKSHEET_NAME=Splitwise Dry Runs
+DRY_RUN_WORKSHEET_NAME=Amex Imports
 ```
 
 **Note:** Update `START_DATE`, `END_DATE`, and `EXPENSES_WORKSHEET_NAME` at the start of each year to automatically target the new year's data.

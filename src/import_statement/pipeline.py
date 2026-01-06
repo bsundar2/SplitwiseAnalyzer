@@ -43,7 +43,7 @@ def process_statement(
 ):
     # Use default from env vars if not provided
     if worksheet_name is None:
-        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Splitwise Dry Runs")
+        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports")
 
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
     df = parse_statement(path)
