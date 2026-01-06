@@ -962,7 +962,9 @@
     "primary_count": 3
   },
   "spothero": {
-    "category": "Car",
+    "canonical_name": "SpotHero",
+    "category": "Transportation",
+    "subcategory": "Parking",
     "confidence": 0.7692307692307693,
     "count": 26,
     "primary_count": 20
