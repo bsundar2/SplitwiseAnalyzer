@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run splitwise_export (example)",
+      "type": "shell",
+      "command": "${config:python.pythonPath} ${workspaceFolder}/src/export/splitwise_export.py --start-date 2025-01-01 --end-date 2025-12-31 --sheet-name \"Splitwise Export\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run pipeline (dry-run)",
+      "type": "shell",
+      "command": "${config:python.pythonPath} ${workspaceFolder}/src/import_statement/pipeline.py --statement ${workspaceFolder}/data/raw/sample_statement.csv --dry-run",
+      "problemMatcher": []
+    }
+  ]
+}

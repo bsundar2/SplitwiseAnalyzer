@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Splitwise Export (Overwrite)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export/splitwise_export.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "--overwrite"
+      ]
+    },
+    {
+      "name": "Splitwise Export (Append)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export/splitwise_export.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "args": [
+        "--start-date",
+        "${env:START_DATE}",
+        "--end-date",
+        "${env:END_DATE}",
+        "--worksheet-name",
+        "${env:EXPENSES_WORKSHEET_NAME}"
+      ]
+    },
+    {
+        "name": "Dry Run",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${workspaceFolder}/src/import_statement/pipeline.py",
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/config/.env",
+        "args": [
+            "--statement",
+            "data/raw/sample_statement.csv",
+            "--dry-run",
+          "--worksheet-name",
+          "${env:DRY_RUN_WORKSHEET_NAME}"
+        ]
+    },
+    {
+      "name": "Run Current Python File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal"
+      ,
+      "envFile": "${workspaceFolder}/config/.env"
+    }
+  ]
+}

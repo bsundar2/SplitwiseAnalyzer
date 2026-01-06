@@ -1,0 +1,1204 @@
+{
+  "000406 beautybarber shop": {
+    "canonical_name": "Bee Choo Origin",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "001734 massage parlor": {
+    "canonical_name": "Kenko Reflexology & Wellness Spa",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "007093": {
+    "canonical_name": "Mandarin Oriental",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "017115 shoe store": {
+    "canonical_name": "Onitsuka Tiger",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "030220 restaurant": {
+    "canonical_name": "Jigger and Pony",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "116390000 indonesian rupiah converted t": {
+    "canonical_name": "Putri Bali",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "150000000 indonesian rupiah converted t": {
+    "canonical_name": "Como Uma Ubud",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "415-348-6377": {
+    "canonical_name": "Fitness SF Transbay",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "443600000 indonesian rupiah converted t": {
+    "canonical_name": "Gama Painting School",
+    "category": "Life",
+    "subcategory": "Education"
+  },
+  "66362100 gardens by the bay singapore sg description px981e566d6y price 000 66362100": {
+    "canonical_name": "Gardens By the Bay",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "800698-4637": {
+    "canonical_name": "NY Times",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "846582": {
+    "canonical_name": "Spirit Halloween",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "869120000 indonesian rupiah converted t": {
+    "canonical_name": "Como Uma Ubud",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "adidas us online store": {
+    "canonical_name": "Adidas Us Online Store",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "airbnb": {
+    "category": "Hotel",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "airbnb hm3xnd4ph3": {
+    "canonical_name": "Airbnb Hm3xnd4ph3",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "airbnb hmkeya2bq4": {
+    "canonical_name": "Airbnb Hmkeya2bq4",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "alexanders pattiserie": {
+    "category": "Entertainment - Other",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "amazon": {
+    "canonical_name": "Amazon",
+    "category": "Home",
+    "subcategory": "Household supplies"
+  },
+  "amazon web services": {
+    "category": "Life - Other",
+    "confidence": 0.9090909090909091,
+    "count": 11,
+    "primary_count": 10
+  },
+  "american airlines": {
+    "canonical_name": "American airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "amex fine hotels and resorts": {
+    "canonical_name": "Mandarin Oriental",
+    "category": "Transportation",
+    "subcategory": "Other"
+  },
+  "apni mandi farmers marke": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 10,
+    "primary_count": 10
+  },
+  "artist supply & craft": {
+    "canonical_name": "Karya Mas Galery",
+    "category": "Life",
+    "subcategory": "Gifts"
+  },
+  "at&t": {
+    "category": "TV/Phone/Internet",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "ayola": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "badminton": {
+    "category": "Sports",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "badung - bali": {
+    "canonical_name": "Impiana Private Villas",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "bang bang cafe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "barebottle brewing": {
+    "category": "Liquor",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "bay padel - dogpatch": {
+    "canonical_name": "Bay Padel - Dogpatch",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "baywhee": {
+    "category": "Taxi",
+    "confidence": 0.918918918918919,
+    "count": 37,
+    "primary_count": 34
+  },
+  "beaverton": {
+    "canonical_name": "Nike",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "bintang badminton fremont": {
+    "canonical_name": "Bintang Badminton Fremont",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "broadway masala": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "btprintwithme": {
+    "canonical_name": "Btprintwithme",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "bun mee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "busmrt 763025179": {
+    "canonical_name": "Busmrt 763025179",
+    "category": "Transportation",
+    "subcategory": "Bus/train"
+  },
+  "busmrt 764159016": {
+    "canonical_name": "Busmrt 764159016",
+    "category": "Transportation",
+    "subcategory": "Bus/train"
+  },
+  "cafe venetia": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "caltrain san carlos": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "car": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 14,
+    "primary_count": 14
+  },
+  "car insurance": {
+    "category": "Insurance",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "car wash": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "ch_2sfynp7q 18556687574": {
+    "canonical_name": "Kachava",
+    "category": "Food and drink",
+    "subcategory": "Groceries"
+  },
+  "ch_3sauinqx 14167312600": {
+    "canonical_name": "Mejuri",
+    "category": "Life",
+    "subcategory": "Gifts"
+  },
+  "ch_3sdbs8qo 17076101240": {
+    "canonical_name": "Universal Tennis",
+    "category": "Food and Drink",
+    "subcategory": "Sports"
+  },
+  "ch_3sddq5fn 18889923102": {
+    "canonical_name": "Untuckit",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "ch_3sddv6e8 15107487373": {
+    "canonical_name": "USTA Norcal",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "ch_3sdyhdbz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3sfbnfqu 14793100211": {
+    "canonical_name": "Proverbs 33",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "ch_3sfmifbz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3srytqdk 16506092641": {
+    "canonical_name": "Seats.aero",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "ch_3ssayybj 17076101240": {
+    "canonical_name": "South Bay Tennis Flex",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "ch_3ssle0cm 14159109224": {
+    "canonical_name": "SF Rec & Park",
+    "category": "Uncategorized",
+    "subcategory": "General"
+  },
+  "ch_3st1rjbz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3stkufbz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3sutkobz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3suwwuac 16464010923": {
+    "canonical_name": "Photogov.com",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "ch_3sv04ojv 18003209625": {
+    "canonical_name": "Simplytrawell.com",
+    "category": "Transportation",
+    "subcategory": "Other"
+  },
+  "ch_3sx0l7bz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "ch_3szve4bz 16464536777": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "chai pani": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "chipotle mexican grill": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 13,
+    "primary_count": 13
+  },
+  "city of cupertino pandr dept 650000": {
+    "canonical_name": "City Of Cupertino Pandr Dept 650000",
+    "category": "Uncategorized",
+    "subcategory": "General"
+  },
+  "clipper systems mobi": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 6,
+    "primary_count": 6
+  },
+  "cocola bakery": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "coffeebar": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "como uma ub travel": {
+    "canonical_name": "Como Uma Ub Travel",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "costco": {
+    "canonical_name": "Costco",
+    "category": "Home",
+    "subcategory": "Household supplies",
+    "confidence": 0.391304347826087,
+    "count": 115,
+    "primary_count": 45
+  },
+  "costco refund": {
+    "category": "Groceries",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "crouchingtigerres": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "curry pizza house": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "cust svc 800 811 1648 itm 1": {
+    "canonical_name": "UPS",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "decathlon singapore pte ltd-1119108": {
+    "canonical_name": "Decathlon Singapore Pte Ltd-1119108",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "delta air lines": {
+    "category": "Plane",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "e8f2d6e8-3c family clothing": {
+    "canonical_name": "Uniqlo",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "el portal": {
+    "canonical_name": "Yoesmite NP",
+    "category": "Uncategorized",
+    "subcategory": "General"
+  },
+  "ettan": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "eylan": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "fastrak csc tolls": {
+    "category": "Transportation - Other",
+    "confidence": 0.8823529411764706,
+    "count": 17,
+    "primary_count": 15
+  },
+  "fitness sf transbay": {
+    "category": "Life",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "five guys": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "flour & water": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "food court": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "foreign transaction fee": {
+    "category": "Life - Other",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "gardens by the bay": {
+    "canonical_name": "Gardens by the bay",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "gas": {
+    "category": "Gas/fuel",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "google fi": {
+    "canonical_name": "Google Fi",
+    "category": "Utilities",
+    "subcategory": "TV/Phone/Internet"
+  },
+  "google fi google payment": {
+    "canonical_name": "Google Fi Google Payment",
+    "category": "Utilities",
+    "subcategory": "TV/Phone/Internet"
+  },
+  "govee": {
+    "canonical_name": "Govee",
+    "category": "Home",
+    "subcategory": "Furniture"
+  },
+  "grab": {
+    "category": "Transportation",
+    "subcategory": "Taxi"
+  },
+  "guardian health & beauty": {
+    "canonical_name": "Guardian Health & Beauty",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "headway": {
+    "canonical_name": "Headway",
+    "category": "Life",
+    "subcategory": "Medical expenses",
+    "confidence": 1.0,
+    "count": 6,
+    "primary_count": 6
+  },
+  "hearth t1": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "hulu": {
+    "canonical_name": "Hulu",
+    "category": "Utilities",
+    "subcategory": "TV/Phone/Internet"
+  },
+  "ice cream": {
+    "category": "Dining out",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "idly express": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 10,
+    "primary_count": 10
+  },
+  "il cilentano": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "impark": {
+    "category": "Parking",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "impiana private villas": {
+    "canonical_name": "Impiana Private Villas",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "indonesia": {
+    "canonical_name": "Singapore Airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "instacart": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "internet": {
+    "category": "TV/Phone/Internet",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "jetblue airways": {
+    "canonical_name": "Jetblue airways",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "khazana": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "kumulilir": {
+    "category": "Food and drink",
+    "subcategory": "Groceries"
+  },
+  "la connessa louie": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "lagardere travel retail singapore p": {
+    "canonical_name": "Home",
+    "category": "Other",
+    "subcategory": "aa"
+  },
+  "laz parking": {
+    "category": "Car",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "left door": {
+    "canonical_name": "Left Door",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "linea caffe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "lodge 7465115": {
+    "canonical_name": "Lodge 7465115",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "lyft": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 6,
+    "primary_count": 6
+  },
+  "mademoiselle colette": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "madhouse coffee": {
+    "canonical_name": "Madhouse Coffee",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "madras cafe": {
+    "category": "Dining out",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "madras groceries": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "mandarin oriental singapore": {
+    "canonical_name": "Mandarin Oriental Singapore",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "marufuku ramen redwood city": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "maya": {
+    "category": "TV/Phone/Internet",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "mazra": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "mehfil indian cuisine": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "milagros": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "misc food store": {
+    "canonical_name": "Circle K",
+    "category": "Food and drink",
+    "subcategory": "Groceries"
+  },
+  "miscspecialty retail": {
+    "canonical_name": "Kumulilir",
+    "category": "Home",
+    "subcategory": "Other"
+  },
+  "mount rainier entry": {
+    "category": "Entertainment - Other",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "mount rainier natl park 000009450": {
+    "canonical_name": "Mount Rainier Natl Park 000009450",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "mylapore": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "mylapore caterers": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "neehees hanover park illinois": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "netflix": {
+    "category": "Movies",
+    "confidence": 0.7333333333333333,
+    "count": 15,
+    "primary_count": 11
+  },
+  "nike": {
+    "canonical_name": "Nike",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "ny times digital": {
+    "canonical_name": "NY Times Digital",
+    "category": "Utilities",
+    "subcategory": "Other"
+  },
+  "nytimescom ny times digital": {
+    "canonical_name": "NY Times Digital",
+    "category": "Utilities",
+    "subcategory": "Other"
+  },
+  "obour foods": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "pack and mail express": {
+    "canonical_name": "Pack And Mail Express",
+    "category": "Home",
+    "subcategory": "Services"
+  },
+  "papa noodle": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "parantha house": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "patel brothers": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "payment": {
+    "category": "General",
+    "confidence": 1.0,
+    "count": 116,
+    "primary_count": 116
+  },
+  "peets": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "philz coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 8,
+    "primary_count": 8
+  },
+  "piccino dogpatch": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "pink onion": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "pints of joy": {
+    "category": "Groceries",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "planttherapy": {
+    "canonical_name": "Planttherapy",
+    "category": "Home",
+    "subcategory": "Other"
+  },
+  "pluckys cafe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "presto fare": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "prime terrace": {
+    "canonical_name": "Prime Terrace",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "putri bali spa 1 mbl": {
+    "canonical_name": "Putri Bali Spa 1 Mbl",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "putri bali spa dining": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "qamaria yemeni coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rad radish": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "red hot chilli pepper": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rent": {
+    "category": "Rent",
+    "confidence": 1.0,
+    "count": 13,
+    "primary_count": 13
+  },
+  "repairs": {
+    "canonical_name": "Peter Pan BMW",
+    "category": "Transportation",
+    "subcategory": "Car"
+  },
+  "restaurant": {
+    "canonical_name": "Warung Orbit",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "ritual coffee at s": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "rockn wraps": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sacramento convention": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "safeway": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 14,
+    "primary_count": 14
+  },
+  "saks direct 689": {
+    "canonical_name": "Saks Direct 689",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "saks direct 689 0647": {
+    "canonical_name": "David Yurman",
+    "category": "Home",
+    "subcategory": "Other"
+  },
+  "saluhall": {
+    "canonical_name": "Saluhall",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "saluhall market": {
+    "category": "Dining out",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "san francisco ash": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sanaa cafe": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 4,
+    "primary_count": 4
+  },
+  "sendero nine elms": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "sfmta muni": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "sfmta muni mosan": {
+    "category": "Bus/train",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "sierra cider": {
+    "category": "Liquor",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "soma eats": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "spin": {
+    "category": "Sports",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "spothero": {
+    "canonical_name": "SpotHero",
+    "category": "Transportation",
+    "subcategory": "Parking",
+    "confidence": 0.7692307692307693,
+    "count": 26,
+    "primary_count": 20
+  },
+  "starbucks": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 7,
+    "primary_count": 7
+  },
+  "subway": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "surya bintang raftingho": {
+    "canonical_name": "Surya Bintang Raftingho",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "suvidha groceries": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "target": {
+    "category": "Home",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "tennis league network ll": {
+    "canonical_name": "Tennis League Network Ll",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "thai rhapsody": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "thai soul kitchen": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the baker next door": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the clan ho travel": {
+    "canonical_name": "The Clan Ho Travel",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "the hainan story coffe": {
+    "canonical_name": "The Hainan Story Coffe",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "the tamil prince london": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "the yard coffee": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 3,
+    "primary_count": 3
+  },
+  "the yellow chilli": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "ticket number": {
+    "canonical_name": "Singapore Airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "tj maxx": {
+    "canonical_name": "TJ Maxx",
+    "category": "Home",
+    "subcategory": "Other",
+    "confidence": 0.6666666666666666,
+    "count": 3,
+    "primary_count": 2
+  },
+  "toll": {
+    "category": "Car",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "tst spqr 00030596": {
+    "canonical_name": "Tst Spqr 00030596",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "uber": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 33,
+    "primary_count": 33
+  },
+  "uber eats": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 10,
+    "primary_count": 10
+  },
+  "uber home": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "uber trip": {
+    "canonical_name": "Uber Trip",
+    "category": "Transportation",
+    "subcategory": "Taxi"
+  },
+  "universal tennis": {
+    "canonical_name": "Universal Tennis",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "untuckit": {
+    "canonical_name": "Untuckit",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "ups": {
+    "category": "General",
+    "confidence": 0.5,
+    "count": 2,
+    "primary_count": 1
+  },
+  "usa6v movie theater": {
+    "canonical_name": "Cinemark",
+    "category": "Entertainment",
+    "subcategory": "Movies"
+  },
+  "usta norcal": {
+    "canonical_name": "Usta Norcal",
+    "category": "Entertainment",
+    "subcategory": "Sports"
+  },
+  "varam": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 5,
+    "primary_count": 5
+  },
+  "vino santo": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "waymo": {
+    "category": "Taxi",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "whole foods": {
+    "category": "Groceries",
+    "confidence": 1.0,
+    "count": 83,
+    "primary_count": 83
+  },
+  "wifi": {
+    "canonical_name": "United Airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "wilson sporting goods co": {
+    "canonical_name": "Wilson Sporting Goods Co",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "woods lower haight": {
+    "category": "Liquor",
+    "confidence": 0.6,
+    "count": 5,
+    "primary_count": 3
+  },
+  "wow auto detailers": {
+    "canonical_name": "Wow Auto Detailers",
+    "category": "Transportation",
+    "subcategory": "Car"
+  },
+  "x00ae beautybarber shop": {
+    "canonical_name": "Fresha",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "y9ezw": {
+    "canonical_name": "On",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "yhmzf restaurant": {
+    "canonical_name": "Cinemark",
+    "category": "Food and drink",
+    "subcategory": "Dining out"
+  },
+  "ykida computer networkinfo": {
+    "canonical_name": "Maya Mobile",
+    "category": "Utilities",
+    "subcategory": "TV/Phone/Internet"
+  },
+  "ynp basecamp eatery": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  },
+  "zareens restauran": {
+    "category": "Dining out",
+    "confidence": 1.0,
+    "count": 2,
+    "primary_count": 2
+  }
+}
