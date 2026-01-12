@@ -8,10 +8,10 @@ You now have a complete merchant review and feedback system to improve merchant 
 
 | File | Purpose |
 |------|---------|
-| [src/review_merchants.py](../src/review_merchants.py) | Interactive CLI tool for reviewing merchants |
-| [src/apply_review_feedback.py](../src/apply_review_feedback.py) | Apply corrections to merchant lookup config |
-| [src/preview_review.py](../src/preview_review.py) | Preview merchants waiting for review |
-| [review.sh](../review.sh) | Helper script with simple commands |
+| [src/merchant_review/run_review_workflow.py](../src/merchant_review/run_review_workflow.py) | **NEW** Unified workflow orchestrator - runs all steps |
+| [src/merchant_review/generate_review_file.py](../src/merchant_review/generate_review_file.py) | Generate review CSV from processed transactions |
+| [src/merchant_review/review_merchants.py](../src/merchant_review/review_merchants.py) | Interactive CLI tool for reviewing merchants |
+| [src/merchant_review/apply_review_feedback.py](../src/merchant_review/apply_review_feedback.py) | Apply corrections to merchant lookup config |
 | [docs/merchant_review_workflow.md](merchant_review_workflow.md) | Detailed workflow guide |
 | [docs/review_demo.md](review_demo.md) | Example walkthrough |
 
@@ -66,10 +66,23 @@ You now have a complete merchant review and feedback system to improve merchant 
 
 ## 🚀 Quick Start
 
-### 1. Preview What Needs Review
+### Unified Workflow (Recommended)
 
 ```bash
-./review.sh preview 10
+# Run all steps automatically
+python src/merchant_review/run_review_workflow.py \
+  --processed-csv data/processed/your_statement.csv.processed.csv \
+  --batch 20
+```
+
+### Individual Steps
+
+#### 1. Generate Review File
+
+```bash
+python src/merchant_review/generate_review_file.py \
+  --processed-csv data/processed/your_statement.csv.processed.csv \
+  --output data/processed/merchant_names_for_review.csv
 ```
 
 **Example output:**

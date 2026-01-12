@@ -34,13 +34,20 @@ python src/import_statement/pipeline.py --statement data/raw/your_statement.csv 
 The pipeline automatically generates a review file for extracted merchant names. Review and correct them to improve future processing:
 
 ```bash
-# Start interactive review (batch of 20)
+# Unified review workflow (recommended - runs all steps)
+python src/merchant_review/run_review_workflow.py --processed-csv data/processed/your_statement.csv.processed.csv --batch 20
+
+# Or run steps individually:
+# 1. Generate review file
+python src/merchant_review/generate_review_file.py --processed-csv data/processed/your_statement.csv.processed.csv --output data/processed/merchant_names_for_review.csv
+
+# 2. Start interactive review (batch of 20)
 python src/merchant_review/review_merchants.py --batch 20
 
-# Check progress
+# 3. Check progress
 python src/merchant_review/review_merchants.py --stats
 
-# Apply your corrections to update the configuration
+# 4. Apply your corrections to update the configuration
 python src/merchant_review/apply_review_feedback.py
 
 # Re-run pipeline to see improvements
@@ -126,16 +133,18 @@ SplitwiseImporter/
 │   │   ├── update_self_expenses.py # Fix self-expense splits
 │   │   └── bulk_update_categories.py # Bulk category updates
 │   ├── merchant_review/        # Interactive merchant review workflow
-│   │   ├── review_merchants.py # Interactive review tool
-│   │   └── apply_review_feedback.py # Apply corrections
+│   │   ├── run_review_workflow.py   # Unified workflow orchestrator (NEW)
+│   │   ├── generate_review_file.py  # Generate review CSV from processed data
+│   │   ├── review_merchants.py      # Interactive review tool
+│   │   └── apply_review_feedback.py # Apply corrections to config
 │   ├── common/                 # Shared utilities
 │   │   ├── splitwise_client.py # Splitwise API wrapper
 │   │   ├── sheets_sync.py      # Google Sheets integration
-│   │   └── utils.py            # Common helper functions
+│   │   └── utils.py            # Common helper functions (simplified merchant extraction)
 │   └── constants/              # Configuration constants
 ├── config/                     # Credentials and mappings
 │   ├── .env                    # API keys (not in git)
-│   ├── merchant_category_lookup.json  # Merchant→category mappings
+│   ├── merchant_category_lookup.json  # 219+ merchant→category mappings
 │   ├── amex_category_mapping.json     # Amex category mappings
 │   └── gsheets_authentication.json    # Google Sheets credentials
 ├── data/
@@ -148,7 +157,8 @@ SplitwiseImporter/
 ## Key Features
 
 ✅ **CSV Statement Parsing** - Automatically detect and parse credit card statements  
-✅ **Smart Merchant Extraction** - Extract clean merchant names from messy descriptions  
+✅ **Smart Merchant Extraction** - Extract clean merchant names from Description field with simple, maintainable logic  
+✅ **Unified Review Workflow** - Single command to generate, review, and apply merchant corrections  
 ✅ **Interactive Merchant Review** - Review and correct merchant names to improve accuracy  
 ✅ **Auto-categorization** - Map transactions to Splitwise categories using merchant lookup  
 ✅ **Batch Processing** - Process large statements in chunks with `--limit` and `--offset`  
@@ -290,8 +300,23 @@ The expense processing workflow can be automated with these steps:
 
 ## Recent Updates (Jan 2026)
 
+### Merchant Extraction Overhaul
+- ✅ **Simplified merchant name extraction** - Rewrote `clean_merchant_name()` from 450+ lines to ~60 lines
+- ✅ **Description field only** - Now uses simple Description column parsing instead of complex Extended Details multi-line extraction
+- ✅ **Canonical name support** - Uses `canonical_name` from merchant lookup for consistent display names (e.g., "Kristyne" → "American Airlines")
+- ✅ **Removed legacy code** - Cleaned up ~450 lines of unmaintainable extraction logic
+- ✅ **Unified review workflow** - Created `run_review_workflow.py` to chain generate → review → apply steps automatically
+- ✅ **Required arguments** - Made `generate_review_file.py` require explicit arguments (no defaults)
+
+### Category Updates & Data Processing
 - ✅ Fixed date timezone issue causing one-day discrepancy between Splitwise UI and sheets
 - ✅ Updated merchant categories: SpotHero → Transportation/Parking, Amazon → Home/Household supplies, Costco → Home/Household supplies
 - ✅ Switched to 2026 tracking (config/.env updated with new dates and "Expenses 2026" worksheet)
+- ✅ Successfully imported January 2026 transactions (12 transactions processed)
 - ✅ Added bulk category update workflow documentation
+
+### Technical Improvements
+- ✅ Fixed column mapping in `parse_statement.py` to use Description field correctly
+- ✅ Improved merchant lookup with 219+ merchant entries
+- ✅ Better error handling and validation throughout workflow
 

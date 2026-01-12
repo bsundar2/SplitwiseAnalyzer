@@ -7,6 +7,42 @@ This document outlines a two-part feature enhancement for the SplitwiseImporter 
 1. **Transaction Filtering**: Automatically exclude payment/credit transactions from being posted to Splitwise
 2. **ML-Enhanced Categorization**: Leverage historical Splitwise data (1,333+ expenses) to improve category prediction accuracy
 
+## ✅ COMPLETED: Merchant Extraction Simplification (Jan 2026)
+
+### What Was Implemented
+
+The merchant name extraction system was completely overhauled and simplified:
+
+- **Simplified extraction logic** - Reduced from 450+ lines to ~60 lines of maintainable code
+- **Description field only** - Now extracts merchant names exclusively from the Description column (not Extended Details)
+- **Canonical name support** - Uses `canonical_name` field from merchant lookup for consistent display
+- **Unified review workflow** - Created `run_review_workflow.py` to chain generate → review → apply steps
+- **Required arguments** - Made `generate_review_file.py` require explicit parameters (no defaults)
+
+### Implementation Details
+
+**New Approach:**
+1. Parse Description field from CSV (not Extended Details)
+2. Remove common prefixes (SP, GglPay, etc.)
+3. Split on 2+ spaces, take first part
+4. Remove phone numbers and state codes
+5. Title case for readability
+6. Use canonical_name from merchant lookup if available
+
+**Files Modified:**
+- `src/common/utils.py` - Simplified `clean_merchant_name()` function
+- `src/import_statement/parse_statement.py` - Fixed column mapping to use Description
+- `src/merchant_review/run_review_workflow.py` - NEW unified workflow orchestrator
+- `src/merchant_review/generate_review_file.py` - Required arguments added
+
+**Benefits:**
+- More reliable extraction with fewer edge cases
+- Easier to maintain and debug
+- Better canonical name support
+- Faster processing with simpler logic
+
+---
+
 ## Current State Analysis
 
 ### Data Insights
@@ -31,23 +67,22 @@ This document outlines a two-part feature enhancement for the SplitwiseImporter 
 
 ## Part 0: Description Cleaning & Normalization
 
-### Problem
-Raw credit card statement descriptions are messy and contain technical noise that makes Splitwise entries hard to read:
+### ✅ COMPLETED (Jan 2026)
 
-**Current State Examples:**
-```
-Raw Statement                                    → Should Be
-─────────────────────────────────────────────────────────────────
-GRAB*A-8PXHISMWWU9TASINGAPORE           SG      → Grab
-GglPay GUARDIAN HEALSINGAPORE           SG      → Guardian Health
-UBER EATS           help.uber.com       CA      → Uber Eats
-GglPay LAGARDERE TRANA                  SG      → Lagardere Travel
-IMPIANA PRIVATE VILLBADUNG - BALI               → Impiana Private Villa
-```
+This section described the original planned implementation for merchant name extraction from messy credit card descriptions. **The implementation has been completed with a simplified approach.**
 
-**Common Noise Patterns:**
-1. **Transaction IDs**: `GRAB*A-8PXHISMWWU9TA`, `A-8OUV3U3G395JA`
-2. **Payment method prefixes**: `GglPay`, `ApplePay`, `AMZN Mktp`, `SQ *`
+**Instead of the complex multi-pattern approach originally planned, the final implementation uses:**
+
+1. **Simple Description field parsing** - Extracts from Description column only (not Extended Details)
+2. **Minimal pattern matching** - Removes common prefixes (SP, GglPay) and cleans up basic noise
+3. **Canonical name lookup** - Uses merchant_category_lookup.json for consistent naming
+4. **~60 lines of code** - Down from 450+ lines in the original complex approach
+
+See `src/common/utils.py::clean_merchant_name()` for the current implementation.
+
+**Status:** Implementation complete and tested with January 2026 transactions.
+
+---
 3. **URLs**: `help.uber.com`, `www.domain.com`
 4. **Country codes**: `SG`, `CA`, `US` (at end of line)
 5. **Extra whitespace**: Multiple spaces between words
