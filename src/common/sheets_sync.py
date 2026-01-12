@@ -182,6 +182,8 @@ def write_to_sheets(
             )
     else:
         # Clear and resize to remove trailing rows from previous exports.
+        # First unfreeze rows to avoid "cannot delete all non-frozen rows" error
+        worksheet.frozen_rows = 0
         worksheet.clear()
         rows_needed = max(1, len(write_data) + 1)
         worksheet.resize(rows=rows_needed, cols=num_cols)

@@ -120,42 +120,23 @@ def parse_csv(path):
                     row["amount"],
                 )
 
-    # Filter out credits (negative amounts) - MUST be done before taking absolute value
-    before_credit_filter = len(out)
-    credit_filter = out["amount"] < 0
-    filtered_credits = out[credit_filter].copy()
-    out = out[~credit_filter]
-    credit_filtered = before_credit_filter - len(out)
-    if credit_filtered > 0:
+    # Identify credits (negative amounts) but keep them instead of filtering
+    # Credits will be handled differently in the pipeline (reversed split)
+    out["is_credit"] = out["amount"] < 0
+    credits_count = out["is_credit"].sum()
+    if credits_count > 0:
         LOG.info(
-            "[TEMP] Filtered out %d credit transactions (amount < 0)", credit_filtered
+            "Found %d credit transactions (amount < 0) - will add with reversed split",
+            credits_count,
         )
-        # Log sample of filtered credit transactions
-        if not filtered_credits.empty:
-            LOG.info("[TEMP] Sample of filtered credit transactions:")
-            for _, row in filtered_credits.head(5).iterrows():
-                LOG.info(
-                    "  [TEMP] %s - %s - $%.2f",
-                    row["date"],
-                    (
-                        (row["description"][:50] + "...")
-                        if len(row["description"]) > 50
-                        else row["description"]
-                    ),
-                    row["amount"],
-                )
 
-    # Now take absolute value of remaining amounts (in case there are any edge cases)
+    # Take absolute value of amounts (credits will be positive in Splitwise)
     out["amount"] = out["amount"].abs()
 
-    # Filter out payment/autopay transactions
+    # Filter out payment/autopay transactions only (not credits/refunds)
     payment_patterns = [
         r"\bAUTOPAY\b",
         r"\bPAYMENT\s*-\s*THANK\s*YOU\b",
-        r"\bAmex\s+Offer\s+Credit\b",
-        r"^\s*Credit\s*$",  # Standalone "Credit"
-        r"\b(?:Entertainment|Digital|Platinum)\s+Credit\b",
-        r"\bREIMBURSEMENT\b",
         r"\bPOINTS\s+FOR\s+AMEX\b",
     ]
 
