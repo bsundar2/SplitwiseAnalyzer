@@ -39,13 +39,15 @@ def parse_csv(path):
         low = c.lower()
         if "date" in low:
             col_map["date"] = c
-        if "description" in low or "merchant" in low or "detail" in low:
+        # Match "Description" column specifically (not "Extended Details")
+        if low == "description" or "merchant" in low:
             col_map["description"] = c
         if "amount" in low or "debit" in low or "credit" in low:
             col_map["amount"] = c
-        if "reference" in low or low == "ref" or "detail" in low:
+        # Match "Extended Details" or "Reference" for detail field
+        if "extended" in low or "reference" in low or low == "ref":
             col_map["detail"] = c
-        if "category" in low or "type" in low:
+        if low == "category" or low == "type":
             col_map["category"] = c
 
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:

@@ -577,6 +577,11 @@
     "count": 5,
     "primary_count": 5
   },
+  "kristyne": {
+    "canonical_name": "American Airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
   "kumulilir": {
     "category": "Food and drink",
     "subcategory": "Groceries"
