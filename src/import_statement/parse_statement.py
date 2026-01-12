@@ -39,13 +39,15 @@ def parse_csv(path):
         low = c.lower()
         if "date" in low:
             col_map["date"] = c
-        if "description" in low or "merchant" in low or "detail" in low:
+        # Match "Description" column specifically (not "Extended Details")
+        if low == "description" or "merchant" in low:
             col_map["description"] = c
         if "amount" in low or "debit" in low or "credit" in low:
             col_map["amount"] = c
-        if "reference" in low or low == "ref" or "detail" in low:
+        # Match "Extended Details" or "Reference" for detail field
+        if "extended" in low or "reference" in low or low == "ref":
             col_map["detail"] = c
-        if "category" in low or "type" in low:
+        if low == "category" or low == "type":
             col_map["category"] = c
 
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
@@ -120,42 +122,23 @@ def parse_csv(path):
                     row["amount"],
                 )
 
-    # Filter out credits (negative amounts) - MUST be done before taking absolute value
-    before_credit_filter = len(out)
-    credit_filter = out["amount"] < 0
-    filtered_credits = out[credit_filter].copy()
-    out = out[~credit_filter]
-    credit_filtered = before_credit_filter - len(out)
-    if credit_filtered > 0:
+    # Identify credits (negative amounts) but keep them instead of filtering
+    # Credits will be handled differently in the pipeline (reversed split)
+    out["is_credit"] = out["amount"] < 0
+    credits_count = out["is_credit"].sum()
+    if credits_count > 0:
         LOG.info(
-            "[TEMP] Filtered out %d credit transactions (amount < 0)", credit_filtered
+            "Found %d credit transactions (amount < 0) - will add with reversed split",
+            credits_count,
         )
-        # Log sample of filtered credit transactions
-        if not filtered_credits.empty:
-            LOG.info("[TEMP] Sample of filtered credit transactions:")
-            for _, row in filtered_credits.head(5).iterrows():
-                LOG.info(
-                    "  [TEMP] %s - %s - $%.2f",
-                    row["date"],
-                    (
-                        (row["description"][:50] + "...")
-                        if len(row["description"]) > 50
-                        else row["description"]
-                    ),
-                    row["amount"],
-                )
 
-    # Now take absolute value of remaining amounts (in case there are any edge cases)
+    # Take absolute value of amounts (credits will be positive in Splitwise)
     out["amount"] = out["amount"].abs()
 
-    # Filter out payment/autopay transactions
+    # Filter out payment/autopay transactions only (not credits/refunds)
     payment_patterns = [
         r"\bAUTOPAY\b",
         r"\bPAYMENT\s*-\s*THANK\s*YOU\b",
-        r"\bAmex\s+Offer\s+Credit\b",
-        r"^\s*Credit\s*$",  # Standalone "Credit"
-        r"\b(?:Entertainment|Digital|Platinum)\s+Credit\b",
-        r"\bREIMBURSEMENT\b",
         r"\bPOINTS\s+FOR\s+AMEX\b",
     ]
 

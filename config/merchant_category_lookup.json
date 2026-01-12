@@ -94,7 +94,7 @@
   "amazon": {
     "canonical_name": "Amazon",
     "category": "Home",
-    "subcategory": "Household supplies"
+    "subcategory": "Other"
   },
   "amazon web services": {
     "category": "Life - Other",
@@ -103,7 +103,7 @@
     "primary_count": 10
   },
   "american airlines": {
-    "canonical_name": "American airlines",
+    "canonical_name": "American Airlines",
     "category": "Transportation",
     "subcategory": "Plane"
   },
@@ -369,10 +369,10 @@
   "costco": {
     "canonical_name": "Costco",
     "category": "Home",
-    "subcategory": "Household supplies",
     "confidence": 0.391304347826087,
     "count": 115,
-    "primary_count": 45
+    "primary_count": 45,
+    "subcategory": "Household supplies"
   },
   "costco refund": {
     "category": "Groceries",
@@ -504,10 +504,10 @@
   "headway": {
     "canonical_name": "Headway",
     "category": "Life",
-    "subcategory": "Medical expenses",
     "confidence": 1.0,
     "count": 6,
-    "primary_count": 6
+    "primary_count": 6,
+    "subcategory": "Medical expenses"
   },
   "hearth t1": {
     "category": "Dining out",
@@ -577,6 +577,11 @@
     "count": 5,
     "primary_count": 5
   },
+  "kristyne": {
+    "canonical_name": "American Airlines",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
   "kumulilir": {
     "category": "Food and drink",
     "subcategory": "Groceries"
@@ -613,6 +618,16 @@
     "canonical_name": "Lodge 7465115",
     "category": "Transportation",
     "subcategory": "Hotel"
+  },
+  "lululemon": {
+    "canonical_name": "Lululemon",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "lululemon athletica": {
+    "canonical_name": "Lululemon Athletica",
+    "category": "Uncategorized",
+    "subcategory": "General"
   },
   "lyft": {
     "category": "Taxi",
@@ -966,10 +981,10 @@
   "spothero": {
     "canonical_name": "SpotHero",
     "category": "Transportation",
-    "subcategory": "Parking",
     "confidence": 0.7692307692307693,
     "count": 26,
-    "primary_count": 20
+    "primary_count": 20,
+    "subcategory": "Parking"
   },
   "starbucks": {
     "category": "Dining out",
@@ -1059,10 +1074,10 @@
   "tj maxx": {
     "canonical_name": "TJ Maxx",
     "category": "Home",
-    "subcategory": "Other",
     "confidence": 0.6666666666666666,
     "count": 3,
-    "primary_count": 2
+    "primary_count": 2,
+    "subcategory": "Other"
   },
   "toll": {
     "category": "Car",

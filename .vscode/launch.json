@@ -22,14 +22,9 @@
       "program": "${workspaceFolder}/src/export/splitwise_export.py",
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/config/.env",
-      "args": [
-        "--start-date",
-        "${env:START_DATE}",
-        "--end-date",
-        "${env:END_DATE}",
-        "--worksheet-name",
-        "${env:EXPENSES_WORKSHEET_NAME}"
-      ]
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
     },
     {
         "name": "Dry Run",

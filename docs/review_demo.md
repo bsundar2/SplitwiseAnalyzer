@@ -26,16 +26,28 @@ You now have a complete merchant review system with:
 
 Let's walk through a complete example:
 
-### Step 1: Run Pipeline to Generate Review Data
+### Step 1: Process Statement and Generate Review Data
 
 ```bash
 # Process your statement
 export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
 source .venv/bin/activate
-python src/pipeline.py --statement data/raw/amex2025.csv
+python src/import_statement/pipeline.py --statement data/raw/jan2026.csv
+
+# Generate review file from processed CSV
+python src/merchant_review/generate_review_file.py \
+  --processed-csv data/processed/jan2026.csv.processed.csv \
+  --output data/processed/merchant_names_for_review.csv
 ```
 
-This creates `data/processed/merchant_names_for_review.csv` with entries like:
+**Or use the unified workflow:**
+
+```bash
+# Run all steps automatically
+python src/merchant_review/run_review_workflow.py \
+  --processed-csv data/processed/jan2026.csv.processed.csv \
+  --batch 20
+```
 
 | date | amount | description | expected_merchant | category_name | expected_category |
 |------|--------|-------------|-------------------|---------------|-------------------|

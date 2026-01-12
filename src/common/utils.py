@@ -64,8 +64,10 @@ def clean_description_for_splitwise(
     normalized_merchant = clean_merchant_name(cleaned).lower()
     if normalized_merchant in merchant_lookup:
         merchant_info = merchant_lookup[normalized_merchant]
-        # Use a readable version of the merchant key
-        canonical_name = " ".join(word.title() for word in normalized_merchant.split())
+        # Use canonical_name if available, otherwise title-case the merchant key
+        canonical_name = merchant_info.get("canonical_name")
+        if not canonical_name:
+            canonical_name = " ".join(word.title() for word in normalized_merchant.split())
         LOG.info(f"Using canonical merchant name: '{canonical_name}' (from lookup)")
         return canonical_name
 
@@ -229,10 +231,19 @@ def clean_description_for_splitwise(
 
 def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     """Clean up and standardize merchant names from transaction descriptions.
+    
+    Simplified approach: Extract merchant name from Description field only.
+    Format: "MERCHANT_NAME   LOCATION_INFO   STATE"
+    
+    Examples:
+        "AMERICAN AIRLINES   800-433-7300        TX" → "American Airlines"
+        "SP BERNAL CUTLERY   SAN FRANCISCO       CA" → "Bernal Cutlery"
+        "GglPay CINEMARK     PLANO               TX" → "Cinemark"
+        "LULULEMON ATHLETICA (877)263-9300       CA" → "Lululemon Athletica"
 
     Args:
-        description: Raw description string from the transaction
-        config: Optional configuration dictionary. If not provided, will use default config.
+        description: Raw description string from the transaction (Description field from CSV)
+        config: Optional configuration dictionary (unused in simplified version)
 
     Returns:
         str: Cleaned and standardized merchant name
@@ -240,381 +251,42 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     if not description or not isinstance(description, str):
         return description or ""
 
-    # Get merchant cleaning config, or use empty config if not available
-    merchant_config = (config or {}).get("merchant_cleaning", {})
-    patterns = merchant_config.get("patterns", [])
-    merchants = merchant_config.get("merchants", [])
-
-    # Start with the original description
-    cleaned = description.strip()
-
-    # Split into lines and work with them
-    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
-
-    # Common patterns to identify and remove
-    # Transaction IDs (hex strings, alphanumeric codes at start)
-    transaction_id_patterns = [
-        r"^[0-9a-f]{7,}\s+",  # Hex IDs at start
-        r"^[A-Z0-9]{7,}\s+",  # Alphanumeric IDs at start
-        r"^\d{10,}\s+",  # Long numeric IDs
-        r"^\d{4}-\d{2}-\d{2}\s+",  # Date patterns at start
-        r"^\d{10,}[A-Z@.]+\s*",  # Long numbers followed by text (phone/email patterns)
-        r"^\+\d{10,}\s+",  # Phone numbers at start like +18556687574
+    # Remove prefixes that aren't part of merchant name
+    description = description.strip()
+    
+    # Remove common payment processor prefixes
+    prefixes_to_remove = [
+        r'^SP\s+',  # Square point of sale prefix
+        r'^GglPay\s+',  # Google Pay prefix
+        r'^PayPal\s*\*\s*',  # PayPal prefix
+        r'^SQ\s*\*\s*',  # Square prefix
     ]
-
-    # Patterns to skip when evaluating candidate lines
-    skip_line_patterns = [
-        r"^\d{10,}[@A-Z.]+",  # Phone/email patterns
-        r"^\+\d{10,}",  # Phone numbers with +
-        r"^(?:CH|NT)_[A-Z0-9]+\s+\+\d{10,}$",  # Stripe/payment charge with phone like "CH_2SFYNP7Q +18556687574"
-        r"^\d{1,3}[\.,]\d{3}[\.,]\d{3}[\.,]\d{2}\s+.*RUPIAH",  # Indonesian rupiah amounts
-        r"^FOREIGN SPEND AMOUNT:",
-        r"^COMMISSION AMOUNT:",
-        r"^CURRENCY EXCHANGE RATE:",
-        r"^TICKET NUMBER\s*:",
-        r"^ADDITIONAL INFO\s*:",
-        r"^DESCRIPTION\s*:",
-        r"^PRICE\s*:",
-        r"^\(?\d{3}\)?[\s\.-]?\d{3}[\s\.-]?\d{4}$",  # Phone numbers: (800)698-4637, 800-806-6453, 415-348-6377
-        r"^1?800\d{7}$",  # Toll-free without dashes: 8006984637, 18002211212 (11 digits)
-        r"^\d{3}-\d{3}-\d{4}$",  # Standard phone format: 415-348-6377
-        r"^\d{10,11}$",  # 10-11 digit numbers (phone/ID): 4158005959, 18002211212
-        r"^\d{8,9}$",  # 8-9 digit numbers (likely phone or ID): 66362100, 9566306007
-        r"^0{2,}\d{1,5}$",  # Numbers with leading zeros: 007093, 000010
-        r"^\d{3,5}$",  # Short numeric codes: 811, 94403
-        r"^\d{15,}$",  # Very long concatenated numbers: 128358141588002383150
-        r"^[A-Z0-9]{5,12}\s+[\d\-\(\)]+$",  # Transaction ID + phone number pattern
-    ]
-
-    # Category labels that appear in Amex descriptions
-    category_labels = [
-        "TELECOM SERVICE",
-        "CABLE & PAY TV",
-        "TAXICAB & LIMOUSINE",
-        "ONLINE SUBS",
-        "MERCHANDISE",
-        "PASSENGER TICKET",
-        "LODGING",
-        "BEAUTY/BARBER SHOP",
-        "BEAUTY & BARBER",
-        "MEDICAL SERVICE",
-        "SPORTS CLOTHING",
-        "LUXURY MATTR",
-        "CONNECTIVITY",
-        "INSURANCE",
-        "COMPUTER PROGRAMMING",
-        "LARGE DIGITAL GOODS M",
-        "SQUAREUP.COM/RECEIPTS",
-        "DUTY-FREE STORE",
-        "MISC FOOD STORE",
-        "MISC/SPECIALTY RETAIL",
-        "RESTAURANT",
-        "MASSAGE PARLOR",
-        "SHOE STORE",
-        "FAMILY CLOTHING",
-        "HEALTH & BEAUTY",
-        "EDUCATIONAL SERVICE",
-        "ARTIST SUPPLY & CRAFT",
-        "RECREATION SERVICE",
-    ]
-
-    # Payment processor prefixes and special merchants
-    payment_processors = {
-        # Stripe transaction patterns - extract merchant name after phone
-        r"^CH_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove CH_ transaction ID and phone
-        r"^NT_[A-Z0-9]+\s+\+?\d{10,}\s+": "",  # Remove NT_ transaction ID and phone
-        # Specific merchant patterns from review corrections
-        r"\bNIKE\.COM\b": "Nike",
-        r"\bPLANTTHERAPY\.COM\b": "Planttherapy",
-        r"\bGOVEE\b": "Govee",
-        # Airlines - extract full name
-        r"\bAMERICAN\s+AIRLINES\b": "American Airlines",
-        r"\bJETBLUE\s+AIRWAYS\b": "JetBlue Airways",
-        r"\bUNITED\s+AIRLINES\b": "United Airlines",
-        r"\bEMIRATES\s+AIRLINES\b": "Emirates",
-        # Amazon - clean up merchandise patterns
-        r"^[A-Z0-9]{7,}\s+MERCHANDISE.*": "",  # Remove transaction ID + merchandise
-        r"\bAMAZON\.COM\b": "Amazon",
-        r"\bAMAZON\s+MARKETPLACE\s+NA\s+PA\b": "Amazon Marketplace",
-        r"\bAMAZON\s+MARKETPLACE\b": "Amazon",
-        # Grab - any GRAB* transaction
-        r"\bGRAB\s*\*\s*[A-Z0-9-]*": "Grab",  # Matches GRAB*A-8PXHISMWWU9TAV, Grab* A-8OTSU6QGX53TAV
-        # Uber patterns
-        r"\b[A-Z0-9]{6,}\s+UBER\s+EATS\b": "Uber Eats",  # Codes like BNJNFFMM before UBER EATS
-        r"\b[A-Z0-9]{6,}\s+UBER TRIP\b": "Uber Trip",  # Codes like SR2VRFGO before Uber Trip
-        r"\bUBER\s+TRIP\b": "Uber Trip",
-        r"\bUBER\s+EATS\b": "Uber Eats",
-        r"\bUBER\s+": "Uber ",
-        # Google services
-        r"\bGOOGLE\s*\*\s*FI\s+[A-Z0-9]+": "Google Fi",  # Google Fi with reference code
-        r"\bGOOGLE\s*\*\s*": "Google ",
-        # Payment processors
-        r"\bGGLPAY\s+": "",  # Remove GglPay prefix entirely
-        r"\bPAYPAL\s*\*?\s*": "PayPal ",
-        r"\bSQ\s*\*\s*": "Square ",
-        r"\bAMZN\s+": "Amazon ",
-        r"\bSP\s+": "",  # Remove SP prefix
-    }
-
-    # Common city names and location indicators to remove
-    location_patterns = [
-        r"\b(?:SAN FRANCISCO|SANTA MONICA|NEW YORK|LOS ANGELES|SEATTLE|PORTLAND|"
-        r"CHICAGO|BOSTON|TORONTO|VANCOUVER|LONDON|PARIS|TOKYO|LONG BEACH|TWIN FALLS|"
-        r"BEAVERTON|TSUEN WAN)\b",
-        r"\b(?:CA|NY|WA|TX|FL|IL|MA|OR|DC|SG|UK|GB|NA|HK|ID)\s*$",  # State/country codes at end only
-    ]
-
-    # URLs and domains to remove
-    url_patterns = [
-        r"SQUAREUP\.COM/RECEIPTS",
-        r"G\.CO/HELPPAY#?",
-        r"HELP\.UBER\.COM",
-        r"AMZN\.COM/BILL",
-        r"HULU\.COM/BILL",
-        # Don't remove brand domains - only generic ones
-        # r"\b[A-Z]+\.COM\b",  # Disabled - removes Nike.com, Planttherapy.com etc
-    ]
-
-    # Foreign transaction details
-    foreign_patterns = [
-        r"FOREIGN SPEND AMOUNT:.*$",
-        r"COMMISSION AMOUNT:.*$",
-        r"CURRENCY EXCHANGE RATE:.*$",
-    ]
-
-    # Process lines to find the best merchant name
-    # Strategy: Prefer lines with GglPay or actual merchant names
-    candidate_lines = []
-    gglpay_lines = []
-
-    for line in lines:
-        line_upper = line.upper()
-
-        # Skip lines matching skip patterns
-        if any(re.match(pattern, line_upper) for pattern in skip_line_patterns):
-            continue
-
-        # Skip lines that start with transaction ID + category label (like "RXBZZ6DJHJM CABLE & PAY TV")
-        # Pattern: alphanumeric ID followed by a category label
-        if re.match(r"^[A-Z0-9]{7,}\s+", line_upper):
-            # Check if the rest is a category label
-            rest = re.sub(r"^[A-Z0-9]{7,}\s+", "", line_upper)
-            if rest in category_labels:
-                continue
-
-        # Skip lines that are NUMBER + category label (like "007093      LODGING")
-        if re.match(r"^\d+\s+", line_upper):
-            rest = re.sub(r"^\d+\s+", "", line_upper)
-            if rest in category_labels:
-                continue
-
-        # Skip lines with transaction IDs + phone/number patterns (like "1Z6ET73P132800 811 1648")
-        if re.match(r"^[A-Z0-9]{10,}\s+\d+", line_upper):
-            continue
-
-        # Skip lines that are SHORT_CODE + PHONE (like "JZD 512-487-1630")
-        # But extract the short code as it's likely the merchant
-        phone_with_code = re.match(r"^([A-Z]{2,5})\s+[\d\-\(\)]+$", line_upper)
-        if phone_with_code:
-            # Use the code part as merchant name
-            candidate_lines.append(phone_with_code.group(1))
-            continue
-
-        # Skip lines that are just category labels
-        if line_upper in category_labels:
-            continue
-
-        # Skip lines that are just locations
-        if line_upper in [
-            "CA",
-            "NY",
-            "SG",
-            "UK",
-            "USA",
-            "NA",
-            "SAN FRANCISCO",
-            "NEW YORK",
-            "SINGAPORE",
-            "DENPASAR",
-            "BADUNG",
-            "GIANYAR",
-            "JAKARTA SLT",
-            "BADUNG - BALI",
-            "GIANYAR - BAL",
-            "SANTA MONICA",
-        ]:
-            continue
-
-        # Skip lines that are URLs or domain patterns
-        if any(re.search(pattern, line_upper) for pattern in url_patterns):
-            continue
-
-        # Skip foreign transaction detail lines
-        if any(re.search(pattern, line_upper) for pattern in foreign_patterns):
-            continue
-
-        # Prioritize lines with merchant names over emails
-        # Check if this line has an actual business name (not email, not city)
-        has_merchant_name = any(
-            [
-                "LEFT DOOR" in line_upper,
-                "GOVEE" in line_upper,
-                "PLANTTHERAPY" in line_upper,
-                "NIKE" in line_upper,
-                "AMAZON" in line_upper,
-            ]
-        )
-
-        # Prioritize lines with GglPay or common merchant indicators
-        if (
-            "GGLPAY" in line_upper
-            or "GOOGLE" in line_upper
-            or "UBER" in line_upper
-            or "GRAB" in line_upper
-            or has_merchant_name
-        ):
-            gglpay_lines.append(line)
-        else:
-            candidate_lines.append(line)
-
-    # Use GglPay lines first, then other candidates
-    if gglpay_lines:
-        cleaned = gglpay_lines[0]
-    elif candidate_lines:
-        cleaned = candidate_lines[0]
-    else:
-        cleaned = description
-
-    # CRITICAL RULE: If selected line is just numbers/dashes/parens, skip it and try next candidate
-    # This catches any numeric-only patterns that slipped through
-    if re.match(r"^[\d\s\-\(\)\.]+$", cleaned.strip()):
-        # Try to find a non-numeric candidate
-        for candidate in candidate_lines[1:] + gglpay_lines[1:]:
-            if not re.match(r"^[\d\s\-\(\)\.]+$", candidate.strip()):
-                cleaned = candidate
-                break
-        else:
-            # If all candidates are numeric, use the original description
-            cleaned = description
-
-    # Convert to uppercase for processing
-    cleaned = cleaned.upper()
-
-    # Remove transaction IDs from the start
-    for pattern in transaction_id_patterns:
-        cleaned = re.sub(pattern, "", cleaned)
-
-    # Remove category labels
-    for label in category_labels:
-        cleaned = re.sub(
-            r"\b" + re.escape(label) + r"\b", "", cleaned, flags=re.IGNORECASE
-        )
-
-    # Apply payment processor patterns
-    for pattern, replacement in payment_processors.items():
-        cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
-
-    # Remove URLs and domains
-    for pattern in url_patterns:
-        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-
-    # Remove location patterns
-    for pattern in location_patterns:
-        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-
-    # Remove foreign transaction details
-    for pattern in foreign_patterns:
-        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-
-    # Apply configured patterns from config
-    for pattern_config in patterns:
-        pattern = pattern_config.get("pattern")
-        replacement = pattern_config.get("replacement", "")
-        if pattern:
-            try:
-                cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
-            except re.error as e:
-                LOG.warning(f"Invalid regex pattern '{pattern}': {e}")
-
-    # Apply merchant-specific overrides from config
-    for merchant in merchants:
-        match_pattern = merchant.get("match")
-        if match_pattern and re.search(match_pattern, cleaned, re.IGNORECASE):
-            cleaned = merchant["name"]
-            break  # Stop after first match
-
-    # Remove trailing store/location IDs (like -1110104105, BAL0313, 0215)
-    cleaned = re.sub(r"-\d{10,}$", "", cleaned)  # -1110104105
-    cleaned = re.sub(r"\s+\d{10,}$", "", cleaned)  # 000000126458
-    cleaned = re.sub(
-        r"\s+[A-Z]{3,}\d{4,}\s+\w+$", "", cleaned, flags=re.IGNORECASE
-    )  # BAL0313 CAMPUH
-    cleaned = re.sub(r"\s+\d{4}$", "", cleaned)  # Trailing 4-digit codes like 0215
-    cleaned = re.sub(r"-\d{7,}$", "", cleaned)  # -1119108
-
-    # Remove trailing location phrases
-    cleaned = re.sub(r"\s+BADUNG - BALI\s+LODGING$", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+SINGAPORE\s+-\s*FO$", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+NGEE ANN CITY$", "", cleaned, flags=re.IGNORECASE)
-
-    # Remove company suffixes
-    cleaned = re.sub(
-        r"\s+(?:SINGAPORE\s+)?PTE\.?\s+LTD\.?", "", cleaned, flags=re.IGNORECASE
-    )
-    cleaned = re.sub(r"\s+\(SINGAPORE\)", "", cleaned, flags=re.IGNORECASE)
-
-    # Remove phone numbers that slipped through
-    cleaned = re.sub(r"^\+?\d{10,}\s+", "", cleaned)  # Phone at start
-    cleaned = re.sub(r"\s+\+?\d{10,}$", "", cleaned)  # Phone at end
-    cleaned = re.sub(r"\s+\(\d{3}\)\d{3}-\d{4}", "", cleaned)  # (800)698-4637 format
-    cleaned = re.sub(
-        r"^\d{10,}\s+", "", cleaned
-    )  # Long numbers at start like 18556687574
-
-    # Remove "HO" suffix (head office marker in some names)
-    # But be careful - "HO" can be part of name like "MEXICOLA HO"
-    # Only remove if it looks like a suffix
-    cleaned = re.sub(r"\s+HO$", "", cleaned, flags=re.IGNORECASE)
-
-    # Clean up whitespace and special characters
-    cleaned = " ".join(cleaned.split())
-    cleaned = re.sub(
-        r"[^\w\s&/-]", "", cleaned
-    )  # Keep letters, numbers, spaces, &, /, and -
-
-    # Remove trailing/leading hyphens and ampersands
-    cleaned = cleaned.strip("- &/")
-
-    # Title case the result
-    cleaned = " ".join(word.capitalize() for word in cleaned.split())
-
-    # Handle special cases for acronyms and brands
-    special_cases = {
-        "Fi": "Fi",  # Google Fi
-        "Uber": "Uber",
-        "Hulu": "Hulu",
-        "Grab": "Grab",
-        "Nyc": "NYC",
-        "Usa": "USA",
-        "Uk": "UK",
-        "Mrt": "MRT",  # Mass Rapid Transit
-        "Pte": "Pte",
-        "Ltd": "Ltd",
-        "Ho": "HO",  # Head Office (when part of name like "Mexicola HO")
-    }
-
-    words = cleaned.split()
-    for i, word in enumerate(words):
-        if word in special_cases:
-            words[i] = special_cases[word]
-        # Handle Bus/MRT case - keep slash
-        if "/" in word:
-            parts = word.split("/")
-            word = "/".join([special_cases.get(p, p) for p in parts])
-            words[i] = word
-    cleaned = " ".join(words)
-
-    return cleaned.strip() or description
+    
+    for prefix_pattern in prefixes_to_remove:
+        description = re.sub(prefix_pattern, '', description, flags=re.IGNORECASE)
+    
+    description = description.strip()
+    
+    # Split on multiple spaces (typically separates merchant from location/phone)
+    # The pattern "  " (2+ spaces) typically separates sections
+    parts = re.split(r'\s{2,}', description)
+    
+    if not parts:
+        return description
+    
+    # First part is typically the merchant name
+    merchant_name = parts[0].strip()
+    
+    # Remove phone numbers in format (XXX)XXX-XXXX or XXX-XXX-XXXX at the end
+    merchant_name = re.sub(r'\s*\(?\d{3}\)?\s*\d{3}-\d{4}\s*$', '', merchant_name)
+    
+    # Remove state codes at the end (like "CA", "TX", "NY" etc)
+    merchant_name = re.sub(r'\s+[A-Z]{2}$', '', merchant_name)
+    
+    # Title case the result for readability
+    merchant_name = ' '.join(word.title() for word in merchant_name.split())
+    
+    return merchant_name
 
 
 def mkdir_p(path):

@@ -35,15 +35,19 @@ def process_statement(
     sheet_key: str = None,
     worksheet_name: str = None,
     no_sheet: bool = False,
-    start_date: str = "2025-01-01",
-    end_date: str = "2025-12-31",
+    start_date: str = None,
+    end_date: str = None,
     append_to_sheet: bool = False,
     offset: int = 0,
     merchant_filter: str = None,
 ):
-    # Use default from env vars if not provided
+    # Use defaults from env vars if not provided
     if worksheet_name is None:
         worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports")
+    if start_date is None:
+        start_date = os.getenv("START_DATE", "2026-01-01")
+    if end_date is None:
+        end_date = os.getenv("END_DATE", "2026-12-31")
 
     LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
     df = parse_statement(path)
@@ -132,6 +136,7 @@ def process_statement(
             "amount": float(amount),
             "detail": cc_reference_id,
             "cc_reference_id": cc_reference_id,
+            "is_credit": row.get("is_credit", False),
         }
         # check cache
         if cc_reference_id in cache:
@@ -181,14 +186,25 @@ def process_statement(
             continue
 
         # Infer category for the transaction
-        category_info = infer_category(
-            {
-                "description": desc,
-                "merchant": merchant,
-                "amount": amount,
-                "category": row.get("category"),  # Pass Amex category if available
+        is_credit = row.get("is_credit", False)
+        if is_credit:
+            # All credits should be categorized as Uncategorized > General
+            category_info = {
+                "category_id": 2,
+                "category_name": "Uncategorized",
+                "subcategory_id": 18,
+                "subcategory_name": "General",
+                "confidence": "credit_override",
             }
-        )
+        else:
+            category_info = infer_category(
+                {
+                    "description": desc,
+                    "merchant": merchant,
+                    "amount": amount,
+                    "category": row.get("category"),  # Pass Amex category if available
+                }
+            )
 
         # Add category info to the entry
         entry.update(
@@ -213,19 +229,46 @@ def process_statement(
             # Get current user ID
             current_user_id = client.get_current_user_id()
 
-            # Create split: SELF_EXPENSE paid everything, current user owes everything
-            users = [
-                {
-                    "user_id": SplitwiseUserId.SELF_EXPENSE,
-                    "paid_share": float(amount),
-                    "owed_share": 0.0,
-                },
-                {
-                    "user_id": current_user_id,
-                    "paid_share": 0.0,
-                    "owed_share": float(amount),
-                },
-            ]
+            # Create split based on whether this is a credit or debit
+            # For credits (refunds/returns): current_user paid (received credit), SELF_EXPENSE owes
+            # For debits (regular expenses): SELF_EXPENSE paid, current_user owes
+            is_credit = entry.get("is_credit", False)
+
+            if is_credit:
+                # Credit: User received money back, SELF_EXPENSE account owes user
+                users = [
+                    {
+                        "user_id": SplitwiseUserId.SELF_EXPENSE,
+                        "paid_share": 0.0,
+                        "owed_share": float(amount),
+                    },
+                    {
+                        "user_id": current_user_id,
+                        "paid_share": float(amount),
+                        "owed_share": 0.0,
+                    },
+                ]
+                LOG.info(
+                    "Adding CREDIT: %s paid $%.2f, %s owes $%.2f",
+                    current_user_id,
+                    amount,
+                    SplitwiseUserId.SELF_EXPENSE,
+                    amount,
+                )
+            else:
+                # Regular expense: SELF_EXPENSE paid, user owes
+                users = [
+                    {
+                        "user_id": SplitwiseUserId.SELF_EXPENSE,
+                        "paid_share": float(amount),
+                        "owed_share": 0.0,
+                    },
+                    {
+                        "user_id": current_user_id,
+                        "paid_share": 0.0,
+                        "owed_share": float(amount),
+                    },
+                ]
 
             # Build transaction dict with category info
             txn_dict = {
@@ -367,14 +410,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start-date",
         type=str,
-        default="2025-01-01",
-        help="Start date for duplicate detection range (YYYY-MM-DD, default: 2025-01-01)",
+        default=None,
+        help="Start date for duplicate detection range (YYYY-MM-DD, default: START_DATE from .env or 2026-01-01)",
     )
     parser.add_argument(
         "--end-date",
         type=str,
-        default="2025-12-31",
-        help="End date for duplicate detection range (YYYY-MM-DD, default: 2025-12-31)",
+        default=None,
+        help="End date for duplicate detection range (YYYY-MM-DD, default: END_DATE from .env or 2026-12-31)",
     )
     args = parser.parse_args()
 
