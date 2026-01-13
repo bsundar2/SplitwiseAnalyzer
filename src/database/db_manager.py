@@ -415,3 +415,116 @@ class DatabaseManager:
 
         conn.close()
         return stats
+
+    # ==================== Splitwise Sync Methods ====================
+
+    def update_splitwise_id(self, txn_id: int, splitwise_id: int) -> bool:
+        """Update transaction with Splitwise expense ID.
+
+        Args:
+            txn_id: Database transaction ID
+            splitwise_id: Splitwise expense ID
+
+        Returns:
+            True if updated successfully
+        """
+        return self.update_transaction(
+            txn_id, {"splitwise_id": splitwise_id, "is_shared": True}
+        )
+
+    def update_transaction_from_splitwise(
+        self, splitwise_id: int, expense_data: Dict[str, Any]
+    ) -> bool:
+        """Update transaction fields based on Splitwise expense data.
+
+        Args:
+            splitwise_id: Splitwise expense ID
+            expense_data: Dictionary with updated expense fields
+
+        Returns:
+            True if transaction found and updated
+        """
+        # Find transaction by splitwise_id
+        txn = self.get_transaction_by_splitwise_id(splitwise_id)
+        if not txn:
+            return False
+
+        # Build update dictionary from expense_data
+        updates = {}
+
+        if "cost" in expense_data:
+            updates["amount"] = float(expense_data["cost"])
+
+        if "description" in expense_data:
+            updates["description"] = expense_data["description"]
+
+        if "date" in expense_data:
+            updates["date"] = expense_data["date"]
+
+        if "category" in expense_data and expense_data["category"]:
+            updates["category"] = expense_data["category"].get("name")
+            updates["category_id"] = expense_data["category"].get("id")
+
+        if "subcategory" in expense_data and expense_data["subcategory"]:
+            updates["subcategory"] = expense_data["subcategory"].get("name")
+            updates["subcategory_id"] = expense_data["subcategory"].get("id")
+
+        # If deleted_at is set, mark as deleted
+        if "deleted_at" in expense_data and expense_data["deleted_at"]:
+            updates["splitwise_deleted_at"] = expense_data["deleted_at"]
+
+        if updates:
+            return self.update_transaction(txn.id, updates)
+
+        return False
+
+    def mark_deleted_by_splitwise_id(self, splitwise_id: int) -> bool:
+        """Mark transaction as deleted in Splitwise.
+
+        Args:
+            splitwise_id: Splitwise expense ID
+
+        Returns:
+            True if transaction found and marked deleted
+        """
+        txn = self.get_transaction_by_splitwise_id(splitwise_id)
+        if not txn:
+            return False
+
+        return self.update_transaction(
+            txn.id, {"splitwise_deleted_at": datetime.utcnow().isoformat()}
+        )
+
+    def get_transactions_with_splitwise_ids(
+        self, start_date: str = None, end_date: str = None
+    ) -> List[Transaction]:
+        """Get all transactions that have Splitwise IDs.
+
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+
+        Returns:
+            List of Transaction objects
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM transactions WHERE splitwise_id IS NOT NULL"
+        params = []
+
+        if start_date:
+            query += " AND date >= ?"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND date <= ?"
+            params.append(end_date)
+
+        query += " ORDER BY date"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [Transaction.from_row(dict(row)) for row in rows]

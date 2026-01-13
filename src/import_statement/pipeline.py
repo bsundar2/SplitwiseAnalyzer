@@ -17,6 +17,8 @@ from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
 from src.import_statement.parse_statement import parse_statement
 from src.common.sheets_sync import write_to_sheets
 from src.common.splitwise_client import SplitwiseClient
+from src.database import DatabaseManager
+from src.database.models import Transaction
 from src.common.utils import (
     LOG,
     clean_merchant_name,
@@ -58,6 +60,7 @@ def process_statement(
     mkdir_p(PROCESSED_DIR)
     cache = load_state(CACHE_PATH)
     client = None
+    db = DatabaseManager()  # Initialize database manager
 
     if not dry_run:
         client = SplitwiseClient()
@@ -301,10 +304,48 @@ def process_statement(
             LOG.info(
                 "Added expense to Splitwise id=%s for txn %s (%s/%s)",
                 sid,
-                cc_reference_id,
                 category_info.get("category_name", "Unknown"),
                 category_info.get("subcategory_name", "Unknown"),
+                cc_reference_id,
             )
+
+            # Save to database after successful Splitwise creation
+            try:
+                db_txn = Transaction(
+                    date=date,
+                    merchant=merchant,
+                    description=desc_clean,
+                    raw_description=desc_raw,
+                    amount=float(amount),
+                    raw_amount=float(amount),
+                    statement_date=date,
+                    source="amex",  # TODO: Make this configurable based on statement source
+                    source_file=os.path.basename(path),
+                    category=entry.get("category_name"),
+                    subcategory=entry.get("subcategory_name"),
+                    category_id=entry.get("category_id"),
+                    subcategory_id=entry.get("subcategory_id"),
+                    is_refund=is_credit,
+                    is_shared=True,
+                    splitwise_id=sid,
+                    imported_at=now_iso(),
+                    notes=f"cc_reference_id: {cc_reference_id}",
+                )
+                db_txn_id = db.insert_transaction(db_txn)
+                entry["db_id"] = db_txn_id
+                LOG.info(
+                    "Saved transaction to database with ID %s (Splitwise ID: %s)",
+                    db_txn_id,
+                    sid,
+                )
+            except Exception as db_error:
+                LOG.warning(
+                    "Failed to save transaction to database: %s (Splitwise ID: %s)",
+                    str(db_error),
+                    sid,
+                )
+                entry["db_error"] = str(db_error)
+
             added += 1
         except (RuntimeError, ValueError) as e:
             entry["status"] = "error"
