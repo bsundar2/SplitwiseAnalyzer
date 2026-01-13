@@ -246,6 +246,8 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     Args:
         description: Raw description string from the transaction (Description field from CSV)
         config: Optional configuration dictionary (unused in simplified version)
+        description: Raw description string from the transaction (Description field from CSV)
+        config: Optional configuration dictionary (unused in simplified version)
 
     Returns:
         str: Cleaned and standardized merchant name

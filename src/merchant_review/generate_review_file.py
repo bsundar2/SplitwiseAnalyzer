@@ -21,6 +21,10 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 DEFAULT_PROCESSED_CSV = "jan2026.csv.processed.csv"
 DEFAULT_REVIEW_FILE = "merchant_names_for_review.csv"
 DEFAULT_FULL_REVIEW_FILE = "merchant_names_full_review.csv"
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+DEFAULT_PROCESSED_CSV = "jan2026.csv.processed.csv"
+DEFAULT_REVIEW_FILE = "merchant_names_for_review.csv"
+DEFAULT_FULL_REVIEW_FILE = "merchant_names_full_review.csv"
 
 
 def generate_review_file(
