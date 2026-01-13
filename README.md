@@ -18,6 +18,7 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - 🎯 **Unified export script** - Supports both Splitwise API and database sources
 - 🎯 **Payment filtering** - Payments excluded from sheets but tracked in database
 - 🎯 **Simplified export** - 12 columns with cc_reference_id in Details
+- 🎯 **Append-only mode** - Tracks written_to_sheet flag, only exports new transactions
 - 🎯 **Dry run mode** - Preview changes before applying
 - 🎯 **Sync script** - Pulls updates from Splitwise API to database
 
@@ -50,6 +51,9 @@ python src/export/monthly_export_pipeline.py \
 
 # Sync and export only (no new statement)
 python src/export/monthly_export_pipeline.py --year 2026 --sync-only
+
+# Append-only mode (only export unwritten transactions)
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only --append-only
 
 # Dry run to preview all changes
 python src/export/monthly_export_pipeline.py \

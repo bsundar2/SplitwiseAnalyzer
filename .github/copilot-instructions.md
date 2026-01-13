@@ -206,6 +206,7 @@ This summary provides everything Copilot needs.
 - ✅ Removed Friends Split column (redundant with Participant Names)
 - ✅ Updated sync script to populate payment information from Splitwise API
 - ✅ Created monthly_export_pipeline.py to automate full workflow
+- ✅ **Append-only mode implemented** - Tracks written_to_sheet flag, only exports new transactions
 - ✅ Added dry-run support to all export/sync scripts
 - ✅ Converted hardcoded strings to constants throughout codebase
 - ✅ Updated documentation with automated pipeline examples
@@ -217,6 +218,7 @@ This summary provides everything Copilot needs.
 - Simplified details column (only cc_reference_id or blank)
 - Sync script updates payment information from Splitwise API
 - **Automated monthly pipeline** - Single command runs import → sync → export
+- **Append-only mode** - Tracks written_to_sheet flag, only exports new transactions
 - Column order: Date, Amount, Category, Description, Details, Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Transaction Fingerprint
 
 🚀 Next Steps - Phase 4: Budget Tracking & Analysis
@@ -226,9 +228,10 @@ This summary provides everything Copilot needs.
 - Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
 - Move rolling averages off transaction tabs
 
-**Append-only Export:**
-- Database → Sheets (only unwritten rows) → mark as written_to_sheet=True
-- Avoid full overwrite for historical months
+**Budget vs Actual:**
+- Load budget data from YAML/JSON
+- Compare with actual spending by category
+- Generate monthly and yearly summaries
 
 See `docs/database_sync_guide.md` for Phase 1 & 2 architecture details.
 
@@ -247,6 +250,9 @@ python src/export/monthly_export_pipeline.py \
 
 # Sync and export only (no new statement)
 python src/export/monthly_export_pipeline.py --year 2026 --sync-only
+
+# Append-only mode (only export unwritten transactions)
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only --append-only
 
 # Dry run to preview all changes
 python src/export/monthly_export_pipeline.py \

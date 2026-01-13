@@ -353,6 +353,7 @@ def fetch_and_write(
     source: str = SOURCE_SPLITWISE,
     year: Optional[int] = None,
     dry_run: bool = False,
+    append_only: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
     """Fetch expenses and write to Google Sheets.
 
@@ -366,6 +367,7 @@ def fetch_and_write(
         source: Data source - 'splitwise' for API or 'database' for local DB
         year: Optional year filter (used with database source)
         dry_run: If True, preview data without writing to sheets or updating state
+        append_only: If True (database source only), only export unwritten transactions
 
     Returns:
         Tuple of (DataFrame with expenses, URL of the updated sheet or None)
@@ -375,11 +377,21 @@ def fetch_and_write(
     if source == SOURCE_DATABASE:
         LOG.info(LOG_FETCHING_FROM_DB)
         is_overwrite = not append
+        
+        # Determine whether to include already-written transactions
+        # - append_only mode: Only fetch unwritten (include_written=False)
+        # - overwrite mode: Fetch all (include_written=True)
+        # - normal append mode: Fetch all (include_written=True) for backward compatibility
+        if append_only:
+            include_written = False
+        else:
+            include_written = is_overwrite or append  # True in overwrite or normal append
+        
         df = fetch_from_database(
             start_date=start_date,
             end_date=end_date,
             year=year,
-            include_written=is_overwrite,  # In overwrite mode, include all transactions
+            include_written=include_written,
         )
 
         if df.empty:
@@ -638,6 +650,11 @@ Examples:
         help="Year filter (primarily for database source, e.g., 2026)",
     )
     parser.add_argument(
+        "--append-only",
+        action="store_true",
+        help="(Database source only) Export only unwritten transactions, tracking via written_to_sheet flag",
+    )
+    parser.add_argument(
         "--start-date",
         default=os.getenv("START_DATE"),
         help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago'). Defaults to START_DATE env var.",
@@ -742,6 +759,7 @@ Examples:
             source=args.source,
             year=args.year,
             dry_run=args.dry_run,
+            append_only=args.append_only,
         )
 
         if new_df is not None and not new_df.empty:

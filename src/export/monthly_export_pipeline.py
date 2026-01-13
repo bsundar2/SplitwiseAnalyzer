@@ -116,7 +116,7 @@ def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False) -
 
 
 def run_export_to_sheets(
-    year: int, worksheet_name: str = None, dry_run: bool = False
+    year: int, worksheet_name: str = None, dry_run: bool = False, append_only: bool = False
 ) -> bool:
     """Run export from database to Google Sheets.
 
@@ -124,6 +124,7 @@ def run_export_to_sheets(
         year: Year to export
         worksheet_name: Name of worksheet to export to
         dry_run: If True, preview without making changes
+        append_only: If True, only export unwritten transactions
 
     Returns:
         True if successful, False otherwise
@@ -147,8 +148,15 @@ def run_export_to_sheets(
         str(year),
         "--worksheet",
         worksheet_name,
-        "--overwrite",
     ]
+
+    # Add mode flags
+    if append_only:
+        # Append-only mode: only export unwritten, use append
+        sys.argv.append("--append-only")
+    else:
+        # Default: overwrite mode (full refresh)
+        sys.argv.append("--overwrite")
 
     if dry_run:
         sys.argv.append("--dry-run")
@@ -219,6 +227,11 @@ Examples:
         help="Skip statement import, only sync and export",
     )
     parser.add_argument(
+        "--append-only",
+        action="store_true",
+        help="Export only unwritten transactions (tracks written_to_sheet flag)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview changes without applying them",
@@ -254,6 +267,10 @@ Examples:
         print(f"Date range: {args.start_date} to {args.end_date}")
     if args.sync_only:
         print("Mode: Sync and export only (no statement import)")
+    if args.append_only:
+        print("Export mode: Append-only (unwritten transactions only)")
+    else:
+        print("Export mode: Overwrite (full refresh)")
     print("=" * 60 + "\n")
 
     success_count = 0
@@ -277,7 +294,7 @@ Examples:
         return 1
 
     # Step 3: Export to sheets
-    if run_export_to_sheets(args.year, args.worksheet, args.dry_run):
+    if run_export_to_sheets(args.year, args.worksheet, args.dry_run, args.append_only):
         success_count += 1
     else:
         LOG.error("Pipeline failed at export step")

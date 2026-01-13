@@ -28,6 +28,9 @@ python src/export/monthly_export_pipeline.py \
 # Sync and export only (no new statement)
 python src/export/monthly_export_pipeline.py --year 2026 --sync-only
 
+# Append-only mode (only export unwritten transactions)
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only --append-only
+
 # Dry run to preview
 python src/export/monthly_export_pipeline.py \
   --statement data/raw/jan2026.csv \
@@ -165,6 +168,32 @@ If you deleted duplicates, fixed splits, or changed categories in Splitwise:
 # Sync and export (no new statement)
 python src/export/monthly_export_pipeline.py --year 2026 --sync-only
 ```
+
+### Incremental Updates (Append-Only Mode)
+
+For ongoing monthly tracking without re-exporting everything:
+
+```bash
+# Only export transactions not yet written to sheets
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only --append-only
+```
+
+**How it works:**
+- Tracks `written_to_sheet` flag in database
+- Only exports transactions where `written_to_sheet = False`
+- Marks transactions as written after successful export
+- Prevents duplicate exports and unnecessary overwrites
+- Ideal for mid-month updates or historical month corrections
+
+**When to use:**
+- Adding new transactions to an existing month
+- After manual Splitwise edits that added/updated transactions
+- Incremental updates without full refresh
+
+**When NOT to use:**
+- Initial month setup (use overwrite mode)
+- Major data cleanup or reformatting
+- When you need to re-export everything
 
 ### Refreshing Google Sheets
 
