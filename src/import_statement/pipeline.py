@@ -137,7 +137,7 @@ def process_statement(
             "cc_reference_id": cc_reference_id,
             "is_credit": row.get("is_credit", False),
         }
-        
+
         # Infer category for ALL transactions (needed for sheet reporting even if duplicate)
         is_credit = row.get("is_credit", False)
         if is_credit:
@@ -169,12 +169,12 @@ def process_statement(
                 "confidence": category_info.get("confidence"),
             }
         )
-        
+
         # Check database for duplicate by cc_reference_id ONLY
-        # Do NOT use fuzzy matching (date/merchant/amount) because legitimate separate 
+        # Do NOT use fuzzy matching (date/merchant/amount) because legitimate separate
         # transactions can have identical details (e.g., 2 plane tickets on same day)
         db_found = None
-        
+
         # Check by cc_reference_id in notes - this is the ONLY reliable duplicate detection
         if cc_reference_id:
             db_transactions = db.get_transactions_by_date_range(start_date, end_date)
@@ -184,10 +184,10 @@ def process_statement(
                     LOG.info(
                         "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
                         cc_reference_id,
-                        txn.splitwise_id
+                        txn.splitwise_id,
                     )
                     break
-        
+
         if db_found:
             entry["status"] = "db_exists"
             entry["db_id"] = db_found.id
@@ -215,12 +215,16 @@ def process_statement(
                     str(e),
                 )
                 remote_found = None
-        
+
         # If found in remote, skip adding to Splitwise
         if remote_found:
             entry["status"] = "remote_exists"
-            entry["splitwise_id"] = remote_found.get("id")  # Use splitwise_id for consistency
-            entry["remote_id"] = remote_found.get("id")  # Keep remote_id for backward compatibility
+            entry["splitwise_id"] = remote_found.get(
+                "id"
+            )  # Use splitwise_id for consistency
+            entry["remote_id"] = remote_found.get(
+                "id"
+            )  # Keep remote_id for backward compatibility
             LOG.info(
                 "Found existing Splitwise expense for txn %s -> id %s",
                 cc_reference_id,
