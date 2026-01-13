@@ -528,3 +528,125 @@ class DatabaseManager:
         conn.close()
 
         return [Transaction.from_row(dict(row)) for row in rows]
+
+    def save_monthly_summary(
+        self,
+        year_month: str,
+        total_spent_net: float,
+        avg_transaction: float,
+        transaction_count: int,
+        total_paid: float,
+        total_owed: float,
+        cumulative_spending: float,
+        mom_change: float,
+        written_to_sheet: bool = False
+    ) -> None:
+        """Save or update monthly summary data.
+
+        Args:
+            year_month: Month in YYYY-MM format
+            total_spent_net: Net spending for the month
+            avg_transaction: Average transaction amount
+            transaction_count: Number of transactions
+            total_paid: Total amount paid
+            total_owed: Total amount owed
+            cumulative_spending: Cumulative spending YTD
+            mom_change: Month-over-month % change
+            written_to_sheet: Whether this has been written to sheets
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        now = datetime.utcnow().isoformat()
+
+        cursor.execute(
+            """
+            INSERT INTO monthly_summaries (
+                year_month, total_spent_net, avg_transaction, transaction_count,
+                total_paid, total_owed, cumulative_spending, mom_change,
+                written_to_sheet, calculated_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(year_month) DO UPDATE SET
+                total_spent_net = excluded.total_spent_net,
+                avg_transaction = excluded.avg_transaction,
+                transaction_count = excluded.transaction_count,
+                total_paid = excluded.total_paid,
+                total_owed = excluded.total_owed,
+                cumulative_spending = excluded.cumulative_spending,
+                mom_change = excluded.mom_change,
+                written_to_sheet = excluded.written_to_sheet,
+                updated_at = excluded.updated_at
+            """,
+            (
+                year_month, total_spent_net, avg_transaction, transaction_count,
+                total_paid, total_owed, cumulative_spending, mom_change,
+                written_to_sheet, now, now
+            )
+        )
+
+        conn.commit()
+        conn.close()
+
+    def get_monthly_summary(self, year_month: str) -> Optional[Dict[str, Any]]:
+        """Get monthly summary for a specific month.
+
+        Args:
+            year_month: Month in YYYY-MM format
+
+        Returns:
+            Dictionary with summary data or None if not found
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT * FROM monthly_summaries WHERE year_month = ?",
+            (year_month,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        return dict(row) if row else None
+
+    def get_all_monthly_summaries(self, year: int = None) -> List[Dict[str, Any]]:
+        """Get all monthly summaries, optionally filtered by year.
+
+        Args:
+            year: Optional year filter
+
+        Returns:
+            List of dictionaries with summary data
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        if year:
+            cursor.execute(
+                "SELECT * FROM monthly_summaries WHERE year_month LIKE ? ORDER BY year_month",
+                (f"{year}-%",)
+            )
+        else:
+            cursor.execute("SELECT * FROM monthly_summaries ORDER BY year_month")
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def mark_monthly_summary_written(self, year_month: str) -> None:
+        """Mark a monthly summary as written to sheets.
+
+        Args:
+            year_month: Month in YYYY-MM format
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "UPDATE monthly_summaries SET written_to_sheet = 1, updated_at = ? WHERE year_month = ?",
+            (datetime.utcnow().isoformat(), year_month)
+        )
+
+        conn.commit()
+        conn.close()
+

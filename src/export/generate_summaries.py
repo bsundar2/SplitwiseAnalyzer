@@ -13,19 +13,21 @@ import os
 from typing import Dict
 
 import pandas as pd
+import pygsheets
 from dotenv import load_dotenv
 
 load_dotenv("config/.env")
 
 from src.common.sheets_sync import write_to_sheets
 from src.common.utils import LOG
+from src.constants.gsheets import (
+    SHEETS_AUTHENTICATION_FILE,
+    WORKSHEET_MONTHLY_SUMMARY,
+    WORKSHEET_CATEGORY_BREAKDOWN,
+    WORKSHEET_BUDGET_VS_ACTUAL,
+    WORKSHEET_MONTHLY_TRENDS,
+)
 from src.database import DatabaseManager
-
-# Worksheet names
-WORKSHEET_MONTHLY_SUMMARY = "Monthly Summary"
-WORKSHEET_CATEGORY_BREAKDOWN = "Category Breakdown"
-WORKSHEET_BUDGET_VS_ACTUAL = "Budget vs Actual"
-WORKSHEET_MONTHLY_TRENDS = "Monthly Trends"
 
 # Constants
 DEFAULT_BUDGET_FILE = "config/budget_2026.json"
@@ -499,20 +501,103 @@ Examples:
         print("\n" + "="*60)
         return 0
     
-    # Write to Google Sheets
+    # Write to Google Sheets (update existing months, append new ones)
     print("Writing summaries to Google Sheets...\n")
     
-    # Only write Monthly Summary sheet
-    url = write_to_sheets(
-        monthly_summary,
-        worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
-        spreadsheet_key=args.sheet_key,
-        append=False,
-        skip_formatting=True  # Skip transaction-specific column formatting
-    )
-    print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: {len(monthly_summary)} rows")
-    if url:
-        print(f"   {url}")
+    db = DatabaseManager()
+    updated_count = 0
+    appended_count = 0
+    unchanged_count = 0
+    
+    # Process each month in the summary
+    gc = None
+    worksheet = None
+    
+    for _, row in monthly_summary.iterrows():
+        year_month = str(row["Month"])
+        
+        # Get existing summary from database
+        existing = db.get_monthly_summary(year_month)
+        
+        # Check if data changed
+        data_changed = False
+        if existing:
+            # Compare numeric values with tolerance
+            if (
+                abs(existing["total_spent_net"] - row["Total Spent (Net)"]) > 0.01 or
+                abs(existing["avg_transaction"] - row["Avg Transaction"]) > 0.01 or
+                existing["transaction_count"] != row["Transaction Count"] or
+                abs(existing["total_paid"] - row["Total Paid"]) > 0.01 or
+                abs(existing["total_owed"] - row["Total Owed"]) > 0.01 or
+                abs(existing["cumulative_spending"] - row["Cumulative Spending"]) > 0.01 or
+                abs(existing["mom_change"] - row["MoM Change"]) > 0.01
+            ):
+                data_changed = True
+        else:
+            # New month
+            data_changed = True
+        
+        if data_changed:
+            # Save to database
+            db.save_monthly_summary(
+                year_month=year_month,
+                total_spent_net=row["Total Spent (Net)"],
+                avg_transaction=row["Avg Transaction"],
+                transaction_count=int(row["Transaction Count"]),
+                total_paid=row["Total Paid"],
+                total_owed=row["Total Owed"],
+                cumulative_spending=row["Cumulative Spending"],
+                mom_change=row["MoM Change"],
+                written_to_sheet=False
+            )
+            
+            # Update or append to sheets
+            if not gc:
+                gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
+                sheet = gc.open_by_key(args.sheet_key)
+                try:
+                    worksheet = sheet.worksheet_by_title(WORKSHEET_MONTHLY_SUMMARY)
+                except pygsheets.WorksheetNotFound:
+                    # Create worksheet if it doesn't exist
+                    worksheet = sheet.add_worksheet(WORKSHEET_MONTHLY_SUMMARY)
+                    # Write header
+                    worksheet.update_row(1, list(monthly_summary.columns))
+            
+            # Check if month exists in sheet
+            all_months = worksheet.get_col(1, include_tailing_empty=False)[1:]  # Skip header
+            
+            if year_month in all_months:
+                # Update existing row
+                row_idx = all_months.index(year_month) + 2  # +1 for 0-index, +1 for header
+                row_values = [row[col] for col in monthly_summary.columns]
+                worksheet.update_row(row_idx, row_values)
+                updated_count += 1
+            else:
+                # Append new row
+                row_values = [row[col] for col in monthly_summary.columns]
+                worksheet.append_table(values=[row_values], start="A1", end=None, dimension="ROWS")
+                appended_count += 1
+            
+            # Mark as written in database
+            db.mark_monthly_summary_written(year_month)
+        else:
+            unchanged_count += 1
+    
+    # Summary message
+    if updated_count > 0 or appended_count > 0:
+        msg_parts = []
+        if updated_count > 0:
+            msg_parts.append(f"{updated_count} updated")
+        if appended_count > 0:
+            msg_parts.append(f"{appended_count} appended")
+        if unchanged_count > 0:
+            msg_parts.append(f"{unchanged_count} unchanged")
+        print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: {', '.join(msg_parts)}")
+    else:
+        print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: No changes needed ({unchanged_count} unchanged)")
+    
+    url = f"https://docs.google.com/spreadsheets/d/{args.sheet_key}"
+    print(f"   {url}")
     
     print(f"\n{'='*60}")
     print("Summary generation complete!")

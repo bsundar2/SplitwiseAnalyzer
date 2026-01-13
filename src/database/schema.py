@@ -92,6 +92,29 @@ CREATE TABLE IF NOT EXISTS import_log (
 );
 """
 
+MONTHLY_SUMMARIES_TABLE = """
+CREATE TABLE IF NOT EXISTS monthly_summaries (
+    -- Cached monthly summary data for comparison
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL UNIQUE,       -- YYYY-MM format
+    total_spent_net REAL NOT NULL,         -- Net spending for the month
+    avg_transaction REAL NOT NULL,         -- Average transaction amount
+    transaction_count INTEGER NOT NULL,    -- Number of transactions
+    total_paid REAL NOT NULL,              -- Total amount paid
+    total_owed REAL NOT NULL,              -- Total amount owed
+    cumulative_spending REAL NOT NULL,     -- Cumulative spending YTD
+    mom_change REAL NOT NULL,              -- Month-over-month % change
+    
+    -- Sync tracking
+    written_to_sheet BOOLEAN DEFAULT 0,    -- True if written to Google Sheets
+    calculated_at TEXT NOT NULL,           -- When this summary was calculated
+    updated_at TEXT                        -- Last update timestamp
+);
+
+CREATE INDEX IF NOT EXISTS idx_year_month ON monthly_summaries(year_month);
+CREATE INDEX IF NOT EXISTS idx_written ON monthly_summaries(written_to_sheet);
+"""
+
 
 def init_database(conn):
     """Initialize database schema.
@@ -105,5 +128,6 @@ def init_database(conn):
     cursor.executescript(TRANSACTIONS_TABLE)
     cursor.executescript(DUPLICATES_TABLE)
     cursor.executescript(IMPORT_LOG_TABLE)
+    cursor.executescript(MONTHLY_SUMMARIES_TABLE)
 
     conn.commit()
