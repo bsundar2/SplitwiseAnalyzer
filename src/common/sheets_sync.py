@@ -134,7 +134,7 @@ def write_to_sheets(
     If append=True, the data will be appended after existing rows (header not duplicated).
     Otherwise the worksheet is cleared (or created) and rewritten.
     After writing, attempt to format key columns (date, amount) and freeze the header row.
-    
+
     Args:
         write_data: DataFrame to write
         worksheet_name: Name of the worksheet

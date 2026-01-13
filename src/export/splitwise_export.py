@@ -51,11 +51,21 @@ SOURCE_DATABASE = "database"
 WORKSHEET_NAME_TEMPLATE = "Expenses {year}"
 
 # Error messages
-ERROR_START_DATE_REQUIRED = "--start-date is required for Splitwise source (or set START_DATE env var)"
-ERROR_END_DATE_REQUIRED = "--end-date is required for Splitwise source (or set END_DATE env var)"
-ERROR_DATABASE_FILTER_REQUIRED = "Database source requires either --year or both --start-date and --end-date"
-ERROR_DATE_RANGE_INVALID = "Start date ({start_date}) cannot be after end date ({end_date})"
-ERROR_SHEET_KEY_REQUIRED = "--sheet-key must be provided (or set SPREADSHEET_KEY env var)"
+ERROR_START_DATE_REQUIRED = (
+    "--start-date is required for Splitwise source (or set START_DATE env var)"
+)
+ERROR_END_DATE_REQUIRED = (
+    "--end-date is required for Splitwise source (or set END_DATE env var)"
+)
+ERROR_DATABASE_FILTER_REQUIRED = (
+    "Database source requires either --year or both --start-date and --end-date"
+)
+ERROR_DATE_RANGE_INVALID = (
+    "Start date ({start_date}) cannot be after end date ({end_date})"
+)
+ERROR_SHEET_KEY_REQUIRED = (
+    "--sheet-key must be provided (or set SPREADSHEET_KEY env var)"
+)
 
 # Log messages
 LOG_NO_TRANSACTIONS_DB = "No transactions found in database for the specified filters"
@@ -67,7 +77,9 @@ LOG_EXPORTING_FROM = "Exporting from %s source: %s to %s"
 LOG_MARKED_WRITTEN = "Marked %d transactions as written to sheet"
 LOG_EXPORT_CATEGORIES = "Exporting categories due to --export-categories flag"
 LOG_FILTERED_SETTLE = "Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export"
-LOG_FILTERED_PAYMENT = "Filtered out %d Splitwise 'Payment' transactions from API export"
+LOG_FILTERED_PAYMENT = (
+    "Filtered out %d Splitwise 'Payment' transactions from API export"
+)
 LOG_FILTERED_NO_PARTICIPATION = "Filtered out %d expenses where my_paid and my_owed were both zero (no participation)"
 
 # User messages
@@ -202,7 +214,7 @@ def fetch_from_database(
         DataFrame with database transactions matching Splitwise export format
     """
     import re
-    
+
     db = DatabaseManager()
 
     # Get transactions based on filters
@@ -237,25 +249,25 @@ def fetch_from_database(
         my_owed = 0.0
         participant_names = ""
         details = ""
-        
+
         if txn.notes:
             # Extract cc_reference_id for details (just the ID number)
-            cc_ref_match = re.search(r'cc_reference_id:\s*(\d+)', txn.notes)
+            cc_ref_match = re.search(r"cc_reference_id:\s*(\d+)", txn.notes)
             if cc_ref_match:
                 details = cc_ref_match.group(1)
-            
+
             # Extract MY_PAID
-            paid_match = re.search(r'Paid:\s*\$?([\d,]+\.?\d*)', txn.notes)
+            paid_match = re.search(r"Paid:\s*\$?([\d,]+\.?\d*)", txn.notes)
             if paid_match:
-                my_paid = float(paid_match.group(1).replace(',', ''))
-            
+                my_paid = float(paid_match.group(1).replace(",", ""))
+
             # Extract MY_OWED
-            owe_match = re.search(r'Owe:\s*\$?([\d,]+\.?\d*)', txn.notes)
+            owe_match = re.search(r"Owe:\s*\$?([\d,]+\.?\d*)", txn.notes)
             if owe_match:
-                my_owed = float(owe_match.group(1).replace(',', ''))
-            
+                my_owed = float(owe_match.group(1).replace(",", ""))
+
             # Extract participant names
-            with_match = re.search(r'With:\s*([^|]+?)(?:\s*$|\s*\|)', txn.notes)
+            with_match = re.search(r"With:\s*([^|]+?)(?:\s*$|\s*\|)", txn.notes)
             if with_match:
                 participant_names = with_match.group(1).strip()
 
@@ -268,9 +280,9 @@ def fetch_from_database(
         # Create row in exact column order to match existing exports
         row = {
             ExportColumns.DATE: txn.date,
-            ExportColumns.AMOUNT: abs(txn.raw_amount)
-            if txn.raw_amount
-            else abs(txn.amount),
+            ExportColumns.AMOUNT: (
+                abs(txn.raw_amount) if txn.raw_amount else abs(txn.amount)
+            ),
             ExportColumns.CATEGORY: txn.category or "Uncategorized",
             ExportColumns.DESCRIPTION: txn.description or txn.merchant,
             ExportColumns.DETAILS: details,
@@ -289,7 +301,12 @@ def fetch_from_database(
     # Ensure proper data types
     if not df.empty:
         # Convert numeric columns
-        for col in [ExportColumns.AMOUNT, ExportColumns.MY_PAID, ExportColumns.MY_OWED, ExportColumns.MY_NET]:
+        for col in [
+            ExportColumns.AMOUNT,
+            ExportColumns.MY_PAID,
+            ExportColumns.MY_OWED,
+            ExportColumns.MY_NET,
+        ]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -377,7 +394,7 @@ def fetch_and_write(
     if source == SOURCE_DATABASE:
         LOG.info(LOG_FETCHING_FROM_DB)
         is_overwrite = not append
-        
+
         # Determine whether to include already-written transactions
         # - append_only mode: Only fetch unwritten (include_written=False)
         # - overwrite mode: Fetch all (include_written=True)
@@ -385,8 +402,10 @@ def fetch_and_write(
         if append_only:
             include_written = False
         else:
-            include_written = is_overwrite or append  # True in overwrite or normal append
-        
+            include_written = (
+                is_overwrite or append
+            )  # True in overwrite or normal append
+
         df = fetch_from_database(
             start_date=start_date,
             end_date=end_date,
@@ -716,8 +735,10 @@ Examples:
         worksheet_name = WORKSHEET_NAME_TEMPLATE.format(year=args.year)
 
     # Validate required arguments based on source
-    if args.source == SOURCE_DATABASE and not args.year and not (
-        args.start_date and args.end_date
+    if (
+        args.source == SOURCE_DATABASE
+        and not args.year
+        and not (args.start_date and args.end_date)
     ):
         raise ValueError(ERROR_DATABASE_FILTER_REQUIRED)
 
@@ -738,9 +759,7 @@ Examples:
 
     if start_date and end_date and start_date > end_date:
         raise ValueError(
-            ERROR_DATE_RANGE_INVALID.format(
-                start_date=start_date, end_date=end_date
-            )
+            ERROR_DATE_RANGE_INVALID.format(start_date=start_date, end_date=end_date)
         )
 
     # Ensure sheet_key is provided for writes unless in dry run mode

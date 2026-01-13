@@ -209,6 +209,11 @@ This summary provides everything Copilot needs.
 - ✅ Budget vs Actual analysis shows variance % and over/under budget status
 - ✅ January 2026 analysis: 42 transactions, $4,273 spent, 96% under budget
 - ✅ Only writes Monthly Summary sheet (other sheets available but not enabled)
+- ✅ **Database-backed summaries** - Monthly summaries cached in `monthly_summaries` table for fast comparison
+- ✅ **Idempotent updates** - Only updates sheets when data actually changes (0.01 tolerance)
+- ✅ **Constants organization** - Moved worksheet constants to `src/constants/gsheets.py`
+- ✅ **Exception handling** - Removed try-catch blocks to fail fast (follows coding_style.md)
+- ✅ **Append-only mode** - Transactions and summaries only write new/changed data
 
 ✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
 - Unified export script supports both Splitwise API and database sources
@@ -230,6 +235,10 @@ This summary provides everything Copilot needs.
 - **4-step automated pipeline** - Import → Sync → Export → Generate Summaries
 - Budget vs Actual analysis with variance % and over/under budget status
 - Spending pattern insights with 3-month rolling averages and YTD trends
+- **Database-backed summaries** - `monthly_summaries` table caches computed values for fast comparison
+- **Idempotent updates** - Compares database values, only updates sheets when data changes (0.01 tolerance)
+- **Fail-fast error handling** - Removed try-catch blocks, exceptions bubble up immediately
+- **Append-only sheets** - Both transactions and summaries only write new/changed rows
 
 🚀 Next Steps - Phase 5: Advanced Analytics & Automation
 

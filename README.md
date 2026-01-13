@@ -14,13 +14,21 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - ✅ **Phase 3**: Unified export & automated monthly pipeline (Database → Google Sheets with filtering)
 
 ### Phase 3 Features
-- 🎯 **Automated monthly pipeline** - Single command runs import → sync → export
+- 🎯 **Automated monthly pipeline** - Single command runs import → sync → export → summaries
 - 🎯 **Unified export script** - Supports both Splitwise API and database sources
 - 🎯 **Payment filtering** - Payments excluded from sheets but tracked in database
 - 🎯 **Simplified export** - 12 columns with cc_reference_id in Details
 - 🎯 **Append-only mode** - Tracks written_to_sheet flag, only exports new transactions
 - 🎯 **Dry run mode** - Preview changes before applying
 - 🎯 **Sync script** - Pulls updates from Splitwise API to database
+
+### Phase 4 Features (Jan 2026)
+- 📊 **Budget tracking** - Automated monthly summaries with budget vs actual analysis
+- 📊 **Database-backed summaries** - Caches monthly data in `monthly_summaries` table for fast comparison
+- 📊 **Idempotent updates** - Only writes to sheets when data actually changes (0.01 tolerance)
+- 📊 **Smart categorization** - Maps 20+ transaction categories to Splitwise budget format
+- 📊 **5 analysis types** - Monthly Summary, Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month
+- 📊 **Fail-fast errors** - Removed exception catching, crashes immediately on errors for easier debugging
 
 See [docs/database_sync_guide.md](docs/database_sync_guide.md) for detailed architecture guide.
 
@@ -257,12 +265,20 @@ Or use `--subcategory-id` with any Splitwise subcategory ID.
 ```
 SplitwiseImporter/
 ├── src/
+│   ├── database/               # Local SQLite database layer
+│   │   ├── schema.py           # Table definitions (transactions, monthly_summaries, etc.)
+│   │   ├── models.py           # Transaction & ImportLog dataclasses
+│   │   └── db_manager.py       # DatabaseManager with CRUD + summary methods
+│   ├── db_sync/                # Database sync utilities
+│   │   └── sync_from_splitwise.py # Sync DB with Splitwise (insert/update/delete)
 │   ├── import_statement/       # CSV statement parsing and import pipeline
 │   │   ├── pipeline.py         # Main ETL pipeline orchestrator
 │   │   ├── parse_statement.py  # CSV parsing and normalization
 │   │   └── categorization.py   # Transaction categorization logic
-│   ├── export/                 # Splitwise data export
-│   │   └── splitwise_export.py # Fetch and export Splitwise expenses
+│   ├── export/                 # Splitwise data export and summaries
+│   │   ├── splitwise_export.py # Fetch and export Splitwise expenses
+│   │   ├── monthly_export_pipeline.py # Automated 4-step pipeline
+│   │   └── generate_summaries.py # Budget analysis and spending summaries
 │   ├── update/                 # Bulk update utilities
 │   │   ├── update_self_expenses.py # Fix self-expense splits
 │   │   └── bulk_update_categories.py # Bulk category updates
@@ -302,7 +318,10 @@ SplitwiseImporter/
 ✅ **Google Sheets Sync** - Write results to your budget tracking sheet (append or overwrite)  
 ✅ **Duplicate Detection** - Avoid re-processing using local cache and remote API checks  
 ✅ **Bulk Updates** - Update existing Splitwise expenses (fix splits, categories, etc.)  
-✅ **Category Export** - Export all Splitwise categories and subcategories to sheets
+✅ **Category Export** - Export all Splitwise categories and subcategories to sheets  
+✅ **Budget Tracking** - Automated monthly summaries with database-backed comparison  
+✅ **Idempotent Updates** - Only writes changed data to sheets (0.01 tolerance)  
+✅ **Fail-fast Errors** - No exception catching, immediate crash for easier debugging
 
 ## Common Workflows
 

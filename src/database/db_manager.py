@@ -539,7 +539,7 @@ class DatabaseManager:
         total_owed: float,
         cumulative_spending: float,
         mom_change: float,
-        written_to_sheet: bool = False
+        written_to_sheet: bool = False,
     ) -> None:
         """Save or update monthly summary data.
 
@@ -578,10 +578,18 @@ class DatabaseManager:
                 updated_at = excluded.updated_at
             """,
             (
-                year_month, total_spent_net, avg_transaction, transaction_count,
-                total_paid, total_owed, cumulative_spending, mom_change,
-                written_to_sheet, now, now
-            )
+                year_month,
+                total_spent_net,
+                avg_transaction,
+                transaction_count,
+                total_paid,
+                total_owed,
+                cumulative_spending,
+                mom_change,
+                written_to_sheet,
+                now,
+                now,
+            ),
         )
 
         conn.commit()
@@ -600,8 +608,7 @@ class DatabaseManager:
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT * FROM monthly_summaries WHERE year_month = ?",
-            (year_month,)
+            "SELECT * FROM monthly_summaries WHERE year_month = ?", (year_month,)
         )
         row = cursor.fetchone()
         conn.close()
@@ -623,7 +630,7 @@ class DatabaseManager:
         if year:
             cursor.execute(
                 "SELECT * FROM monthly_summaries WHERE year_month LIKE ? ORDER BY year_month",
-                (f"{year}-%",)
+                (f"{year}-%",),
             )
         else:
             cursor.execute("SELECT * FROM monthly_summaries ORDER BY year_month")
@@ -644,9 +651,8 @@ class DatabaseManager:
 
         cursor.execute(
             "UPDATE monthly_summaries SET written_to_sheet = 1, updated_at = ? WHERE year_month = ?",
-            (datetime.utcnow().isoformat(), year_month)
+            (datetime.utcnow().isoformat(), year_month),
         )
 
         conn.commit()
         conn.close()
-

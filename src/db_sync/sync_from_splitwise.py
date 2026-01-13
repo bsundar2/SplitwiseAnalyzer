@@ -69,13 +69,13 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
 
     # Build notes
     notes_parts = []
-    
+
     # Preserve cc_reference_id from details if it exists
     if details and "cc_reference_id" in details:
         notes_parts.append(details)
-    
+
     notes_parts.append("Imported from Splitwise API")
-    
+
     if my_paid > 0:
         notes_parts.append(f"Paid: ${my_paid:.2f}")
     if my_owed > 0:
@@ -252,33 +252,34 @@ def sync_from_splitwise(
         sw_my_paid = float(expense.get(ExportColumns.MY_PAID, 0))
         sw_my_owed = float(expense.get(ExportColumns.MY_OWED, 0))
         sw_participant_names = expense.get(ExportColumns.PARTICIPANT_NAMES, "")
-        
+
         notes_parts = []
-        
+
         # Preserve cc_reference_id from existing notes or Splitwise details
         cc_ref_from_notes = None
         if txn.notes and "cc_reference_id" in txn.notes:
             import re
-            match = re.search(r'cc_reference_id:\s*(\d+)', txn.notes)
+
+            match = re.search(r"cc_reference_id:\s*(\d+)", txn.notes)
             if match:
                 cc_ref_from_notes = f"cc_reference_id: {match.group(1)}"
-        
+
         if cc_ref_from_notes:
             notes_parts.append(cc_ref_from_notes)
         elif sw_details and "cc_reference_id" in sw_details:
             notes_parts.append(sw_details)
-        
+
         notes_parts.append("Imported from Splitwise API")
-        
+
         if sw_my_paid > 0:
             notes_parts.append(f"Paid: ${sw_my_paid:.2f}")
         if sw_my_owed > 0:
             notes_parts.append(f"Owe: ${sw_my_owed:.2f}")
         if sw_participant_names:
             notes_parts.append(f"With: {sw_participant_names}")
-        
+
         sw_notes = " | ".join(notes_parts)
-        
+
         # Check if notes need updating (payment info missing)
         if txn.notes != sw_notes:
             # Don't log full notes change unless verbose, it's long
