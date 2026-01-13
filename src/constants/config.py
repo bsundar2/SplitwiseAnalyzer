@@ -26,8 +26,7 @@ CFG_PATHS = [
 DATA_DIR = PROJECT_ROOT / "data"
 PROCESSED_DIR = DATA_DIR / "processed"
 
-# Cache and state files
-CACHE_PATH = DATA_DIR / "splitwise_cache.json"
+# State files
 STATE_PATH = DATA_DIR / "splitwise_exported.json"
 
 # Ensure directories exist

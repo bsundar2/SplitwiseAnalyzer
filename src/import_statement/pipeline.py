@@ -12,8 +12,7 @@ from dotenv import load_dotenv
 load_dotenv("config/.env")
 
 # Local application
-from src.constants.config import CACHE_PATH, PROCESSED_DIR
-from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
+from src.constants.config import PROCESSED_DIR
 from src.import_statement.parse_statement import parse_statement
 from src.common.sheets_sync import write_to_sheets
 from src.common.splitwise_client import SplitwiseClient
@@ -23,10 +22,8 @@ from src.common.utils import (
     LOG,
     clean_merchant_name,
     infer_category,
-    load_state,
     mkdir_p,
     now_iso,
-    save_state_atomic,
 )
 
 
@@ -58,7 +55,6 @@ def process_statement(
         return
 
     mkdir_p(PROCESSED_DIR)
-    cache = load_state(CACHE_PATH)
     client = None
     db = DatabaseManager()  # Initialize database manager
 
@@ -141,10 +137,48 @@ def process_statement(
             "cc_reference_id": cc_reference_id,
             "is_credit": row.get("is_credit", False),
         }
-        # check cache
-        if cc_reference_id in cache:
-            entry["status"] = "cached"
-            LOG.info("Skipping cached txn %s %s %s", date, amount, desc)
+        
+        # Check database for duplicate
+        # Method 1: Check by cc_reference_id in notes (for statement imports)
+        # Method 2: Check by date/merchant/amount (for all transactions)
+        db_found = None
+        
+        # Try finding by cc_reference_id in notes first
+        if cc_reference_id:
+            db_transactions = db.get_transactions_by_date_range(start_date, end_date)
+            for txn in db_transactions:
+                if txn.notes and f"cc_reference_id: {cc_reference_id}" in txn.notes:
+                    db_found = txn
+                    LOG.info(
+                        "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
+                        cc_reference_id,
+                        txn.splitwise_id
+                    )
+                    break
+        
+        # If not found by cc_reference_id, check by date/merchant/amount
+        if not db_found:
+            potential_dupes = db.find_potential_duplicates(
+                date=date,
+                merchant=merchant,
+                amount=float(amount),
+                tolerance_days=1,
+                amount_tolerance=0.01
+            )
+            if potential_dupes:
+                db_found = potential_dupes[0]
+                LOG.info(
+                    "Found existing transaction by date/merchant/amount in DB: %s | %s | $%.2f (SW ID: %s)",
+                    date,
+                    merchant,
+                    float(amount),
+                    db_found.splitwise_id
+                )
+        
+        if db_found:
+            entry["status"] = "db_exists"
+            entry["db_id"] = db_found.id
+            entry["splitwise_id"] = db_found.splitwise_id
             results.append(entry)
             continue
 
@@ -176,15 +210,6 @@ def process_statement(
                 cc_reference_id,
                 remote_found.get("id"),
             )
-            # save to cache for idempotency
-            cache[cc_reference_id] = {
-                "splitwise_id": remote_found.get("id"),
-                "amount": amount,
-                "date": date,
-                "description": remote_found.get("description"),
-                "added_at": now_iso(),
-            }
-            save_state_atomic(CACHE_PATH, cache)  # Save cache immediately
             results.append(entry)
             continue
 
@@ -293,20 +318,12 @@ def process_statement(
             )
             entry["status"] = "added"
             entry["splitwise_id"] = sid
-            cache[cc_reference_id] = {
-                "splitwise_id": sid,
-                "amount": amount,
-                "date": date,
-                "description": desc,
-                "added_at": now_iso(),
-            }
-            save_state_atomic(CACHE_PATH, cache)
             LOG.info(
                 "Added expense to Splitwise id=%s for txn %s (%s/%s)",
                 sid,
+                cc_reference_id,
                 category_info.get("category_name", "Unknown"),
                 category_info.get("subcategory_name", "Unknown"),
-                cc_reference_id,
             )
 
             # Save to database after successful Splitwise creation
