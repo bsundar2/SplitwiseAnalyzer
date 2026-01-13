@@ -99,7 +99,8 @@ SplitwiseImporter/
 │   │   ├── parse_statement.py  # CSV parsing
 │   │   └── categorization.py   # Transaction categorization
 │   ├── export/
-│   │   └── splitwise_export.py # Fetch and export Splitwise expenses
+│   │   ├── splitwise_export.py # Unified export (Splitwise API or database)
+│   │   └── monthly_export_pipeline.py # Automated monthly workflow (import→sync→export)
 │   ├── update/
 │   │   ├── update_self_expenses.py # Fix self-expense splits
 │   │   └── bulk_update_categories.py # Bulk category updates
@@ -197,44 +198,106 @@ This summary provides everything Copilot needs.
 - 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-**🔧 Recent Session Changes (Jan 12, 2026 - Phase 2 Complete)**
-- ✅ Fixed duplicate detection to ONLY check cc_reference_id (removed fuzzy date/merchant/amount matching)
-- ✅ Allows legitimate duplicate transactions (e.g., 2 plane tickets same day/amount)
-- ✅ Category inference moved before duplicate checks (ensures all transactions get category info for sheets)
-- ✅ Fixed sheet output: remote_exists transactions now have splitwise_id populated
-- ✅ Black formatting applied to codebase
-- ✅ Removed review.sh (merchant review complete with 216+ merchants configured)
-- ✅ Removed CACHE_PATH constant and splitwise_cache.json file
-- ✅ Successfully tested with jan2026.csv import (5 new transactions added correctly)
-- ✅ **Coding Style Cleanup**: All emojis removed from codebase, all imports moved to top of files, organized per coding_style.md guidelines
+**Recent Session Changes (Jan 12, 2026 - Phase 3 Complete)**
+- ✅ Created unified export script (splitwise_export.py) supporting both Splitwise API and database sources
+- ✅ Database export includes all 12 columns matching Splitwise format
+- ✅ Payment transactions filtered from sheets (remain in database)
+- ✅ Details column simplified (only cc_reference_id or blank)
+- ✅ Removed Friends Split column (redundant with Participant Names)
+- ✅ Updated sync script to populate payment information from Splitwise API
+- ✅ Created monthly_export_pipeline.py to automate full workflow
+- ✅ Added dry-run support to all export/sync scripts
+- ✅ Converted hardcoded strings to constants throughout codebase
+- ✅ Updated documentation with automated pipeline examples
 
-🚀 Next Steps - Phase 3: Google Sheets Export & Budget Tracking
+✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
+- Unified export script supports both Splitwise API and database sources
+- Database export with full 12-column format matching Splitwise API
+- Payment transaction filtering (excluded from sheets but kept in DB)
+- Simplified details column (only cc_reference_id or blank)
+- Sync script updates payment information from Splitwise API
+- **Automated monthly pipeline** - Single command runs import → sync → export
+- Column order: Date, Amount, Category, Description, Details, Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Transaction Fingerprint
 
-**Export Pipeline Refactor:**
-- Database → Sheets (only unwritten rows) → mark as written_to_sheet=True
-- Implement append-only sheet writes with tracking
+🚀 Next Steps - Phase 4: Budget Tracking & Analysis
 
 **Analysis Layer:**
 - Keep raw transaction tabs (2024, 2025, 2026) in sheets
 - Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
 - Move rolling averages off transaction tabs
 
-**Database Cleanup (Optional):**
-- Update migrated transaction notes to include cc_reference_id from statements
-- This will improve duplicate detection by using DB instead of remote API checks
+**Append-only Export:**
+- Database → Sheets (only unwritten rows) → mark as written_to_sheet=True
+- Avoid full overwrite for historical months
 
 See `docs/database_sync_guide.md` for Phase 1 & 2 architecture details.
 
+**Workflow - Automated Monthly Pipeline (Recommended)**
+
+The automated pipeline runs all three steps in sequence:
+
+```bash
+# Full pipeline: Import new statement → Sync DB → Export to sheets
+export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
+python src/export/monthly_export_pipeline.py \
+  --statement data/raw/jan2026.csv \
+  --year 2026 \
+  --start-date 2026-01-01 \
+  --end-date 2026-01-31
+
+# Sync and export only (no new statement)
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only
+
+# Dry run to preview all changes
+python src/export/monthly_export_pipeline.py \
+  --statement data/raw/jan2026.csv \
+  --year 2026 \
+  --dry-run
+```
+
+**Individual Commands (for troubleshooting):**
+
+If you need to run steps separately:
+
+1. Import statement to Splitwise:
+```bash
+python src/import_statement/pipeline.py \
+  --statement data/raw/jan2026.csv \
+  --start-date 2026-01-01 \
+  --end-date 2026-01-31
+```
+
+2. Sync database with Splitwise (updates payment info):
+```bash
+python src/db_sync/sync_from_splitwise.py --year 2026 --live
+```
+
+3. Export to Google Sheets:
+```bash
+python src/export/splitwise_export.py \
+  --source database \
+  --year 2026 \
+  --worksheet "Expenses 2026" \
+  --overwrite
+```
+
+**Why this order:**
+- Splitwise is the source of truth (manual edits happen there)
+- Database reflects current Splitwise state via sync
+- Sync script populates payment information (Paid/Owe/With) from Splitwise API
+- Must sync after importing statements to get complete transaction data
+- Export uses database as source (faster, offline-capable, consistent)
+
+**Key Features:**
+- Payment transactions filtered from sheets (remain in DB)
+- Details column shows only cc_reference_id
+- 12 columns: Date, Amount, Category, Description, Details, Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Fingerprint
+- Dry run mode available for all scripts
+- Overwrite mode for full refresh
+
+See [docs/monthly_workflow.md](docs/monthly_workflow.md) for complete workflow guide with troubleshooting tips.
+
 **Phase 2 (Complete): Splitwise-First Pipeline Flow**
-
-The pipeline follows this flow:
-
-1. **Import statements to Splitwise** - Parse CSV and add transactions using pipeline.py
-2. **Save to Database** - After successful Splitwise creation, save with splitwise_id
-3. **Manual edits in Splitwise** - Adjust splits, delete entries, fix categories  
-4. **Sync back to Database** - Run unified sync script to update/insert/delete in DB
-
-**Import new statement:**
 ```bash
 source .venv/bin/activate
 export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter

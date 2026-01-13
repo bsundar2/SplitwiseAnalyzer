@@ -2,23 +2,26 @@
 
 A Python project to import Splitwise expenses, process credit card statements, categorize expenses, and sync to Google Sheets for budget tracking.
 
-## 🎯 Project Architecture (Phase 1 Complete!)
+## 🎯 Project Architecture (Phase 3 Complete!)
 
-**Local Database = Source of Truth**  
-**Google Sheets = View Cache**
+**Splitwise = Source of Truth (Manual Edits)**  
+**Local Database = Synced Mirror (Fast Queries)**  
+**Google Sheets = View Cache (Filtered Export)**
 
-Phase 1 introduces a local SQLite database that serves as the canonical source for all transaction data. Google Sheets becomes a human-readable mirror of this data, not the primary ledger.
+### Phase Evolution
+- ✅ **Phase 1**: SQLite database as canonical source with comprehensive transaction model
+- ✅ **Phase 2**: Splitwise-first pipeline (CSV → Splitwise → Database, with sync-back capability)
+- ✅ **Phase 3**: Unified export & automated monthly pipeline (Database → Google Sheets with filtering)
 
-### What's New in Phase 1
-- ✅ SQLite database (`data/transactions.db`) for all transactions
-- ✅ Direct Splitwise API import (no cache file dependencies)
-- ✅ Comprehensive transaction model with deduplication
-- ✅ Simple migration tool for historical data
-- ✅ Source tracking and sync status
-- ✅ Import audit trail
-- ✅ Clean project structure with everything under `src/`
+### Phase 3 Features
+- 🎯 **Automated monthly pipeline** - Single command runs import → sync → export
+- 🎯 **Unified export script** - Supports both Splitwise API and database sources
+- 🎯 **Payment filtering** - Payments excluded from sheets but tracked in database
+- 🎯 **Simplified export** - 12 columns with cc_reference_id in Details
+- 🎯 **Dry run mode** - Preview changes before applying
+- 🎯 **Sync script** - Pulls updates from Splitwise API to database
 
-See [docs/database_migration.md](docs/database_migration.md) for detailed migration guide.
+See [docs/database_sync_guide.md](docs/database_sync_guide.md) for detailed architecture guide.
 
 ## Setup
 1. Create a virtual environment: `python -m venv .venv`
@@ -29,6 +32,37 @@ See [docs/database_migration.md](docs/database_migration.md) for detailed migrat
 
 ## Quick Start
 
+### Recommended: Automated Monthly Pipeline
+
+The easiest way to process a new statement is the automated pipeline:
+
+```bash
+# Activate venv and set PYTHONPATH
+source .venv/bin/activate
+export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
+
+# Full pipeline: Import statement → Sync DB → Export to sheets
+python src/export/monthly_export_pipeline.py \
+  --statement data/raw/jan2026.csv \
+  --year 2026 \
+  --start-date 2026-01-01 \
+  --end-date 2026-01-31
+
+# Sync and export only (no new statement)
+python src/export/monthly_export_pipeline.py --year 2026 --sync-only
+
+# Dry run to preview all changes
+python src/export/monthly_export_pipeline.py \
+  --statement data/raw/jan2026.csv \
+  --year 2026 \
+  --dry-run
+```
+
+This single command:
+1. Imports your CSV statement to Splitwise
+2. Syncs database with Splitwise (updates payment info)
+3. Exports to Google Sheets (filters payments, shows only 12 columns)
+
 ### Phase 1: Migrate Historical Data to Database
 
 ```bash
@@ -37,35 +71,53 @@ source .venv/bin/activate
 export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
 
 # Import Splitwise expenses by year
-python src/db_migration/migrate_from_splitwise_api.py --year 2025
-python src/db_migration/migrate_from_splitwise_api.py --year 2026
+python src/db_sync/sync_from_splitwise.py --year 2025 --live
+python src/db_sync/sync_from_splitwise.py --year 2026 --live
 
-# Or import multiple years at once
-python src/db_migration/migrate_from_splitwise_api.py --years 2023 2024 2025 2026
-
-# Or import a range
-python src/db_migration/migrate_from_splitwise_api.py --year-range 2020 2026
+# Dry run first to preview
+python src/db_sync/sync_from_splitwise.py --year 2025 --dry-run
 
 # Check database stats
 python -c "from src.database import DatabaseManager; print(DatabaseManager().get_stats())"
 ```
 
-### Process a Credit Card Statement
+### Process a Credit Card Statement (Manual Steps)
 ```bash
 # Parse and categorize transactions
 python src/import_statement/pipeline.py --statement data/raw/your_statement.csv
 
+If you need to troubleshoot or run individual steps:
+
+```bash
+# 1. Import statement to Splitwise
+python src/import_statement/pipeline.py \
+  --statement data/raw/your_statement.csv \
+  --start-date 2026-01-01 \
+  --end-date 2026-01-31
+
 # Dry run to preview without saving
-python src/import_statement/pipeline.py --statement data/raw/your_statement.csv --dry-run
+python src/import_statement/pipeline.py \
+  --statement data/raw/your_statement.csv \
+  --dry-run
 
-# Process specific batch (useful for large statements)
-python src/import_statement/pipeline.py --statement data/raw/your_statement.csv --limit 50 --offset 0
+# 2. Sync database with Splitwise
+python src/db_sync/sync_from_splitwise.py --year 2026 --live
 
-# Append results to existing Google Sheet
-python src/import_statement/pipeline.py --statement data/raw/your_statement.csv --append
+# Dry run first to preview
+python src/db_sync/sync_from_splitwise.py --year 2026 --dry-run
 
-# Filter by merchant (selective reprocessing)
-python src/import_statement/pipeline.py --statement data/raw/your_statement.csv --merchant-filter "Headway" --offset 0
+# 3. Export to Google Sheets
+python src/export/splitwise_export.py \
+  --source database \
+  --year 2026 \
+  --worksheet "Expenses 2026" \
+  --overwrite
+
+# Dry run export
+python src/export/splitwise_export.py \
+  --source database \
+  --year 2026 \
+  --dry-run
 ```
 
 ### Review & Improve Merchant Extraction
@@ -93,20 +145,37 @@ python src/merchant_review/apply_review_feedback.py
 python src/import_statement/pipeline.py --statement data/raw/your_statement.csv
 ```
 
-### Export Splitwise Data
+### Export Options
+
+Export from Splitwise API or database to Google Sheets:
+
 ```bash
-# Export all Splitwise expenses for a date range
-python src/export/splitwise_export.py --start-date 2025-01-01 --end-date 2025-12-31
+# Export from database (recommended - faster, filtered)
+python src/export/splitwise_export.py \
+  --source database \
+  --year 2026 \
+  --worksheet "Expenses 2026" \
+  --overwrite
 
-# Export and sync to Google Sheets (append mode)
-python src/export/splitwise_export.py --start-date 2025-01-01 --end-date 2025-12-31 --sheet-name "Splitwise 2025"
+# Export from Splitwise API (live data)
+python src/export/splitwise_export.py \
+  --source splitwise \
+  --start-date 2026-01-01 \
+  --end-date 2026-12-31 \
+  --worksheet "Expenses 2026" \
+  --overwrite
 
-# Overwrite sheet with fresh data (removes duplicates, filters deleted transactions)
-python src/export/splitwise_export.py --start-date 2025-01-01 --end-date 2025-12-31 --overwrite
-
-# Export Splitwise categories to a separate sheet
-python src/export/splitwise_export.py --start-date 2025-01-01 --end-date 2025-12-31 --overwrite --export-categories
+# Dry run to preview
+python src/export/splitwise_export.py \
+  --source database \
+  --year 2026 \
+  --dry-run
 ```
+
+**Export features:**
+- 12 columns: Date, Amount, Category, Description, Details (cc_ref), Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Fingerprint
+- Filters Payment transactions (excluded from sheets but tracked in DB)
+- Overwrite mode for full refresh or default append mode
 
 ### Update Existing Splitwise Expenses
 
