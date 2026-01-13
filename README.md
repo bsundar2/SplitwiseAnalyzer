@@ -67,6 +67,28 @@ This single command:
 2. Syncs database with Splitwise (updates payment info)
 3. Exports to Google Sheets (filters payments, shows only 12 columns)
 
+### Generate Budget Summaries
+
+After exporting transactions, generate budget analysis and spending patterns:
+
+```bash
+# Generate all summary sheets for 2026
+python src/export/generate_summaries.py --year 2026
+
+# Preview summaries without writing
+python src/export/generate_summaries.py --year 2026 --dry-run
+
+# With custom budget file
+python src/export/generate_summaries.py --year 2026 --budget config/budget_2026.json
+```
+
+**Summary sheets generated:**
+- **Monthly Summary** - Total spending by month with MoM changes and cumulative totals
+- **Category Breakdown** - Spending by category with percentages and transaction counts
+- **Budget vs Actual** - Compare actual spending against budget targets with variance %
+- **Monthly Trends** - 3-month rolling averages and YTD trends
+- **Category by Month** - Pivot table showing category spending by month
+
 ### Phase 1: Migrate Historical Data to Database
 
 ```bash

@@ -100,7 +100,8 @@ SplitwiseImporter/
 │   │   └── categorization.py   # Transaction categorization
 │   ├── export/
 │   │   ├── splitwise_export.py # Unified export (Splitwise API or database)
-│   │   └── monthly_export_pipeline.py # Automated monthly workflow (import→sync→export)
+│   │   ├── monthly_export_pipeline.py # Automated monthly workflow (import→sync→export)
+│   │   └── generate_summaries.py # Budget analysis and spending pattern summaries
 │   ├── update/
 │   │   ├── update_self_expenses.py # Fix self-expense splits
 │   │   └── bulk_update_categories.py # Bulk category updates
@@ -219,6 +220,7 @@ This summary provides everything Copilot needs.
 - Sync script updates payment information from Splitwise API
 - **Automated monthly pipeline** - Single command runs import → sync → export
 - **Append-only mode** - Tracks written_to_sheet flag, only exports new transactions
+- **Budget summary generation** - Analyzes spending patterns and compares against budget targets
 - Column order: Date, Amount, Category, Description, Details, Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Transaction Fingerprint
 
 🚀 Next Steps - Phase 4: Budget Tracking & Analysis
