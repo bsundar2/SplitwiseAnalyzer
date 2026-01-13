@@ -129,30 +129,30 @@ def parse_csv(path):
     # Identify credits (negative amounts) but keep them instead of filtering
     # Credits will be handled differently in the pipeline (reversed split)
     out["is_credit"] = out["amount"] < 0
-    
+
     # Identify refunds specifically (credits with refund/credit keywords, excluding payments)
     def is_likely_refund(row):
         """Check if transaction is likely a refund based on description."""
         if not row["is_credit"]:
             return False
-        
+
         # Combine description and merchant for pattern matching
         combined_text = f"{row['description']} {out.loc[row.name, 'category'] if 'category' in out.columns else ''}".lower()
-        
+
         # Exclude payment patterns
-        payment_keywords = ['payment', 'autopay', 'thank you', 'settle']
+        payment_keywords = ["payment", "autopay", "thank you", "settle"]
         if any(kw in combined_text for kw in payment_keywords):
             return False
-        
+
         # Look for refund indicators
-        refund_keywords = ['refund', 'credit', 'return', 'reversal', 'chargeback']
+        refund_keywords = ["refund", "credit", "return", "reversal", "chargeback"]
         return any(kw in combined_text for kw in refund_keywords)
-    
+
     out["is_refund"] = out.apply(is_likely_refund, axis=1)
-    
+
     credits_count = out["is_credit"].sum()
     refunds_count = out["is_refund"].sum()
-    
+
     if credits_count > 0:
         LOG.info(
             "Found %d credit transactions (amount < 0): %d refunds, %d other credits (payments)",
@@ -263,34 +263,34 @@ def parse_amount_safe(s):
 
 def extract_reference_id(detail_str):
     """Extract credit card reference/transaction ID from detail field.
-    
+
     Handles various formats:
     - Pure numeric IDs (e.g., "123456789")
     - Alphanumeric IDs (e.g., "TXN123ABC456")
     - IDs with prefixes (e.g., "REF: 123456789")
-    
+
     Returns:
         Cleaned reference ID string or None if not found/invalid
     """
     if pd.isna(detail_str) or detail_str in ["None", "null", "", "nan"]:
         return None
-    
+
     detail_str = str(detail_str).strip()
-    
+
     # Skip empty or placeholder values
     if not detail_str or detail_str.lower() in ["none", "null", "nan", "n/a"]:
         return None
-    
+
     # Remove common prefixes
     for prefix in ["REF:", "REFERENCE:", "TXN:", "TRANS:", "ID:"]:
         if detail_str.upper().startswith(prefix):
-            detail_str = detail_str[len(prefix):].strip()
-    
+            detail_str = detail_str[len(prefix) :].strip()
+
     # Clean and validate (keep alphanumeric only)
     ref_id = "".join(c for c in detail_str if c.isalnum())
-    
+
     # Must have at least 8 characters to be a valid reference
     if len(ref_id) >= 8:
         return ref_id
-    
+
     return None

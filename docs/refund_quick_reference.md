@@ -1,5 +1,11 @@
 # Refund Processing - Quick Reference
 
+**Updated: Jan 13, 2026 - Simplified Implementation**
+
+## Overview
+
+The refund system automatically detects credits/refunds in your CSV statements and creates corresponding Splitwise expenses. No complex matching logic - just creates expenses with the original statement description for you to manually categorize in Splitwise.
+
 ## Import Statement with Refunds
 
 ```bash
@@ -10,19 +16,20 @@ python src/import_statement/pipeline.py \
   --end-date 2026-01-31
 
 # Check logs for:
-# "Processing refunds (matching to original transactions)..."
-# "Refund processing summary:"
+# "Detected X credit/refund transactions"
+# "Created 1 refund in Splitwise (ID: XXXXXX)"
 ```
 
-## Process Pending Refunds
+## How It Works
 
-```bash
-# Preview what would happen
-python -m src.import_statement.process_refunds --dry-run --verbose
-
-# Process all pending refunds
-python -m src.import_statement.process_refunds --verbose
-```
+1. **Parser Detection** - `parse_statement.py` identifies refunds via keywords (refund, credit, return) excluding payments
+2. **Save to DB** - Pipeline saves refund as `is_refund=True` with `reconciliation_status='pending'`
+3. **Create in Splitwise** - RefundProcessor creates expense with:
+   - Original statement description (no prefix added)
+   - Amount as positive (credit becomes expense you "paid")
+   - Split: SELF paid 100%, SELF_EXPENSE owes 100%
+   - cc_reference_id from statement (or generated UUID)
+4. **Manual Categorization** - You categorize/link in Splitwise UI as needed
 
 ## Check Refund Status
 
@@ -30,54 +37,22 @@ python -m src.import_statement.process_refunds --verbose
 from src.database import DatabaseManager
 
 db = DatabaseManager()
+conn = db.get_connection()
 
-# Get all unmatched refunds
-pending = db.get_unmatched_refunds()
-print(f"Found {len(pending)} pending refunds")
+# Get all refunds from January
+cursor = conn.execute('''
+    SELECT id, date, description, amount, reconciliation_status, 
+           splitwise_id, cc_reference_id
+    FROM transactions
+    WHERE is_refund = 1 
+    AND date LIKE '2026-01%'
+    ORDER BY date
+''')
 
-# Get specific transaction
-txn = db.get_transaction_by_id(123)
-print(f"Status: {txn.reconciliation_status}")
-print(f"Refund for: {txn.refund_for_txn_id}")
-print(f"Partial refund: {txn.is_partial_refund}")
-print(f"Refund percentage: {txn.refund_percentage:.1f}%")
-
-# Get total refunds for an original transaction (should be 0 or 1 refund)
-original_id = 456
-total_refunded = db.get_total_refunds_for_original(original_id)
-original = db.get_transaction_by_id(original_id)
-print(f"Credit applied: ${total_refunded:.2f} of ${original.amount:.2f}")
-print(f"Net cost: ${original.amount - total_refunded:.2f}")
+print("Refunds in January 2026:")
+for row in cursor.fetchall():
+    print(f"  {row[1]} | {row[2]:40} | ${abs(row[3]):7.2f} | SW:{row[5]} | Status:{row[4]}")
 ```
-
-## Manual Refund Linking
-
-```python
-from src.database import DatabaseManager
-from src.import_statement.process_refunds import RefundProcessor
-from src.common.splitwise_client import SplitwiseClient
-
-db = DatabaseManager()
-client = SplitwiseClient()
-
-# Link refund to original manually
-db.update_refund_linkage(
-    refund_txn_id=456,           # Refund transaction ID
-    original_txn_id=123,          # Original transaction ID
-    original_splitwise_id=789012, # Original Splitwise expense ID
-    match_method="manual"
-)
-
-# Create Splitwise expense for manually linked refund
-refund = db.get_transaction_by_id(456)
-processor = RefundProcessor(db, client)
-result = processor.process_refund(refund, dry_run=False)
-print(f"Result: {result['status']}")
-```
-
-## Common Queries
-
-### Find All Refunds
 ```python
 conn = db.get_connection()
 cursor = conn.cursor()

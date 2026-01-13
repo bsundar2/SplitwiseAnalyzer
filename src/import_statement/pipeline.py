@@ -133,7 +133,7 @@ def process_statement(
 
         # Detect if this is a refund/credit (negative amount OR explicit is_credit flag)
         is_credit = row.get("is_credit", False) or float(amount) < 0
-        
+
         # For refunds, use absolute value for amount
         amount_abs = abs(float(amount))
 
@@ -253,7 +253,7 @@ def process_statement(
         if is_credit:
             entry["status"] = "added"
             entry["splitwise_id"] = None  # Will be set by refund processor
-            
+
             # Save to database with pending status
             txn = Transaction(
                 date=date,
@@ -267,7 +267,7 @@ def process_statement(
                 category_id=entry.get("category_id"),
                 subcategory_id=entry.get("subcategory_id"),
             )
-            
+
             txn_id = db.insert_transaction(txn)
             entry["status"] = "added"
             entry["db_id"] = txn_id
@@ -375,15 +375,20 @@ def process_statement(
     # Collect refund transaction IDs from this batch that need Splitwise processing
     # Include: newly added ("added") OR already in DB but not yet in Splitwise ("db_exists" with no splitwise_id)
     imported_refund_ids = [
-        entry.get("db_id") 
-        for entry in results 
-        if entry.get("db_id") and entry.get("is_credit") and (
-            entry.get("status") == "added" or 
-            (entry.get("status") == "db_exists" and not entry.get("splitwise_id"))
+        entry.get("db_id")
+        for entry in results
+        if entry.get("db_id")
+        and entry.get("is_credit")
+        and (
+            entry.get("status") == "added"
+            or (entry.get("status") == "db_exists" and not entry.get("splitwise_id"))
         )
     ]
-    
-    LOG.info("Found %d refund transactions in this batch that need Splitwise processing", len(imported_refund_ids))
+
+    LOG.info(
+        "Found %d refund transactions in this batch that need Splitwise processing",
+        len(imported_refund_ids),
+    )
 
     # write processed CSV (with statuses)
     out_df = pd.DataFrame(results)
@@ -396,11 +401,13 @@ def process_statement(
     # Only process refunds that were imported in THIS batch (not all pending refunds)
     if not dry_run and client and imported_refund_ids:
         LOG.info("=" * 60)
-        LOG.info("Processing %d refunds from this import batch...", len(imported_refund_ids))
+        LOG.info(
+            "Processing %d refunds from this import batch...", len(imported_refund_ids)
+        )
         LOG.info("=" * 60)
-        
+
         refund_processor = RefundProcessor(db=db, client=client)
-        
+
         # Process only the refunds imported in this batch
         refund_summary = {
             "total": len(imported_refund_ids),
@@ -409,24 +416,26 @@ def process_statement(
             "errors": 0,
             "results": [],
         }
-        
+
         for refund_id in imported_refund_ids:
             # Get the transaction from database
             refund_txn = db.get_transaction_by_id(refund_id)
             if not refund_txn:
-                LOG.warning("Could not find refund transaction ID %s in database", refund_id)
+                LOG.warning(
+                    "Could not find refund transaction ID %s in database", refund_id
+                )
                 continue
-            
+
             result = refund_processor.process_refund(refund_txn, dry_run=False)
             refund_summary["results"].append(result)
-            
+
             if result["status"] == "created":
                 refund_summary["created"] += 1
             elif result["status"] == "duplicate":
                 refund_summary["duplicate"] += 1
             elif result["status"] == "error":
                 refund_summary["errors"] += 1
-        
+
         LOG.info("Refund processing summary:")
         LOG.info("  Total refunds from this batch: %d", refund_summary["total"])
         LOG.info("  Successfully created: %d", refund_summary["created"])
@@ -435,7 +444,9 @@ def process_statement(
     elif dry_run and len(imported_refund_ids) > 0:
         LOG.info("=" * 60)
         LOG.info("Refund processing (would run in live mode):")
-        LOG.info("  %d refunds from this batch would be processed", len(imported_refund_ids))
+        LOG.info(
+            "  %d refunds from this batch would be processed", len(imported_refund_ids)
+        )
         LOG.info("=" * 60)
 
     # If requested, push the processed output to Google Sheets

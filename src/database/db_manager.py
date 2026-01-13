@@ -326,11 +326,11 @@ class DatabaseManager:
         allow_partial: bool = True,
     ) -> Optional[Transaction]:
         """Find the original transaction for a refund.
-        
+
         Uses a waterfall matching strategy:
         1. cc_reference_id match (most reliable) - allows partial refunds
         2. merchant + date window + amount range (fallback)
-        
+
         Args:
             refund_amount: Absolute amount of the refund
             refund_date: Date of the refund transaction
@@ -338,7 +338,7 @@ class DatabaseManager:
             cc_reference_id: Credit card reference ID (if available)
             date_window_days: Maximum days before refund to search for original
             allow_partial: If True, match even when refund < original amount
-            
+
         Returns:
             Original Transaction object if found, None otherwise
         """
@@ -371,9 +371,9 @@ class DatabaseManager:
                     LIMIT 1
                 """
                 cursor.execute(query, (cc_reference_id, refund_amount))
-            
+
             row = cursor.fetchone()
-            
+
             if row:
                 conn.close()
                 return Transaction.from_row(dict(row))
@@ -394,7 +394,14 @@ class DatabaseManager:
             """
             cursor.execute(
                 query,
-                (merchant, refund_amount - 0.01, refund_date, refund_date, date_window_days, refund_amount),
+                (
+                    merchant,
+                    refund_amount - 0.01,
+                    refund_date,
+                    refund_date,
+                    date_window_days,
+                    refund_amount,
+                ),
             )
         else:
             # Exact match only
@@ -413,7 +420,7 @@ class DatabaseManager:
                 query,
                 (merchant, refund_amount, refund_date, refund_date, date_window_days),
             )
-        
+
         row = cursor.fetchone()
         conn.close()
 
@@ -424,7 +431,7 @@ class DatabaseManager:
 
     def get_unmatched_refunds(self) -> List[Transaction]:
         """Get all refunds that haven't been matched to original transactions.
-        
+
         Returns:
             List of unmatched refund Transaction objects
         """
@@ -452,7 +459,7 @@ class DatabaseManager:
         match_method: str,
     ) -> None:
         """Update refund transaction with linkage to original.
-        
+
         Args:
             refund_txn_id: Database ID of refund transaction
             original_txn_id: Database ID of original transaction
@@ -487,7 +494,7 @@ class DatabaseManager:
 
     def mark_refund_as_unmatched(self, refund_txn_id: int, reason: str = "") -> None:
         """Mark refund as unmatched for manual review.
-        
+
         Args:
             refund_txn_id: Database ID of refund transaction
             reason: Reason why it couldn't be matched
@@ -508,18 +515,21 @@ class DatabaseManager:
             cursor.execute(query, (notes, now, refund_txn_id))
 
     def has_existing_refund_for_original(
-        self, original_txn_id: int, refund_amount: float = None, cc_reference_id: Optional[str] = None
+        self,
+        original_txn_id: int,
+        refund_amount: float = None,
+        cc_reference_id: Optional[str] = None,
     ) -> bool:
         """Check if a refund already exists for an original transaction.
-        
+
         Used for idempotency - prevents duplicate refund creation.
         Only one refund allowed per original transaction.
-        
+
         Args:
             original_txn_id: Database ID of original transaction
             refund_amount: Amount of the refund (optional, for logging)
             cc_reference_id: Credit card reference ID (optional, for logging)
-            
+
         Returns:
             True if any refund exists for this original
         """
@@ -539,12 +549,12 @@ class DatabaseManager:
 
     def get_total_refunds_for_original(self, original_txn_id: int) -> float:
         """Get total refund amount for an original transaction.
-        
+
         Useful for tracking cumulative partial refunds.
-        
+
         Args:
             original_txn_id: Database ID of original transaction
-            
+
         Returns:
             Total refund amount (sum of all refunds)
         """

@@ -82,7 +82,7 @@ Sheet will update from local script execution.
 
 5. Project Structure
 
-Current structure (updated Jan 12, 2026 - Phase 2 Complete):
+Current structure (updated Jan 13, 2026 - Phase 5 Complete):
 
 SplitwiseImporter/
 ├── src/
@@ -90,14 +90,16 @@ SplitwiseImporter/
 │   │   ├── __init__.py
 │   │   ├── schema.py           # Table definitions
 │   │   ├── models.py           # Transaction & ImportLog dataclasses
-│   │   └── db_manager.py       # DatabaseManager with CRUD operations
+│   │   ├── db_manager.py       # DatabaseManager with CRUD operations
+│   │   └── migrate_refund_columns.py # Schema migration for refund tracking
 │   ├── db_sync/                # Unified sync utilities (Phase 1 & 2)
 │   │   ├── __init__.py
 │   │   └── sync_from_splitwise.py # Sync DB with Splitwise (insert/update/delete)
 │   ├── import_statement/       # CSV statement parsing and import pipeline
 │   │   ├── pipeline.py         # Main ETL orchestrator (Phase 2: Splitwise → DB)
-│   │   ├── parse_statement.py  # CSV parsing
-│   │   └── categorization.py   # Transaction categorization
+│   │   ├── parse_statement.py  # CSV parsing with refund detection
+│   │   ├── categorization.py   # Transaction categorization
+│   │   └── process_refunds.py  # Automatic refund/credit expense creation
 │   ├── export/
 │   │   ├── splitwise_export.py # Unified export (Splitwise API or database)
 │   │   ├── monthly_export_pipeline.py # Automated monthly workflow (import→sync→export)
@@ -177,6 +179,9 @@ This summary provides everything Copilot needs.
 - Duplicate detection using local cache and remote API checks
 - Auto-categorization using merchant lookup with 216+ merchants configured
 - Interactive merchant review workflow for improving extraction accuracy
+- **Automatic refund/credit processing** - Detects credits in statements and creates Splitwise expenses
+- **Refund tracking** - 8 database columns for reconciliation (cc_reference_id, refund_for_txn_id, etc.)
+- **Simplified refund creation** - Creates refunds with original statement description, no transaction matching
 
 ✅ **Export & Sync**
 - Export Splitwise expenses to Google Sheets with filtering
@@ -240,7 +245,18 @@ This summary provides everything Copilot needs.
 - **Fail-fast error handling** - Removed try-catch blocks, exceptions bubble up immediately
 - **Append-only sheets** - Both transactions and summaries only write new/changed rows
 
-🚀 Next Steps - Phase 5: Advanced Analytics & Automation
+✅ **Phase 5: Refund/Credit Processing (Complete - Jan 13, 2026)**
+- **Automatic refund detection** - Parser identifies credits via keywords (refund, credit, return) excluding payments
+- **Database schema** - 8 refund tracking columns (cc_reference_id, refund_for_txn_id, refund_for_splitwise_id, etc.)
+- **Schema migration** - Idempotent migration script in `src/database/migrate_refund_columns.py`
+- **RefundProcessor** - Simplified processor creates Splitwise expenses with original statement description
+- **No matching logic** - User can manually categorize/link refunds in Splitwise UI
+- **UUID generation** - Creates unique cc_reference_id for refunds without statement reference
+- **Split logic** - SELF paid 100%, SELF_EXPENSE owes 100% (tracks credits back to self)
+- **Batch processing** - Only processes refunds from current import batch to prevent duplicates
+- **Database reconciliation** - Notes field stores cc_reference_id for sheet export
+
+🚀 Next Steps - Phase 6: Advanced Analytics & Automation
 
 **Additional Summary Sheets:**
 - Enable Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month sheets

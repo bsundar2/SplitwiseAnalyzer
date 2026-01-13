@@ -2,7 +2,7 @@
 
 A Python project to import Splitwise expenses, process credit card statements, categorize expenses, and sync to Google Sheets for budget tracking.
 
-## 🎯 Project Architecture (Phase 3 Complete!)
+## 🎯 Project Architecture (Phase 5 Complete!)
 
 **Splitwise = Source of Truth (Manual Edits)**  
 **Local Database = Synced Mirror (Fast Queries)**  
@@ -12,6 +12,8 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - ✅ **Phase 1**: SQLite database as canonical source with comprehensive transaction model
 - ✅ **Phase 2**: Splitwise-first pipeline (CSV → Splitwise → Database, with sync-back capability)
 - ✅ **Phase 3**: Unified export & automated monthly pipeline (Database → Google Sheets with filtering)
+- ✅ **Phase 4**: Budget tracking & analysis (Monthly summaries, budget vs actual, spending patterns)
+- ✅ **Phase 5**: Refund/credit processing (Automatic detection & Splitwise creation)
 
 ### Phase 3 Features
 - 🎯 **Automated monthly pipeline** - Single command runs import → sync → export → summaries
@@ -29,6 +31,14 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - 📊 **Smart categorization** - Maps 20+ transaction categories to Splitwise budget format
 - 📊 **5 analysis types** - Monthly Summary, Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month
 - 📊 **Fail-fast errors** - Removed exception catching, crashes immediately on errors for easier debugging
+
+### Phase 5 Features (Jan 2026)
+- 💳 **Automatic refund detection** - Parser identifies credits/refunds in statements via keywords
+- 💳 **Refund creation** - Automatically creates Splitwise expenses for all detected credits
+- 💳 **Simple workflow** - Uses original statement description, no complex matching logic
+- 💳 **Database tracking** - 8 refund columns for reconciliation (cc_reference_id, refund_for_txn_id, etc.)
+- 💳 **Batch processing** - Only processes refunds from current import to prevent duplicates
+- 💳 **UUID generation** - Creates unique cc_reference_id for refunds without statement reference
 
 See [docs/database_sync_guide.md](docs/database_sync_guide.md) for detailed architecture guide.
 

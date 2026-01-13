@@ -91,9 +91,15 @@ class Transaction:
         self.splitwise_deleted_at = datetime.utcnow().isoformat()
         self.updated_at = datetime.utcnow().isoformat()
 
-    def link_to_original_transaction(self, original_txn_id: int, original_splitwise_id: Optional[int], match_method: str, original_amount: Optional[float] = None):
+    def link_to_original_transaction(
+        self,
+        original_txn_id: int,
+        original_splitwise_id: Optional[int],
+        match_method: str,
+        original_amount: Optional[float] = None,
+    ):
         """Link this refund to its original transaction.
-        
+
         Args:
             original_txn_id: Database ID of original transaction
             original_splitwise_id: Splitwise expense ID of original transaction
@@ -106,7 +112,7 @@ class Transaction:
         self.reconciliation_status = "matched"
         self.refund_created_at = datetime.utcnow().isoformat()
         self.updated_at = datetime.utcnow().isoformat()
-        
+
         # Calculate if this is a partial refund
         if original_amount and abs(self.amount) > 0:
             refund_amt = abs(self.amount)

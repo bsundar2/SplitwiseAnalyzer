@@ -551,17 +551,17 @@ Examples:
     print("Writing summaries to Google Sheets...\n")
 
     db = DatabaseManager()
-    
+
     # Check if any data changed
     any_changes = False
     for _, row in monthly_summary.iterrows():
         year_month = str(row["Month"])
         existing = db.get_monthly_summary(year_month)
-        
+
         if not existing:
             any_changes = True
             break
-            
+
         # Compare numeric values with tolerance
         if (
             abs(existing["total_spent_net"] - row["Total Spent (Net)"]) > 0.01
@@ -581,7 +581,7 @@ Examples:
         # Open sheet and clear/rewrite
         gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
         sheet = gc.open_by_key(args.sheet_key)
-        
+
         try:
             worksheet = sheet.worksheet_by_title(WORKSHEET_MONTHLY_SUMMARY)
             # Clear existing content
@@ -589,15 +589,17 @@ Examples:
         except pygsheets.WorksheetNotFound:
             # Create worksheet if it doesn't exist
             worksheet = sheet.add_worksheet(WORKSHEET_MONTHLY_SUMMARY)
-        
+
         # Write header
         worksheet.update_row(1, list(monthly_summary.columns))
-        
+
         # Write all data rows
         for idx, row in monthly_summary.iterrows():
             row_values = [row[col] for col in monthly_summary.columns]
-            worksheet.update_row(idx + 2, row_values)  # +2 because row 1 is header, idx is 0-based
-            
+            worksheet.update_row(
+                idx + 2, row_values
+            )  # +2 because row 1 is header, idx is 0-based
+
             # Save to database and mark as written
             year_month = str(row["Month"])
             db.save_monthly_summary(
@@ -611,8 +613,10 @@ Examples:
                 mom_change=row["MoM Change"],
                 written_to_sheet=True,
             )
-        
-        print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Cleared and rewrote {len(monthly_summary)} rows")
+
+        print(
+            f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Cleared and rewrote {len(monthly_summary)} rows"
+        )
 
     url = f"https://docs.google.com/spreadsheets/d/{args.sheet_key}"
     print(f"   {url}")

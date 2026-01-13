@@ -9,7 +9,7 @@ Example usage:
     from src.import_statement.process_refunds import RefundProcessor
     processor = RefundProcessor(db, client)
     summary = processor.process_all_pending_refunds()
-    
+
     # As script
     python -m src.import_statement.process_refunds --dry-run --verbose
 """
@@ -31,7 +31,7 @@ class RefundProcessor:
 
     def __init__(self, db: DatabaseManager, client: SplitwiseClient = None):
         """Initialize refund processor.
-        
+
         Args:
             db: DatabaseManager instance
             client: SplitwiseClient instance (optional, for dry-run mode)
@@ -45,14 +45,14 @@ class RefundProcessor:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         """Process a single refund transaction.
-        
+
         Creates a Splitwise expense with default split (SELF paid 100%, SELF_EXPENSE owes 100%).
         No matching or linking to original transactions.
-        
+
         Args:
             refund_txn: Transaction object for the refund (is_refund=True)
             dry_run: If True, don't create Splitwise expense
-            
+
         Returns:
             Result dictionary with status and details
         """
@@ -68,22 +68,25 @@ class RefundProcessor:
         if not dry_run:
             try:
                 splitwise_id = self._create_refund_in_splitwise(refund_txn)
-                
+
                 LOG.info(
                     "Created refund in Splitwise: ID %s",
                     splitwise_id,
                 )
-                
+
                 # Update refund transaction with Splitwise ID
-                self.db.update_transaction(refund_txn.id, {
-                    "splitwise_id": splitwise_id,
-                    "reconciliation_status": "matched",
-                    "updated_at": datetime.now().isoformat(),
-                })
-                
+                self.db.update_transaction(
+                    refund_txn.id,
+                    {
+                        "splitwise_id": splitwise_id,
+                        "reconciliation_status": "matched",
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                )
+
                 result["status"] = "created"
                 result["splitwise_id"] = splitwise_id
-                
+
             except Exception as e:
                 LOG.exception(
                     "Failed to create refund in Splitwise for txn %s: %s",
@@ -94,7 +97,7 @@ class RefundProcessor:
                 result["error"] = str(e)
         else:
             result["status"] = "would_create"
-        
+
         return result
 
         return result
@@ -104,14 +107,14 @@ class RefundProcessor:
         refund_txn: Transaction,
     ) -> int:
         """Create a refund expense in Splitwise.
-        
+
         Uses a default split where:
         - SELF (current user) paid 100% (received the credit)
         - SELF_EXPENSE account owes 100% (tracks credit as owed back to self)
-        
+
         Args:
             refund_txn: Refund transaction to create
-            
+
         Returns:
             Splitwise expense ID of created refund
         """
@@ -164,10 +167,10 @@ class RefundProcessor:
 
     def process_all_pending_refunds(self, dry_run: bool = False) -> Dict[str, Any]:
         """Process all pending unmatched refunds.
-        
+
         Args:
             dry_run: If True, don't create Splitwise expenses
-            
+
         Returns:
             Summary of processing results
         """
@@ -251,15 +254,18 @@ def main():
 
     # Get pending refunds count
     all_pending = db.get_unmatched_refunds()
-    
+
     # Filter by year if specified
     if args.year:
         pending_refunds = [
-            r for r in all_pending 
-            if r.date and r.date.startswith(str(args.year))
+            r for r in all_pending if r.date and r.date.startswith(str(args.year))
         ]
-        LOG.info("Found %d refunds from year %d (out of %d total)", 
-                 len(pending_refunds), args.year, len(all_pending))
+        LOG.info(
+            "Found %d refunds from year %d (out of %d total)",
+            len(pending_refunds),
+            args.year,
+            len(all_pending),
+        )
     else:
         pending_refunds = all_pending
         LOG.info("Found %d pending refunds to process", len(pending_refunds))
@@ -342,6 +348,7 @@ def main():
 if __name__ == "__main__":
     # Load environment variables when run as script
     from dotenv import load_dotenv
+
     load_dotenv("config/.env")
-    
+
     main()
