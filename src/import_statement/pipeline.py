@@ -138,82 +138,7 @@ def process_statement(
             "is_credit": row.get("is_credit", False),
         }
         
-        # Check database for duplicate
-        # Method 1: Check by cc_reference_id in notes (for statement imports)
-        # Method 2: Check by date/merchant/amount (for all transactions)
-        db_found = None
-        
-        # Try finding by cc_reference_id in notes first
-        if cc_reference_id:
-            db_transactions = db.get_transactions_by_date_range(start_date, end_date)
-            for txn in db_transactions:
-                if txn.notes and f"cc_reference_id: {cc_reference_id}" in txn.notes:
-                    db_found = txn
-                    LOG.info(
-                        "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
-                        cc_reference_id,
-                        txn.splitwise_id
-                    )
-                    break
-        
-        # If not found by cc_reference_id, check by date/merchant/amount
-        if not db_found:
-            potential_dupes = db.find_potential_duplicates(
-                date=date,
-                merchant=merchant,
-                amount=float(amount),
-                tolerance_days=1,
-                amount_tolerance=0.01
-            )
-            if potential_dupes:
-                db_found = potential_dupes[0]
-                LOG.info(
-                    "Found existing transaction by date/merchant/amount in DB: %s | %s | $%.2f (SW ID: %s)",
-                    date,
-                    merchant,
-                    float(amount),
-                    db_found.splitwise_id
-                )
-        
-        if db_found:
-            entry["status"] = "db_exists"
-            entry["db_id"] = db_found.id
-            entry["splitwise_id"] = db_found.splitwise_id
-            results.append(entry)
-            continue
-
-        # check remote (only if not dry_run and client exists)
-        remote_found = None
-        if client:
-            try:
-                remote_found = client.find_expense_by_cc_reference(
-                    cc_reference_id,
-                    amount=amount,
-                    date=date,
-                    merchant=merchant,
-                    use_detailed_search=True,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            except (RuntimeError, ValueError) as e:
-                LOG.warning(
-                    "Error searching remote for cc_reference_id %s: %s",
-                    cc_reference_id,
-                    str(e),
-                )
-                remote_found = None
-        if remote_found:
-            entry["status"] = "remote_exists"
-            entry["remote_id"] = remote_found.get("id")
-            LOG.info(
-                "Found existing Splitwise expense for txn %s -> id %s",
-                cc_reference_id,
-                remote_found.get("id"),
-            )
-            results.append(entry)
-            continue
-
-        # Infer category for the transaction
+        # Infer category for ALL transactions (needed for sheet reporting even if duplicate)
         is_credit = row.get("is_credit", False)
         if is_credit:
             # All credits should be categorized as Uncategorized > General
@@ -244,6 +169,65 @@ def process_statement(
                 "confidence": category_info.get("confidence"),
             }
         )
+        
+        # Check database for duplicate by cc_reference_id ONLY
+        # Do NOT use fuzzy matching (date/merchant/amount) because legitimate separate 
+        # transactions can have identical details (e.g., 2 plane tickets on same day)
+        db_found = None
+        
+        # Check by cc_reference_id in notes - this is the ONLY reliable duplicate detection
+        if cc_reference_id:
+            db_transactions = db.get_transactions_by_date_range(start_date, end_date)
+            for txn in db_transactions:
+                if txn.notes and f"cc_reference_id: {cc_reference_id}" in txn.notes:
+                    db_found = txn
+                    LOG.info(
+                        "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
+                        cc_reference_id,
+                        txn.splitwise_id
+                    )
+                    break
+        
+        if db_found:
+            entry["status"] = "db_exists"
+            entry["db_id"] = db_found.id
+            entry["splitwise_id"] = db_found.splitwise_id
+            results.append(entry)
+            continue
+
+        # check remote (only if not dry_run and client exists)
+        remote_found = None
+        if client:
+            try:
+                remote_found = client.find_expense_by_cc_reference(
+                    cc_reference_id,
+                    amount=amount,
+                    date=date,
+                    merchant=merchant,
+                    use_detailed_search=True,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            except (RuntimeError, ValueError) as e:
+                LOG.warning(
+                    "Error searching remote for cc_reference_id %s: %s",
+                    cc_reference_id,
+                    str(e),
+                )
+                remote_found = None
+        
+        # If found in remote, skip adding to Splitwise
+        if remote_found:
+            entry["status"] = "remote_exists"
+            entry["splitwise_id"] = remote_found.get("id")  # Use splitwise_id for consistency
+            entry["remote_id"] = remote_found.get("id")  # Keep remote_id for backward compatibility
+            LOG.info(
+                "Found existing Splitwise expense for txn %s -> id %s",
+                cc_reference_id,
+                remote_found.get("id"),
+            )
+            results.append(entry)
+            continue
 
         # create expense (unless dry_run)
         if dry_run:
