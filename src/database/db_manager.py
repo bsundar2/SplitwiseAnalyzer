@@ -314,6 +314,256 @@ class DatabaseManager:
 
         return [Transaction.from_row(dict(row)) for row in rows]
 
+    # ==================== Refund Matching ====================
+
+    def find_original_for_refund(
+        self,
+        refund_amount: float,
+        refund_date: str,
+        merchant: str,
+        cc_reference_id: Optional[str] = None,
+        date_window_days: int = 90,
+        allow_partial: bool = True,
+    ) -> Optional[Transaction]:
+        """Find the original transaction for a refund.
+        
+        Uses a waterfall matching strategy:
+        1. cc_reference_id match (most reliable) - allows partial refunds
+        2. merchant + date window + amount range (fallback)
+        
+        Args:
+            refund_amount: Absolute amount of the refund
+            refund_date: Date of the refund transaction
+            merchant: Merchant name
+            cc_reference_id: Credit card reference ID (if available)
+            date_window_days: Maximum days before refund to search for original
+            allow_partial: If True, match even when refund < original amount
+            
+        Returns:
+            Original Transaction object if found, None otherwise
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Strategy 1: Match by cc_reference_id (preferred)
+        # For partial refunds, refund amount must be <= original amount
+        if cc_reference_id:
+            if allow_partial:
+                query = """
+                    SELECT * FROM transactions
+                    WHERE cc_reference_id = ?
+                    AND is_refund = 0
+                    AND amount >= ?
+                    AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+                    ORDER BY date DESC
+                    LIMIT 1
+                """
+                cursor.execute(query, (cc_reference_id, refund_amount - 0.01))
+            else:
+                # Exact match only
+                query = """
+                    SELECT * FROM transactions
+                    WHERE cc_reference_id = ?
+                    AND is_refund = 0
+                    AND ABS(amount - ?) <= 0.01
+                    AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+                    ORDER BY date DESC
+                    LIMIT 1
+                """
+                cursor.execute(query, (cc_reference_id, refund_amount))
+            
+            row = cursor.fetchone()
+            
+            if row:
+                conn.close()
+                return Transaction.from_row(dict(row))
+
+        # Strategy 2: Match by merchant + date window + amount range (fallback)
+        # Look for transactions where original amount >= refund amount (partial refund support)
+        if allow_partial:
+            query = """
+                SELECT * FROM transactions
+                WHERE merchant = ?
+                AND is_refund = 0
+                AND amount >= ?
+                AND date <= ?
+                AND julianday(?) - julianday(date) <= ?
+                AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+                ORDER BY date DESC, ABS(amount - ?) ASC
+                LIMIT 1
+            """
+            cursor.execute(
+                query,
+                (merchant, refund_amount - 0.01, refund_date, refund_date, date_window_days, refund_amount),
+            )
+        else:
+            # Exact match only
+            query = """
+                SELECT * FROM transactions
+                WHERE merchant = ?
+                AND is_refund = 0
+                AND ABS(amount - ?) <= 0.01
+                AND date <= ?
+                AND julianday(?) - julianday(date) <= ?
+                AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+                ORDER BY date DESC
+                LIMIT 1
+            """
+            cursor.execute(
+                query,
+                (merchant, refund_amount, refund_date, refund_date, date_window_days),
+            )
+        
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return Transaction.from_row(dict(row))
+
+        return None
+
+    def get_unmatched_refunds(self) -> List[Transaction]:
+        """Get all refunds that haven't been matched to original transactions.
+        
+        Returns:
+            List of unmatched refund Transaction objects
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT * FROM transactions
+            WHERE is_refund = 1
+            AND (reconciliation_status = 'pending' OR reconciliation_status = 'unmatched')
+            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+            ORDER BY date
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [Transaction.from_row(dict(row)) for row in rows]
+
+    def update_refund_linkage(
+        self,
+        refund_txn_id: int,
+        original_txn_id: int,
+        original_splitwise_id: Optional[int],
+        match_method: str,
+    ) -> None:
+        """Update refund transaction with linkage to original.
+        
+        Args:
+            refund_txn_id: Database ID of refund transaction
+            original_txn_id: Database ID of original transaction
+            original_splitwise_id: Splitwise expense ID of original (if available)
+            match_method: How match was made (txn_id, merchant_amount, manual)
+        """
+        with self.transaction() as conn:
+            cursor = conn.cursor()
+
+            now = datetime.utcnow().isoformat()
+            query = """
+                UPDATE transactions
+                SET refund_for_txn_id = ?,
+                    refund_for_splitwise_id = ?,
+                    refund_match_method = ?,
+                    reconciliation_status = 'matched',
+                    refund_created_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """
+            cursor.execute(
+                query,
+                (
+                    original_txn_id,
+                    original_splitwise_id,
+                    match_method,
+                    now,
+                    now,
+                    refund_txn_id,
+                ),
+            )
+
+    def mark_refund_as_unmatched(self, refund_txn_id: int, reason: str = "") -> None:
+        """Mark refund as unmatched for manual review.
+        
+        Args:
+            refund_txn_id: Database ID of refund transaction
+            reason: Reason why it couldn't be matched
+        """
+        with self.transaction() as conn:
+            cursor = conn.cursor()
+
+            now = datetime.utcnow().isoformat()
+            notes = f"REFUND_UNMATCHED: {reason}" if reason else "REFUND_UNMATCHED"
+
+            query = """
+                UPDATE transactions
+                SET reconciliation_status = 'manual_review',
+                    notes = COALESCE(notes || ' | ', '') || ?,
+                    updated_at = ?
+                WHERE id = ?
+            """
+            cursor.execute(query, (notes, now, refund_txn_id))
+
+    def has_existing_refund_for_original(
+        self, original_txn_id: int, refund_amount: float = None, cc_reference_id: Optional[str] = None
+    ) -> bool:
+        """Check if a refund already exists for an original transaction.
+        
+        Used for idempotency - prevents duplicate refund creation.
+        Only one refund allowed per original transaction.
+        
+        Args:
+            original_txn_id: Database ID of original transaction
+            refund_amount: Amount of the refund (optional, for logging)
+            cc_reference_id: Credit card reference ID (optional, for logging)
+            
+        Returns:
+            True if any refund exists for this original
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT COUNT(*) as count FROM transactions
+            WHERE refund_for_txn_id = ?
+            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+        """
+        cursor.execute(query, (original_txn_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        return row["count"] > 0 if row else False
+
+    def get_total_refunds_for_original(self, original_txn_id: int) -> float:
+        """Get total refund amount for an original transaction.
+        
+        Useful for tracking cumulative partial refunds.
+        
+        Args:
+            original_txn_id: Database ID of original transaction
+            
+        Returns:
+            Total refund amount (sum of all refunds)
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT COALESCE(SUM(ABS(amount)), 0) as total_refunded
+            FROM transactions
+            WHERE refund_for_txn_id = ?
+            AND is_refund = 1
+            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
+        """
+        cursor.execute(query, (original_txn_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        return row["total_refunded"] if row else 0.0
+
     # ==================== Import Logging ====================
 
     def log_import(self, log: ImportLog) -> int:

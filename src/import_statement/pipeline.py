@@ -16,6 +16,7 @@ load_dotenv("config/.env")
 from src.constants.config import PROCESSED_DIR
 from src.constants.splitwise import SplitwiseUserId
 from src.import_statement.parse_statement import parse_statement
+from src.import_statement.process_refunds import RefundProcessor
 from src.common.sheets_sync import write_to_sheets
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager
@@ -122,18 +123,28 @@ def process_statement(
             if s and s.lower() != "nan":
                 cc_reference_id = s
 
+        # Extract cc_reference_id from row if parsed (from detail column)
+        if not cc_reference_id and "cc_reference_id" in row:
+            cc_reference_id = row.get("cc_reference_id")
+
         if not cc_reference_id:
             error_msg = f"Transaction is missing required cc_reference_id (date={date}, amount={amount}, description='{desc}')"
             raise ValueError(error_msg)
+
+        # Detect if this is a refund/credit (negative amount OR explicit is_credit flag)
+        is_credit = row.get("is_credit", False) or float(amount) < 0
+        
+        # For refunds, use absolute value for amount
+        amount_abs = abs(float(amount))
 
         entry = {
             "date": date,
             "description": desc_clean,  # Clean version for Splitwise
             "description_raw": desc_raw,  # Raw version for debugging in sheets
-            "amount": float(amount),
+            "amount": amount_abs,
             "detail": cc_reference_id,
             "cc_reference_id": cc_reference_id,
-            "is_credit": row.get("is_credit", False),
+            "is_credit": is_credit,
         }
 
         # Infer category for ALL transactions (needed for sheet reporting even if duplicate)
@@ -317,9 +328,10 @@ def process_statement(
                     merchant=merchant,
                     description=desc_clean,
                     raw_description=desc_raw,
-                    amount=float(amount),
-                    raw_amount=float(amount),
+                    amount=amount_abs,
+                    raw_amount=float(amount),  # Store original signed amount
                     statement_date=date,
+                    cc_reference_id=cc_reference_id,
                     source="amex",  # TODO: Make this configurable based on statement source
                     source_file=os.path.basename(path),
                     category=entry.get("category_name"),
@@ -331,13 +343,15 @@ def process_statement(
                     splitwise_id=sid,
                     imported_at=now_iso(),
                     notes=f"cc_reference_id: {cc_reference_id}",
+                    reconciliation_status="pending" if is_credit else "matched",
                 )
                 db_txn_id = db.insert_transaction(db_txn)
                 entry["db_id"] = db_txn_id
                 LOG.info(
-                    "Saved transaction to database with ID %s (Splitwise ID: %s)",
+                    "Saved transaction to database with ID %s (Splitwise ID: %s)%s",
                     db_txn_id,
                     sid,
+                    " [REFUND - pending matching]" if is_credit else "",
                 )
             except Exception as db_error:
                 LOG.warning(
@@ -360,6 +374,25 @@ def process_statement(
     out_path = os.path.join(PROCESSED_DIR, base + ".processed.csv")
     out_df.to_csv(out_path, index=False)
     LOG.info("Wrote processed output to %s", out_path)
+
+    # Process refunds (match to originals and create in Splitwise if needed)
+    # Only process refunds if not in dry_run mode and we have transactions
+    if not dry_run and client and added > 0:
+        LOG.info("=" * 60)
+        LOG.info("Processing refunds (matching to original transactions)...")
+        LOG.info("=" * 60)
+        
+        refund_processor = RefundProcessor(db=db, client=client)
+        refund_summary = refund_processor.process_all_pending_refunds(dry_run=False)
+        
+        LOG.info("Refund processing summary:")
+        LOG.info("  Total pending refunds: %d", refund_summary["total"])
+        LOG.info("  Successfully created: %d", refund_summary["created"])
+        LOG.info("  Duplicates skipped: %d", refund_summary["duplicate"])
+        LOG.info("  Unmatched (manual review): %d", refund_summary["unmatched"])
+        LOG.info("  Errors: %d", refund_summary["errors"])
+    elif dry_run:
+        LOG.info("Skipping refund processing (dry-run mode)")
 
     # If requested, push the processed output to Google Sheets
     if sheet_key and not no_sheet:

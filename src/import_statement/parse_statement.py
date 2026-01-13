@@ -70,8 +70,12 @@ def parse_csv(path):
     else:
         out["category"] = None
 
+    # Extract cc_reference_id from detail/reference column if available
     if "detail" in col_map:
         out["detail"] = df[col_map["detail"]].astype(str).str.strip()
+        out["cc_reference_id"] = out["detail"].apply(extract_reference_id)
+    else:
+        out["cc_reference_id"] = None
 
     out["raw_line"] = df.apply(
         lambda r: " | ".join([str(r[c]) for c in df.columns]), axis=1
@@ -230,3 +234,38 @@ def parse_amount_safe(s):
             except ValueError:
                 raise
         raise
+
+
+def extract_reference_id(detail_str):
+    """Extract credit card reference/transaction ID from detail field.
+    
+    Handles various formats:
+    - Pure numeric IDs (e.g., "123456789")
+    - Alphanumeric IDs (e.g., "TXN123ABC456")
+    - IDs with prefixes (e.g., "REF: 123456789")
+    
+    Returns:
+        Cleaned reference ID string or None if not found/invalid
+    """
+    if pd.isna(detail_str) or detail_str in ["None", "null", "", "nan"]:
+        return None
+    
+    detail_str = str(detail_str).strip()
+    
+    # Skip empty or placeholder values
+    if not detail_str or detail_str.lower() in ["none", "null", "nan", "n/a"]:
+        return None
+    
+    # Remove common prefixes
+    for prefix in ["REF:", "REFERENCE:", "TXN:", "TRANS:", "ID:"]:
+        if detail_str.upper().startswith(prefix):
+            detail_str = detail_str[len(prefix):].strip()
+    
+    # Clean and validate (keep alphanumeric only)
+    ref_id = "".join(c for c in detail_str if c.isalnum())
+    
+    # Must have at least 8 characters to be a valid reference
+    if len(ref_id) >= 8:
+        return ref_id
+    
+    return None

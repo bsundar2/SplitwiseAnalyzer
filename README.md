@@ -260,6 +260,30 @@ See `src/constants/splitwise.py` (SUBCATEGORY_IDS) for the full list of availabl
 
 Or use `--subcategory-id` with any Splitwise subcategory ID.
 
+### Process Refunds and Credits
+
+Refunds are automatically processed during statement import, but you can also process pending refunds separately:
+
+```bash
+# Automatic - refunds processed after importing statements
+python src/import_statement/pipeline.py --statement data/raw/jan2026.csv
+
+# Manual - process all pending refunds
+python -m src.import_statement.process_refunds --verbose
+
+# Dry run - preview refund matching
+python -m src.import_statement.process_refunds --dry-run --verbose
+```
+
+**How it works:**
+- Detects refunds (negative amounts in CSV)
+- Matches to original transaction by cc_reference_id or merchant+amount+date
+- Creates negative Splitwise expense with same category and split
+- Links refund to original in database for audit trail
+- Idempotent - safe to re-run, won't create duplicates
+
+See [docs/refund_handling_guide.md](docs/refund_handling_guide.md) for complete documentation.
+
 ## Project Structure
 
 ```
@@ -311,6 +335,7 @@ SplitwiseImporter/
 ✅ **Unified Review Workflow** - Single command to generate, review, and apply merchant corrections  
 ✅ **Interactive Merchant Review** - Review and correct merchant names to improve accuracy  
 ✅ **Auto-categorization** - Map transactions to Splitwise categories using merchant lookup  
+✅ **Refund & Credit Handling** - Automatically match refunds to original transactions and create negative Splitwise expenses  
 ✅ **Batch Processing** - Process large statements in chunks with `--limit` and `--offset`  
 ✅ **Merchant Filtering** - Selectively reprocess transactions by merchant name  
 ✅ **Splitwise Integration** - Add expenses to Splitwise with proper categorization  
