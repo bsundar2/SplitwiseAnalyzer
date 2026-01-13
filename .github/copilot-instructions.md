@@ -91,11 +91,9 @@ SplitwiseImporter/
 │   │   ├── schema.py           # Table definitions
 │   │   ├── models.py           # Transaction & ImportLog dataclasses
 │   │   └── db_manager.py       # DatabaseManager with CRUD operations
-│   ├── db_migration/           # Database migration tools (Phase 1)
-│   │   └── migrate_from_splitwise_api.py # Import from Splitwise API
-│   ├── db_sync/                # Database sync utilities (NEW - Phase 2)
+│   ├── db_sync/                # Unified sync utilities (Phase 1 & 2)
 │   │   ├── __init__.py
-│   │   └── sync_from_splitwise.py # Sync DB with Splitwise changes
+│   │   └── sync_from_splitwise.py # Sync DB with Splitwise (insert/update/delete)
 │   ├── import_statement/       # CSV statement parsing and import pipeline
 │   │   ├── pipeline.py         # Main ETL orchestrator (UPDATED - Phase 2: saves to DB)
 │   │   ├── parse_statement.py  # CSV parsing
@@ -123,8 +121,7 @@ SplitwiseImporter/
 │   ├── processed/              # Processed outputs
 │   └── transactions.db         # SQLite database (Phase 1)
 └── docs/
-    ├── database_migration.md   # Phase 1 migration guide
-    ├── phase2_pipeline.md      # Phase 2 pipeline documentation (NEW)
+    ├── database_sync_guide.md  # Complete database & sync guide (Phase 1 & 2)
     └── ...
 
 🤖 AI Workflow
@@ -200,7 +197,8 @@ This summary provides everything Copilot needs.
 - ✅ Added get_transactions_with_splitwise_ids() for sync queries
 - ✅ Pipeline now saves: splitwise_id, source, source_file, category info to DB
 - ✅ Error handling: DB save failures logged but don't block Splitwise creation
-- ✅ Documentation: Created `docs/phase2_pipeline.md` with complete workflow guide
+- ✅ Documentation: Consolidated into `docs/database_sync_guide.md`
+- ✅ Merged db_migration into db_sync for unified sync tool
 - ✅ Updated copilot-instructions.md with Phase 2 architecture
 
 🚀 Next Steps - Phase 3: Google Sheets Export & Budget Tracking
@@ -218,7 +216,7 @@ This summary provides everything Copilot needs.
 - Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
 - Move rolling averages off transaction tabs
 
-See `docs/database_migration.md` for Phase 1 details.
+See `docs/database_sync_guide.md` for Phase 1 details.
 
 **Phase 2 (Current): Splitwise-First Pipeline Flow**
 
@@ -227,7 +225,7 @@ The pipeline now follows this flow:
 1. **Import statements to Splitwise** - Parse CSV and add transactions using pipeline.py
 2. **Save to Database** - After successful Splitwise creation, save with splitwise_id
 3. **Manual edits in Splitwise** - Adjust splits, delete entries, fix categories  
-4. **Sync back to Database** - Run sync script to update DB with Splitwise changes
+4. **Sync back to Database** - Run unified sync script to update/insert/delete in DB
 
 **Import new statement:**
 ```bash
@@ -240,20 +238,27 @@ python src/import_statement/pipeline.py \
   --end-date 2026-01-31
 ```
 
-**Sync after making edits in Splitwise:**
+**Sync with Splitwise (handles inserts/updates/deletes):**
 ```bash
-# Dry run first (see what changed)
+# Dry run first (see what would change)
 python src/db_sync/sync_from_splitwise.py --year 2026 --dry-run --verbose
 
-# Apply changes
+# Apply changes (inserts new, updates existing, marks deleted)
 python src/db_sync/sync_from_splitwise.py --year 2026 --live
+
+# Initial migration for historical data (same command)
+python src/db_sync/sync_from_splitwise.py --year 2025 --live
 ```
 
 **Why this flow:**
 - Splitwise is the source of truth (manual edits happen there)
 - Database reflects current Splitwise state
-- Sync script handles: amount changes, description edits, deletions, category updates
+- Unified sync script handles:
+  - **New expenses**: Insert into DB (migration behavior)
+  - **Updated expenses**: Update amount, description, category, etc.
+  - **Deleted expenses**: Mark as deleted in DB
 - Can re-sync anytime to get latest Splitwise state
+- Same tool for both initial migration and ongoing sync
 
 **Phase 3 (Next): Sheets Export**
 

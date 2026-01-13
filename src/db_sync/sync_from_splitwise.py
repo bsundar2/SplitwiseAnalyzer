@@ -1,17 +1,99 @@
-"""Sync database with Splitwise - handle updates and deletions.
+"""Sync database with Splitwise - handle inserts, updates, and deletions.
 
-This script fetches expenses from Splitwise and updates the local database
-to reflect any changes made in Splitwise (edits, deletions, split changes).
+This unified script handles both:
+1. Initial migration (bulk import of historical data)
+2. Ongoing sync (update existing transactions, mark deletions)
+
+It fetches expenses from Splitwise and:
+- Inserts new transactions not in DB (migration behavior)
+- Updates existing transactions if changed (sync behavior)
+- Marks transactions as deleted if removed from Splitwise
 """
 
 import argparse
 import sys
 from datetime import datetime
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any
 
 from src.common.splitwise_client import SplitwiseClient
-from src.database import DatabaseManager
+from src.database import DatabaseManager, Transaction, ImportLog
 from src.constants.export_columns import ExportColumns
+
+
+def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
+    """Convert Splitwise dataframe row to Transaction object.
+
+    Args:
+        row: Row dictionary from SplitwiseClient.get_my_expenses_by_date_range()
+
+    Returns:
+        Transaction object
+    """
+    # Extract fields using ExportColumns constants
+    expense_id = row.get(ExportColumns.ID)
+
+    # Date - clean up if needed
+    date_str = str(row.get(ExportColumns.DATE, ""))
+    if "T" in date_str:
+        date_val = date_str.split("T")[0]
+    else:
+        date_val = date_str
+
+    description = row.get(ExportColumns.DESCRIPTION, "")
+    merchant = description  # Use description as merchant
+    details = row.get(ExportColumns.DETAILS, "")
+
+    # Amounts
+    total_cost = float(row.get(ExportColumns.AMOUNT, 0))
+    my_paid = float(row.get(ExportColumns.MY_PAID, 0))
+    my_owed = float(row.get(ExportColumns.MY_OWED, 0))
+    my_net = float(
+        row.get(ExportColumns.MY_NET, 0)
+    )  # This is what we paid minus what we owe
+
+    # Category
+    category_name = row.get(ExportColumns.CATEGORY, "Uncategorized")
+    subcategory_name = row.get(ExportColumns.SUBCATEGORY)
+
+    # Split type
+    split_type = row.get(ExportColumns.SPLIT_TYPE, "unknown")
+    is_self = split_type == "self"
+
+    # Participants
+    participant_names = row.get(ExportColumns.PARTICIPANT_NAMES, "")
+
+    # Determine if refund/payment
+    is_refund = total_cost < 0
+
+    # Build notes
+    notes_parts = ["Synced from Splitwise API"]
+    if my_paid > 0:
+        notes_parts.append(f"Paid: ${my_paid:.2f}")
+    if my_owed > 0:
+        notes_parts.append(f"Owe: ${my_owed:.2f}")
+    if participant_names:
+        notes_parts.append(f"With: {participant_names}")
+    notes = " | ".join(notes_parts)
+
+    txn = Transaction(
+        date=date_val,
+        merchant=merchant,
+        description=description,
+        raw_description=f"{description} | {details}".strip(" |"),
+        amount=my_net,  # Net: what you paid minus what you owe
+        raw_amount=total_cost,  # Total expense cost
+        source="splitwise",
+        category=category_name,
+        subcategory=subcategory_name,
+        is_refund=is_refund,
+        is_shared=not is_self,
+        currency="USD",
+        splitwise_id=expense_id,
+        imported_at=datetime.utcnow().isoformat(),
+        notes=notes,
+    )
+
+    return txn
 
 
 def sync_from_splitwise(
@@ -21,6 +103,11 @@ def sync_from_splitwise(
     verbose: bool = False,
 ) -> Dict[str, int]:
     """Sync database with Splitwise expenses.
+
+    Handles both initial migration and ongoing sync:
+    - Inserts new expenses not in DB
+    - Updates existing expenses if changed
+    - Marks deleted expenses
 
     Args:
         start_date: Start date for sync (YYYY-MM-DD)
@@ -43,20 +130,21 @@ def sync_from_splitwise(
     # Stats tracking
     stats = {
         "checked": 0,
+        "inserted": 0,
         "updated": 0,
         "marked_deleted": 0,
         "unchanged": 0,
-        "not_in_db": 0,
         "errors": 0,
     }
 
     # Get all transactions from DB that have Splitwise IDs in this date range
     print(f"📊 Fetching transactions from database...")
     db_transactions = db.get_transactions_with_splitwise_ids(start_date, end_date)
-    print(f"   Found {len(db_transactions)} transactions with Splitwise IDs\n")
+    print(f"   Found {len(db_transactions)} transactions with Splitwise IDs in DB\n")
 
     # Build lookup by splitwise_id
     db_by_splitwise_id = {txn.splitwise_id: txn for txn in db_transactions}
+    db_splitwise_ids = set(db_by_splitwise_id.keys())
 
     # Fetch expenses from Splitwise
     print(f"📥 Fetching expenses from Splitwise API...")
@@ -67,24 +155,119 @@ def sync_from_splitwise(
     )
     print(f"   Found {len(splitwise_df)} expenses in Splitwise\n")
 
+    if splitwise_df.empty:
+        print("⚠️  No expenses found in Splitwise for this date range")
+        return stats
+
     # Get splitwise_ids that exist in Splitwise
     splitwise_ids_in_api: Set[int] = set()
-    if not splitwise_df.empty and ExportColumns.ID in splitwise_df.columns:
+    if ExportColumns.ID in splitwise_df.columns:
         splitwise_ids_in_api = set(splitwise_df[ExportColumns.ID].dropna().astype(int))
 
-    # Process each DB transaction
-    print(f"🔄 Processing transactions...\n")
+    # Convert to list of dicts for easier processing
+    expenses = splitwise_df.to_dict("records")
 
-    for txn in db_transactions:
+    print(f"🔄 Processing {len(expenses)} expenses from Splitwise...\n")
+
+    # Track new transactions to insert
+    transactions_to_insert = []
+
+    # Process each Splitwise expense
+    for idx, expense in enumerate(expenses, start=1):
+        splitwise_id = expense.get(ExportColumns.ID)
+
+        if not splitwise_id:
+            continue
+
         stats["checked"] += 1
-        splitwise_id = txn.splitwise_id
 
-        # Check if expense still exists in Splitwise
-        if splitwise_id not in splitwise_ids_in_api:
-            # Expense deleted in Splitwise
+        # Check if this expense exists in DB
+        if splitwise_id not in db_by_splitwise_id:
+            # NEW TRANSACTION - Insert it
+            try:
+                txn = parse_expense_to_transaction(expense)
+                print(
+                    f"  ➕ NEW: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
+                )
+
+                if not dry_run:
+                    transactions_to_insert.append(txn)
+
+                stats["inserted"] += 1
+
+            except Exception as e:
+                print(f"  ❌ Error parsing new expense {splitwise_id}: {e}")
+                stats["errors"] += 1
+
+            continue
+
+        # EXISTING TRANSACTION - Check for updates
+        txn = db_by_splitwise_id[splitwise_id]
+
+        # Compare and detect changes
+        changes = []
+        updates = {}
+
+        # Check amount
+        sw_amount = float(expense[ExportColumns.MY_NET])
+        if abs(sw_amount - txn.amount) > 0.01:
+            changes.append(f"amount: ${txn.amount:.2f} → ${sw_amount:.2f}")
+            updates["amount"] = sw_amount
+
+        # Check date
+        sw_date_str = str(expense[ExportColumns.DATE])
+        sw_date = sw_date_str.split("T")[0] if "T" in sw_date_str else sw_date_str
+        if sw_date != txn.date:
+            changes.append(f"date: {txn.date} → {sw_date}")
+            updates["date"] = sw_date
+
+        # Check description/merchant
+        sw_desc = expense[ExportColumns.DESCRIPTION]
+        if sw_desc != txn.merchant:
+            changes.append(f"merchant: '{txn.merchant}' → '{sw_desc}'")
+            updates["merchant"] = sw_desc
+            updates["description"] = sw_desc
+
+        # Check category
+        sw_category = expense.get(ExportColumns.CATEGORY)
+        if sw_category and sw_category != txn.category:
+            changes.append(f"category: '{txn.category}' → '{sw_category}'")
+            updates["category"] = sw_category
+
+        # Check subcategory
+        sw_subcategory = expense.get(ExportColumns.SUBCATEGORY)
+        if sw_subcategory and sw_subcategory != txn.subcategory:
+            changes.append(f"subcategory: '{txn.subcategory}' → '{sw_subcategory}'")
+            updates["subcategory"] = sw_subcategory
+
+        if changes:
+            print(
+                f"  ✏️  UPDATED: ID {splitwise_id} | {txn.merchant[:40]} | {', '.join(changes)}"
+            )
+            if not dry_run:
+                db.update_transaction(txn.id, updates)
+            stats["updated"] += 1
+        else:
+            if verbose:
+                print(f"  ✅ Unchanged: ID {splitwise_id} | {txn.merchant[:40]}")
+            stats["unchanged"] += 1
+
+    # Batch insert new transactions
+    if not dry_run and transactions_to_insert:
+        print(f"\n💾 Inserting {len(transactions_to_insert)} new transactions...")
+        db.insert_transactions_batch(transactions_to_insert)
+        print(f"   ✅ Inserted successfully\n")
+
+    # Check for deletions (transactions in DB but not in Splitwise)
+    print(f"\n🗑️  Checking for deletions...")
+    deleted_ids = db_splitwise_ids - splitwise_ids_in_api
+
+    if deleted_ids:
+        for splitwise_id in deleted_ids:
+            txn = db_by_splitwise_id[splitwise_id]
             if not txn.splitwise_deleted_at:
                 print(
-                    f"  🗑️  DELETED: ID {splitwise_id} | {txn.date} | {txn.merchant} | ${txn.amount:.2f}"
+                    f"  🗑️  DELETED: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
                 )
                 if not dry_run:
                     db.mark_deleted_by_splitwise_id(splitwise_id)
@@ -92,68 +275,17 @@ def sync_from_splitwise(
             else:
                 if verbose:
                     print(
-                        f"  ⏭️  Already marked deleted: ID {splitwise_id} | {txn.merchant}"
+                        f"  ⏭️  Already marked deleted: ID {splitwise_id} | {txn.merchant[:40]}"
                     )
-                stats["unchanged"] += 1
-            continue
-
-        # Get current data from Splitwise
-        expense_row = splitwise_df[splitwise_df[ExportColumns.ID] == splitwise_id].iloc[
-            0
-        ]
-
-        # Compare and detect changes
-        changes = []
-        updates = {}
-
-        # Check amount
-        sw_amount = float(expense_row[ExportColumns.MY_NET])
-        if abs(sw_amount - txn.amount) > 0.01:
-            changes.append(f"amount: ${txn.amount:.2f} → ${sw_amount:.2f}")
-            updates["amount"] = sw_amount
-
-        # Check date
-        sw_date = expense_row[ExportColumns.DATE]
-        if sw_date != txn.date:
-            changes.append(f"date: {txn.date} → {sw_date}")
-            updates["date"] = sw_date
-
-        # Check description/merchant
-        sw_desc = expense_row[ExportColumns.DESCRIPTION]
-        if sw_desc != txn.merchant:
-            changes.append(f"merchant: '{txn.merchant}' → '{sw_desc}'")
-            updates["merchant"] = sw_desc
-            updates["description"] = sw_desc
-
-        # Check category
-        sw_category = expense_row.get(ExportColumns.CATEGORY)
-        if sw_category and sw_category != txn.category:
-            changes.append(f"category: '{txn.category}' → '{sw_category}'")
-            updates["category"] = sw_category
-
-        # Check subcategory
-        sw_subcategory = expense_row.get(ExportColumns.SUBCATEGORY)
-        if sw_subcategory and sw_subcategory != txn.subcategory:
-            changes.append(f"subcategory: '{txn.subcategory}' → '{sw_subcategory}'")
-            updates["subcategory"] = sw_subcategory
-
-        if changes:
-            print(
-                f"  ✏️  UPDATED: ID {splitwise_id} | {txn.merchant} | {', '.join(changes)}"
-            )
-            if not dry_run:
-                db.update_transaction(txn.id, updates)
-            stats["updated"] += 1
-        else:
-            if verbose:
-                print(f"  ✅ Unchanged: ID {splitwise_id} | {txn.merchant}")
-            stats["unchanged"] += 1
+    else:
+        print(f"   No deletions detected")
 
     # Summary
     print(f"\n{'='*60}")
     print(f"Sync Summary {'(DRY RUN)' if dry_run else ''}")
     print(f"{'='*60}")
-    print(f"  Transactions checked:    {stats['checked']}")
+    print(f"  Expenses checked:        {stats['checked']}")
+    print(f"  New (inserted):          {stats['inserted']}")
     print(f"  Updated:                 {stats['updated']}")
     print(f"  Marked as deleted:       {stats['marked_deleted']}")
     print(f"  Unchanged:               {stats['unchanged']}")
@@ -161,28 +293,42 @@ def sync_from_splitwise(
     print(f"{'='*60}\n")
 
     if dry_run:
-        print(
-            "💡 This was a dry run. Use --live to apply changes to the database.\n"
-        )
+        print("💡 This was a dry run. Use --live to apply changes to the database.\n")
 
     return stats
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sync database with Splitwise (handle updates and deletions)"
+        description="Sync database with Splitwise (insert new, update existing, mark deleted)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Dry run for specific year (default mode, safe)
+  python src/db_sync/sync_from_splitwise.py --year 2026
+  
+  # Live sync for specific year (applies changes)
+  python src/db_sync/sync_from_splitwise.py --year 2026 --live
+  
+  # Verbose output showing all transactions
+  python src/db_sync/sync_from_splitwise.py --year 2026 --verbose
+  
+  # Sync specific date range
+  python src/db_sync/sync_from_splitwise.py --start-date 2026-01-01 --end-date 2026-03-31 --live
+  
+  # Initial migration for a year (same command, will insert missing expenses)
+  python src/db_sync/sync_from_splitwise.py --year 2025 --live
+        """,
     )
     parser.add_argument(
         "--start-date",
         type=str,
-        default="2025-01-01",
-        help="Start date for sync (YYYY-MM-DD, default: 2025-01-01)",
+        help="Start date for sync (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end-date",
         type=str,
-        default="2026-12-31",
-        help="End date for sync (YYYY-MM-DD, default: 2026-12-31)",
+        help="End date for sync (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--dry-run",
@@ -201,6 +347,12 @@ def main():
         help="Sync specific year (sets start-date and end-date)",
     )
     parser.add_argument(
+        "--years",
+        type=int,
+        nargs="+",
+        help="Sync multiple years (e.g., --years 2025 2026)",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -209,33 +361,126 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle year shortcut
+    # Determine years to process
+    years = []
     if args.year:
-        args.start_date = f"{args.year}-01-01"
-        args.end_date = f"{args.year}-12-31"
+        years = [args.year]
+    elif args.years:
+        years = sorted(args.years)
 
-    # Determine if live mode
-    is_live = args.live
-    is_dry_run = not is_live
+    # If years specified, process each year
+    if years:
+        total_stats = {
+            "checked": 0,
+            "inserted": 0,
+            "updated": 0,
+            "marked_deleted": 0,
+            "unchanged": 0,
+            "errors": 0,
+        }
 
-    try:
-        stats = sync_from_splitwise(
-            start_date=args.start_date,
-            end_date=args.end_date,
-            dry_run=is_dry_run,
-            verbose=args.verbose,
-        )
+        is_live = args.live
+        is_dry_run = not is_live
+
+        for year in years:
+            start_date = f"{year}-01-01"
+            end_date = f"{year}-12-31"
+
+            try:
+                stats = sync_from_splitwise(
+                    start_date=start_date,
+                    end_date=end_date,
+                    dry_run=is_dry_run,
+                    verbose=args.verbose,
+                )
+
+                # Accumulate stats
+                for key in total_stats:
+                    total_stats[key] += stats[key]
+
+                # Log import (if not dry run and had some activity)
+                if not is_dry_run and (stats["inserted"] > 0 or stats["updated"] > 0):
+                    db = DatabaseManager()
+                    log = ImportLog(
+                        timestamp=datetime.utcnow().isoformat(),
+                        source_type="splitwise_sync",
+                        source_identifier=f"year_{year}",
+                        records_attempted=stats["checked"],
+                        records_imported=stats["inserted"],
+                        records_skipped=stats["unchanged"],
+                        records_failed=stats["errors"],
+                        metadata=f"updated={stats['updated']}, deleted={stats['marked_deleted']}",
+                    )
+                    db.log_import(log)
+
+            except Exception as e:
+                print(f"\n❌ Error syncing year {year}: {e}", file=sys.stderr)
+                import traceback
+
+                traceback.print_exc()
+                total_stats["errors"] += 1
+
+        # Print overall summary if multiple years
+        if len(years) > 1:
+            print(f"\n{'='*60}")
+            print(f"OVERALL SUMMARY (Years: {', '.join(map(str, years))})")
+            print(f"{'='*60}")
+            print(f"  Total checked:           {total_stats['checked']}")
+            print(f"  Total inserted:          {total_stats['inserted']}")
+            print(f"  Total updated:           {total_stats['updated']}")
+            print(f"  Total marked deleted:    {total_stats['marked_deleted']}")
+            print(f"  Total unchanged:         {total_stats['unchanged']}")
+            print(f"  Total errors:            {total_stats['errors']}")
+            print(f"{'='*60}\n")
 
         # Exit with error code if there were errors
-        if stats["errors"] > 0:
+        if total_stats["errors"] > 0:
             sys.exit(1)
 
-    except Exception as e:
-        print(f"\n❌ Error: {e}", file=sys.stderr)
-        import traceback
+    # Otherwise use provided date range
+    else:
+        if not args.start_date or not args.end_date:
+            parser.error(
+                "Must specify either --year/--years OR both --start-date and --end-date"
+            )
 
-        traceback.print_exc()
-        sys.exit(1)
+        # Determine if live mode
+        is_live = args.live
+        is_dry_run = not is_live
+
+        try:
+            stats = sync_from_splitwise(
+                start_date=args.start_date,
+                end_date=args.end_date,
+                dry_run=is_dry_run,
+                verbose=args.verbose,
+            )
+
+            # Log import (if not dry run and had some activity)
+            if not is_dry_run and (stats["inserted"] > 0 or stats["updated"] > 0):
+                db = DatabaseManager()
+                log = ImportLog(
+                    timestamp=datetime.utcnow().isoformat(),
+                    source_type="splitwise_sync",
+                    source_identifier=f"{args.start_date}_to_{args.end_date}",
+                    records_attempted=stats["checked"],
+                    records_imported=stats["inserted"],
+                    records_skipped=stats["unchanged"],
+                    records_failed=stats["errors"],
+                    metadata=f"updated={stats['updated']}, deleted={stats['marked_deleted']}",
+                )
+                db.log_import(log)
+
+            # Exit with error code if there were errors
+            if stats["errors"] > 0:
+                sys.exit(1)
+
+        except Exception as e:
+            print(f"\n❌ Error: {e}", file=sys.stderr)
+            import traceback
+
+            traceback.print_exc()
+            sys.exit(1)
 
 
 if __name__ == "__main__":
