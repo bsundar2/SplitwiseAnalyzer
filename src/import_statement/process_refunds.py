@@ -15,14 +15,15 @@ Example usage:
 """
 
 import argparse
+import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 from src.common.utils import LOG
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager
 from src.database.models import Transaction
-from src.constants.splitwise import SplitwiseUserId
+from src.constants.splitwise import SplitwiseUserId, SUBCATEGORY_MAPPER
 
 
 class RefundProcessor:
@@ -45,11 +46,8 @@ class RefundProcessor:
     ) -> Dict[str, Any]:
         """Process a single refund transaction.
         
-        Workflow:
-        1. Find original transaction (by cc_reference_id or merchant+amount+date)
-        2. Check if refund already processed (idempotency)
-        3. Create negative Splitwise expense with same category/split as original
-        4. Link refund to original in database
+        Creates a Splitwise expense with default split (SELF paid 100%, SELF_EXPENSE owes 100%).
+        No matching or linking to original transactions.
         
         Args:
             refund_txn: Transaction object for the refund (is_refund=True)
@@ -66,164 +64,53 @@ class RefundProcessor:
             "cc_reference_id": refund_txn.cc_reference_id,
         }
 
-        # Step 1: Find original transaction
-        original = self.db.find_original_for_refund(
-            refund_amount=abs(refund_txn.amount),
-            refund_date=refund_txn.date,
-            merchant=refund_txn.merchant,
-            cc_reference_id=refund_txn.cc_reference_id,
-            date_window_days=90,
-        )
-
-        if not original:
-            LOG.warning(
-                "Cannot find original transaction for refund: %s (merchant=%s, amount=$%.2f, date=%s)",
-                refund_txn.cc_reference_id,
-                refund_txn.merchant,
-                refund_txn.amount,
-                refund_txn.date,
-            )
-            self.db.mark_refund_as_unmatched(
-                refund_txn.id,
-                reason=f"No original found for merchant={refund_txn.merchant}, amount={refund_txn.amount}",
-            )
-            result["status"] = "unmatched"
-            result["error"] = "Original transaction not found"
-            return result
-
-        # Step 2: Check idempotency - has this refund already been processed?
-        if self.db.has_existing_refund_for_original(
-            original_txn_id=original.id,
-            refund_amount=abs(refund_txn.amount),
-            cc_reference_id=refund_txn.cc_reference_id,
-        ):
-            LOG.info(
-                "Refund already exists for original transaction ID %s, skipping",
-                original.id,
-            )
-            result["status"] = "duplicate"
-            result["original_txn_id"] = original.id
-            result["original_splitwise_id"] = original.splitwise_id
-            return result
-        
-        # Check if this is a partial refund
-        refund_percentage = (abs(refund_txn.amount) / original.amount * 100) if original.amount > 0 else 0
-        is_full_refund = refund_percentage >= 95.0  # >= 95% considered full (allows for fees)
-        
-        # Get cumulative refunds for logging
-        total_refunded = self.db.get_total_refunds_for_original(original.id)
-        net_cost = original.amount - total_refunded - abs(refund_txn.amount)
-        
-        if not is_full_refund:
-            LOG.info(
-                "Processing PARTIAL REFUND: $%.2f of $%.2f (%.1f%%) - Net cost: $%.2f",
-                abs(refund_txn.amount),
-                original.amount,
-                refund_percentage,
-                net_cost,
-            )
+        # Create refund with default self-owed split
+        if not dry_run:
+            try:
+                splitwise_id = self._create_refund_in_splitwise(refund_txn)
+                
+                LOG.info(
+                    "Created refund in Splitwise: ID %s",
+                    splitwise_id,
+                )
+                
+                # Update refund transaction with Splitwise ID
+                self.db.update_transaction(refund_txn.id, {
+                    "splitwise_id": splitwise_id,
+                    "reconciliation_status": "matched",
+                    "updated_at": datetime.now().isoformat(),
+                })
+                
+                result["status"] = "created"
+                result["splitwise_id"] = splitwise_id
+                
+            except Exception as e:
+                LOG.exception(
+                    "Failed to create refund in Splitwise for txn %s: %s",
+                    refund_txn.id,
+                    str(e),
+                )
+                result["status"] = "error"
+                result["error"] = str(e)
         else:
-            LOG.info(
-                "Processing FULL REFUND: $%.2f of $%.2f (%.1f%%)",
-                abs(refund_txn.amount),
-                original.amount,
-                refund_percentage,
-            )
-
-        # Step 3: Verify original has Splitwise ID
-        if not original.splitwise_id:
-            LOG.warning(
-                "Original transaction ID %s has no Splitwise ID, cannot create refund",
-                original.id,
-            )
-            self.db.mark_refund_as_unmatched(
-                refund_txn.id,
-                reason=f"Original transaction ID {original.id} not in Splitwise",
-            )
-            result["status"] = "unmatched"
-            result["error"] = "Original not in Splitwise"
-            result["original_txn_id"] = original.id
-            return result
-
-        LOG.info(
-            "Matched refund to original: refund_id=%s -> original_id=%s (Splitwise ID: %s)",
-            refund_txn.id,
-            original.id,
-            original.splitwise_id,
-        )
-
-        result["original_txn_id"] = original.id
-        result["original_splitwise_id"] = original.splitwise_id
-        result["category"] = original.category
-        result["subcategory"] = original.subcategory
-        result["match_method"] = (
-            "txn_id" if refund_txn.cc_reference_id else "merchant_amount"
-        )
-
-        if dry_run:
             result["status"] = "would_create"
-            return result
-
-        # Step 4: Create negative Splitwise expense with same category/split
-        try:
-            splitwise_id = self._create_refund_in_splitwise(
-                refund_txn=refund_txn,
-                original_txn=original,
-            )
-
-            LOG.info(
-                "Created refund in Splitwise: ID %s (original: %s)",
-                splitwise_id,
-                original.splitwise_id,
-            )
-
-            # Step 5: Update refund transaction with Splitwise ID and linkage
-            refund_txn.update_splitwise_id(splitwise_id)
-            refund_txn.link_to_original_transaction(
-                original_txn_id=original.id,
-                original_splitwise_id=original.splitwise_id,
-                match_method=result["match_method"],
-                original_amount=original.amount,
-            )
-
-            # Update database
-            self.db.update_transaction(refund_txn)
-
-            result["status"] = "created"
-            result["splitwise_id"] = splitwise_id
-
-        except Exception as e:
-            LOG.exception(
-                "Failed to create refund in Splitwise for txn %s: %s",
-                refund_txn.id,
-                str(e),
-            )
-            self.db.mark_refund_as_unmatched(
-                refund_txn.id,
-                reason=f"Splitwise creation failed: {str(e)}",
-            )
-            result["status"] = "error"
-            result["error"] = str(e)
+        
+        return result
 
         return result
 
     def _create_refund_in_splitwise(
         self,
         refund_txn: Transaction,
-        original_txn: Transaction,
     ) -> int:
-        """Create a negative expense in Splitwise for a refund.
+        """Create a refund expense in Splitwise.
         
-        The refund expense will have:
-        - Negative amount
-        - Same category/subcategory as original
-        - Same split participants and ratios as original
-        - Description indicating it's a refund
-        - Notes linking to original expense
+        Uses a default split where:
+        - SELF (current user) paid 100% (received the credit)
+        - SELF_EXPENSE account owes 100% (tracks credit as owed back to self)
         
         Args:
-            refund_txn: Refund transaction
-            original_txn: Original transaction being refunded
+            refund_txn: Refund transaction to create
             
         Returns:
             Splitwise expense ID of created refund
@@ -231,76 +118,46 @@ class RefundProcessor:
         if not self.client:
             raise ValueError("SplitwiseClient required for creating refunds")
 
-        # Fetch original expense details to get split information
-        original_expense = self.client.get_expense(original_txn.splitwise_id)
-        if not original_expense:
-            raise ValueError(
-                f"Cannot fetch original Splitwise expense {original_txn.splitwise_id}"
-            )
-
         # Get current user ID
         current_user_id = self.client.get_current_user_id()
 
-        # Extract users and their split ratios from original expense
-        # Refund should mirror the original split exactly
-        original_users = original_expense.getUsers()
-        users = []
+        # Default split: SELF paid 100%, SELF_EXPENSE owes 100%
+        users = [
+            {
+                "user_id": current_user_id,
+                "paid_share": abs(refund_txn.amount),  # SELF received the credit
+                "owed_share": 0,  # SELF doesn't owe anything
+            },
+            {
+                "user_id": SplitwiseUserId.SELF_EXPENSE,
+                "paid_share": 0,  # Self-account didn't pay
+                "owed_share": abs(refund_txn.amount),  # Self-account owes it back
+            },
+        ]
 
-        for user in original_users:
-            user_id = user.getId()
-            paid_share = float(user.getPaidShare())
-            owed_share = float(user.getOwedShare())
+        # Use original description from statement
+        description = refund_txn.description or refund_txn.merchant
 
-            # For refund: reverse the paid/owed shares
-            # Original: SELF paid X, user owed X
-            # Refund: user paid X (received credit), SELF owed X
-            users.append(
-                {
-                    "user_id": user_id,
-                    "paid_share": owed_share,  # Reversed
-                    "owed_share": paid_share,  # Reversed
-                }
-            )
-
-        # Build refund expense
-        refund_percentage = (abs(refund_txn.amount) / original_txn.amount * 100) if original_txn.amount > 0 else 0
-        # Consider it a full refund if >= 95% (allows for restocking fees, return fees, etc.)
-        is_full_refund = refund_percentage >= 95.0
-        
-        if is_full_refund:
-            description = f"REFUND: {original_txn.description or original_txn.merchant}"
-        else:
-            # Partial refund - show percentage
-            description = f"REFUND ({refund_percentage:.0f}%): {original_txn.description or original_txn.merchant}"
-        
-        # Always include net cost information in notes
-        net_cost = original_txn.amount - abs(refund_txn.amount)
-        notes = (
-            f"REFUND for Splitwise expense {original_txn.splitwise_id}\n"
-            f"Refund amount: ${abs(refund_txn.amount):.2f} of ${original_txn.amount:.2f} ({refund_percentage:.1f}%)\n"
-            f"Net cost: ${net_cost:.2f}\n"
-            f"Original cc_reference_id: {original_txn.cc_reference_id}\n"
-            f"Refund cc_reference_id: {refund_txn.cc_reference_id}"
-        )
+        # Use cc_reference_id if available, otherwise generate a UUID
+        ref_id = refund_txn.cc_reference_id or f"CREDIT_{uuid.uuid4().hex[:16]}"
 
         txn_dict = {
             "date": refund_txn.date,
-            "amount": abs(refund_txn.amount),  # Use absolute value
+            "amount": abs(refund_txn.amount),
             "description": description,
             "merchant": refund_txn.merchant,
-            "detail": refund_txn.cc_reference_id,
-            "category_id": original_txn.category_id,
-            "subcategory_id": original_txn.subcategory_id,
-            "category_name": original_txn.category,
-            "subcategory_name": original_txn.subcategory,
+            "detail": ref_id,  # Store reference ID in detail field
+            "category_id": refund_txn.category_id,
+            "subcategory_id": refund_txn.subcategory_id,
+            "category_name": refund_txn.category,
+            "subcategory_name": refund_txn.subcategory,
         }
 
         # Create expense using client
         splitwise_id = self.client.add_expense_from_txn(
             txn_dict,
-            cc_reference_id=refund_txn.cc_reference_id,
+            cc_reference_id=ref_id,
             users=users,
-            notes=notes,
         )
 
         return splitwise_id
@@ -371,6 +228,11 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--year",
+        type=int,
+        help="Only process refunds from a specific year (e.g., 2026)",
+    )
 
     args = parser.parse_args()
 
@@ -383,11 +245,24 @@ def main():
     LOG.info("=" * 60)
     LOG.info("Mode: %s", "DRY RUN" if args.dry_run else "LIVE")
     LOG.info("Time: %s", datetime.now().isoformat())
+    if args.year:
+        LOG.info("Year Filter: %d", args.year)
     LOG.info("=" * 60)
 
     # Get pending refunds count
-    pending_refunds = db.get_unmatched_refunds()
-    LOG.info("Found %d pending refunds to process", len(pending_refunds))
+    all_pending = db.get_unmatched_refunds()
+    
+    # Filter by year if specified
+    if args.year:
+        pending_refunds = [
+            r for r in all_pending 
+            if r.date and r.date.startswith(str(args.year))
+        ]
+        LOG.info("Found %d refunds from year %d (out of %d total)", 
+                 len(pending_refunds), args.year, len(all_pending))
+    else:
+        pending_refunds = all_pending
+        LOG.info("Found %d pending refunds to process", len(pending_refunds))
 
     if not pending_refunds:
         LOG.info("No pending refunds to process")

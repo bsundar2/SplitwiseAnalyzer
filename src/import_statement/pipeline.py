@@ -248,50 +248,54 @@ def process_statement(
             results.append(entry)
             continue
 
+        # Skip creating expense for refunds/credits here - they'll be handled by refund processor
+        is_credit = entry.get("is_credit", False)
+        if is_credit:
+            entry["status"] = "added"
+            entry["splitwise_id"] = None  # Will be set by refund processor
+            
+            # Save to database with pending status
+            txn = Transaction(
+                date=date,
+                merchant=merchant,
+                amount=-float(amount),  # Store as negative for refunds
+                cc_reference_id=cc_reference_id,
+                notes=f"cc_reference_id: {cc_reference_id}",
+                description=desc_clean,
+                is_refund=True,
+                reconciliation_status="pending",
+                category_id=entry.get("category_id"),
+                subcategory_id=entry.get("subcategory_id"),
+            )
+            
+            txn_id = db.insert_transaction(txn)
+            entry["status"] = "added"
+            entry["db_id"] = txn_id
+            entry["splitwise_id"] = None  # Will be set by refund processor
+            LOG.info(
+                "Saved CREDIT transaction to database with ID %d (pending refund processing)",
+                txn_id,
+            )
+            results.append(entry)
+            continue
+
         try:
             # Get current user ID
             current_user_id = client.get_current_user_id()
 
-            # Create split based on whether this is a credit or debit
-            # For credits (refunds/returns): current_user paid (received credit), SELF_EXPENSE owes
-            # For debits (regular expenses): SELF_EXPENSE paid, current_user owes
-            is_credit = entry.get("is_credit", False)
-
-            if is_credit:
-                # Credit: User received money back, SELF_EXPENSE account owes user
-                users = [
-                    {
-                        "user_id": SplitwiseUserId.SELF_EXPENSE,
-                        "paid_share": 0.0,
-                        "owed_share": float(amount),
-                    },
-                    {
-                        "user_id": current_user_id,
-                        "paid_share": float(amount),
-                        "owed_share": 0.0,
-                    },
-                ]
-                LOG.info(
-                    "Adding CREDIT: %s paid $%.2f, %s owes $%.2f",
-                    current_user_id,
-                    amount,
-                    SplitwiseUserId.SELF_EXPENSE,
-                    amount,
-                )
-            else:
-                # Regular expense: SELF_EXPENSE paid, user owes
-                users = [
-                    {
-                        "user_id": SplitwiseUserId.SELF_EXPENSE,
-                        "paid_share": float(amount),
-                        "owed_share": 0.0,
-                    },
-                    {
-                        "user_id": current_user_id,
-                        "paid_share": 0.0,
-                        "owed_share": float(amount),
-                    },
-                ]
+            # Regular expense: SELF_EXPENSE paid, user owes
+            users = [
+                {
+                    "user_id": SplitwiseUserId.SELF_EXPENSE,
+                    "paid_share": float(amount),
+                    "owed_share": 0.0,
+                },
+                {
+                    "user_id": current_user_id,
+                    "paid_share": 0.0,
+                    "owed_share": float(amount),
+                },
+            ]
 
             # Build transaction dict with category info
             txn_dict = {
@@ -368,6 +372,19 @@ def process_statement(
             LOG.exception("Failed to add txn %s: %s", cc_reference_id, str(e))
         results.append(entry)
 
+    # Collect refund transaction IDs from this batch that need Splitwise processing
+    # Include: newly added ("added") OR already in DB but not yet in Splitwise ("db_exists" with no splitwise_id)
+    imported_refund_ids = [
+        entry.get("db_id") 
+        for entry in results 
+        if entry.get("db_id") and entry.get("is_credit") and (
+            entry.get("status") == "added" or 
+            (entry.get("status") == "db_exists" and not entry.get("splitwise_id"))
+        )
+    ]
+    
+    LOG.info("Found %d refund transactions in this batch that need Splitwise processing", len(imported_refund_ids))
+
     # write processed CSV (with statuses)
     out_df = pd.DataFrame(results)
     base = os.path.basename(path)
@@ -376,23 +393,50 @@ def process_statement(
     LOG.info("Wrote processed output to %s", out_path)
 
     # Process refunds (match to originals and create in Splitwise if needed)
-    # Only process refunds if not in dry_run mode and we have transactions
-    if not dry_run and client and added > 0:
+    # Only process refunds that were imported in THIS batch (not all pending refunds)
+    if not dry_run and client and imported_refund_ids:
         LOG.info("=" * 60)
-        LOG.info("Processing refunds (matching to original transactions)...")
+        LOG.info("Processing %d refunds from this import batch...", len(imported_refund_ids))
         LOG.info("=" * 60)
         
         refund_processor = RefundProcessor(db=db, client=client)
-        refund_summary = refund_processor.process_all_pending_refunds(dry_run=False)
+        
+        # Process only the refunds imported in this batch
+        refund_summary = {
+            "total": len(imported_refund_ids),
+            "created": 0,
+            "duplicate": 0,
+            "errors": 0,
+            "results": [],
+        }
+        
+        for refund_id in imported_refund_ids:
+            # Get the transaction from database
+            refund_txn = db.get_transaction_by_id(refund_id)
+            if not refund_txn:
+                LOG.warning("Could not find refund transaction ID %s in database", refund_id)
+                continue
+            
+            result = refund_processor.process_refund(refund_txn, dry_run=False)
+            refund_summary["results"].append(result)
+            
+            if result["status"] == "created":
+                refund_summary["created"] += 1
+            elif result["status"] == "duplicate":
+                refund_summary["duplicate"] += 1
+            elif result["status"] == "error":
+                refund_summary["errors"] += 1
         
         LOG.info("Refund processing summary:")
-        LOG.info("  Total pending refunds: %d", refund_summary["total"])
+        LOG.info("  Total refunds from this batch: %d", refund_summary["total"])
         LOG.info("  Successfully created: %d", refund_summary["created"])
         LOG.info("  Duplicates skipped: %d", refund_summary["duplicate"])
-        LOG.info("  Unmatched (manual review): %d", refund_summary["unmatched"])
         LOG.info("  Errors: %d", refund_summary["errors"])
-    elif dry_run:
-        LOG.info("Skipping refund processing (dry-run mode)")
+    elif dry_run and len(imported_refund_ids) > 0:
+        LOG.info("=" * 60)
+        LOG.info("Refund processing (would run in live mode):")
+        LOG.info("  %d refunds from this batch would be processed", len(imported_refund_ids))
+        LOG.info("=" * 60)
 
     # If requested, push the processed output to Google Sheets
     if sheet_key and not no_sheet:

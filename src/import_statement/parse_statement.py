@@ -129,11 +129,36 @@ def parse_csv(path):
     # Identify credits (negative amounts) but keep them instead of filtering
     # Credits will be handled differently in the pipeline (reversed split)
     out["is_credit"] = out["amount"] < 0
+    
+    # Identify refunds specifically (credits with refund/credit keywords, excluding payments)
+    def is_likely_refund(row):
+        """Check if transaction is likely a refund based on description."""
+        if not row["is_credit"]:
+            return False
+        
+        # Combine description and merchant for pattern matching
+        combined_text = f"{row['description']} {out.loc[row.name, 'category'] if 'category' in out.columns else ''}".lower()
+        
+        # Exclude payment patterns
+        payment_keywords = ['payment', 'autopay', 'thank you', 'settle']
+        if any(kw in combined_text for kw in payment_keywords):
+            return False
+        
+        # Look for refund indicators
+        refund_keywords = ['refund', 'credit', 'return', 'reversal', 'chargeback']
+        return any(kw in combined_text for kw in refund_keywords)
+    
+    out["is_refund"] = out.apply(is_likely_refund, axis=1)
+    
     credits_count = out["is_credit"].sum()
+    refunds_count = out["is_refund"].sum()
+    
     if credits_count > 0:
         LOG.info(
-            "Found %d credit transactions (amount < 0) - will add with reversed split",
+            "Found %d credit transactions (amount < 0): %d refunds, %d other credits (payments)",
             credits_count,
+            refunds_count,
+            credits_count - refunds_count,
         )
 
     # Take absolute value of amounts (credits will be positive in Splitwise)
