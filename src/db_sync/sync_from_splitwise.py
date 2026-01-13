@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Dict, List, Set, Any
 
 from src.common.splitwise_client import SplitwiseClient
-from src.database import DatabaseManager, Transaction, ImportLog
+from src.database import DatabaseManager, Transaction
 from src.constants.export_columns import ExportColumns
 
 
@@ -53,7 +53,6 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
 
     # Category
     category_name = row.get(ExportColumns.CATEGORY, "Uncategorized")
-    subcategory_name = row.get(ExportColumns.SUBCATEGORY)
 
     # Split type
     split_type = row.get(ExportColumns.SPLIT_TYPE, "unknown")
@@ -84,7 +83,6 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
         raw_amount=total_cost,  # Total expense cost
         source="splitwise",
         category=category_name,
-        subcategory=subcategory_name,
         is_refund=is_refund,
         is_shared=not is_self,
         currency="USD",
@@ -148,10 +146,14 @@ def sync_from_splitwise(
 
     # Fetch expenses from Splitwise
     print(f"📥 Fetching expenses from Splitwise API...")
+    # Convert string dates to datetime objects for the client
+    from datetime import datetime as dt
+    start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
+    end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
+    
     splitwise_df = client.get_my_expenses_by_date_range(
-        start_date=start_date,
-        end_date=end_date,
-        use_cache=False,  # Always fetch fresh data for sync
+        start_date=start_date_obj,
+        end_date=end_date_obj,
     )
     print(f"   Found {len(splitwise_df)} expenses in Splitwise\n")
 
@@ -233,12 +235,6 @@ def sync_from_splitwise(
         if sw_category and sw_category != txn.category:
             changes.append(f"category: '{txn.category}' → '{sw_category}'")
             updates["category"] = sw_category
-
-        # Check subcategory
-        sw_subcategory = expense.get(ExportColumns.SUBCATEGORY)
-        if sw_subcategory and sw_subcategory != txn.subcategory:
-            changes.append(f"subcategory: '{txn.subcategory}' → '{sw_subcategory}'")
-            updates["subcategory"] = sw_subcategory
 
         if changes:
             print(
@@ -398,20 +394,8 @@ Examples:
                 for key in total_stats:
                     total_stats[key] += stats[key]
 
-                # Log import (if not dry run and had some activity)
-                if not is_dry_run and (stats["inserted"] > 0 or stats["updated"] > 0):
-                    db = DatabaseManager()
-                    log = ImportLog(
-                        timestamp=datetime.utcnow().isoformat(),
-                        source_type="splitwise_sync",
-                        source_identifier=f"year_{year}",
-                        records_attempted=stats["checked"],
-                        records_imported=stats["inserted"],
-                        records_skipped=stats["unchanged"],
-                        records_failed=stats["errors"],
-                        metadata=f"updated={stats['updated']}, deleted={stats['marked_deleted']}",
-                    )
-                    db.log_import(log)
+                # Note: ImportLog feature not yet implemented
+                # Could add logging here for audit trail if needed
 
             except Exception as e:
                 print(f"\n❌ Error syncing year {year}: {e}", file=sys.stderr)
@@ -456,20 +440,8 @@ Examples:
                 verbose=args.verbose,
             )
 
-            # Log import (if not dry run and had some activity)
-            if not is_dry_run and (stats["inserted"] > 0 or stats["updated"] > 0):
-                db = DatabaseManager()
-                log = ImportLog(
-                    timestamp=datetime.utcnow().isoformat(),
-                    source_type="splitwise_sync",
-                    source_identifier=f"{args.start_date}_to_{args.end_date}",
-                    records_attempted=stats["checked"],
-                    records_imported=stats["inserted"],
-                    records_skipped=stats["unchanged"],
-                    records_failed=stats["errors"],
-                    metadata=f"updated={stats['updated']}, deleted={stats['marked_deleted']}",
-                )
-                db.log_import(log)
+            # Note: ImportLog feature not yet implemented
+            # Could add logging here for audit trail if needed
 
             # Exit with error code if there were errors
             if stats["errors"] > 0:
