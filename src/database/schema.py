@@ -92,17 +92,18 @@ CREATE TABLE IF NOT EXISTS import_log (
 );
 """
 
+
 def init_database(conn):
     """Initialize database schema.
-    
+
     Args:
         conn: SQLite database connection
     """
     cursor = conn.cursor()
-    
+
     # Create tables
     cursor.executescript(TRANSACTIONS_TABLE)
     cursor.executescript(DUPLICATES_TABLE)
     cursor.executescript(IMPORT_LOG_TABLE)
-    
+
     conn.commit()

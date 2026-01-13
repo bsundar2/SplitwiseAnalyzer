@@ -51,8 +51,22 @@ class SplitwiseClient:
         )
 
     @cache
+    def get_current_user(self):
+        """Get current user from Splitwise API.
+
+        Returns:
+            Splitwise User object
+        """
+        return self.sObj.getCurrentUser()
+
+    @cache
     def get_current_user_id(self):
-        return self.sObj.getCurrentUser().getId()
+        """Get current user ID from Splitwise API.
+
+        Returns:
+            int: User ID
+        """
+        return self.get_current_user().getId()
 
     def _fetch_expenses_paginated(
         self, start_date_str: str, end_date_str: str, fetch_full_details: bool = False

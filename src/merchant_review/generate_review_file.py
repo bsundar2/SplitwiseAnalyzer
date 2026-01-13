@@ -38,7 +38,7 @@ def generate_review_file(
     processed_path = Path(processed_csv)
     if not processed_path.is_absolute():
         processed_path = PROJECT_ROOT / "data" / "processed" / processed_csv
-    
+
     if not processed_path.exists():
         LOG.error(f"Processed CSV not found: {processed_path}")
         LOG.error(
@@ -52,9 +52,11 @@ def generate_review_file(
         if not output_path.is_absolute():
             output_path = PROJECT_ROOT / "data" / "processed" / output_file
     else:
-        default_name = DEFAULT_FULL_REVIEW_FILE if include_known else DEFAULT_REVIEW_FILE
+        default_name = (
+            DEFAULT_FULL_REVIEW_FILE if include_known else DEFAULT_REVIEW_FILE
+        )
         output_path = PROJECT_ROOT / "data" / "processed" / default_name
-    
+
     # Load merchant lookup
     merchant_lookup_path = PROJECT_ROOT / "config" / "merchant_category_lookup.json"
     merchant_lookup = {}

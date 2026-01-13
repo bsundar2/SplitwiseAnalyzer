@@ -67,7 +67,9 @@ def clean_description_for_splitwise(
         # Use canonical_name if available, otherwise title-case the merchant key
         canonical_name = merchant_info.get("canonical_name")
         if not canonical_name:
-            canonical_name = " ".join(word.title() for word in normalized_merchant.split())
+            canonical_name = " ".join(
+                word.title() for word in normalized_merchant.split()
+            )
         LOG.info(f"Using canonical merchant name: '{canonical_name}' (from lookup)")
         return canonical_name
 
@@ -231,10 +233,10 @@ def clean_description_for_splitwise(
 
 def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     """Clean up and standardize merchant names from transaction descriptions.
-    
+
     Simplified approach: Extract merchant name from Description field only.
     Format: "MERCHANT_NAME   LOCATION_INFO   STATE"
-    
+
     Examples:
         "AMERICAN AIRLINES   800-433-7300        TX" → "American Airlines"
         "SP BERNAL CUTLERY   SAN FRANCISCO       CA" → "Bernal Cutlery"
@@ -253,39 +255,39 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
 
     # Remove prefixes that aren't part of merchant name
     description = description.strip()
-    
+
     # Remove common payment processor prefixes
     prefixes_to_remove = [
-        r'^SP\s+',  # Square point of sale prefix
-        r'^GglPay\s+',  # Google Pay prefix
-        r'^PayPal\s*\*\s*',  # PayPal prefix
-        r'^SQ\s*\*\s*',  # Square prefix
+        r"^SP\s+",  # Square point of sale prefix
+        r"^GglPay\s+",  # Google Pay prefix
+        r"^PayPal\s*\*\s*",  # PayPal prefix
+        r"^SQ\s*\*\s*",  # Square prefix
     ]
-    
+
     for prefix_pattern in prefixes_to_remove:
-        description = re.sub(prefix_pattern, '', description, flags=re.IGNORECASE)
-    
+        description = re.sub(prefix_pattern, "", description, flags=re.IGNORECASE)
+
     description = description.strip()
-    
+
     # Split on multiple spaces (typically separates merchant from location/phone)
     # The pattern "  " (2+ spaces) typically separates sections
-    parts = re.split(r'\s{2,}', description)
-    
+    parts = re.split(r"\s{2,}", description)
+
     if not parts:
         return description
-    
+
     # First part is typically the merchant name
     merchant_name = parts[0].strip()
-    
+
     # Remove phone numbers in format (XXX)XXX-XXXX or XXX-XXX-XXXX at the end
-    merchant_name = re.sub(r'\s*\(?\d{3}\)?\s*\d{3}-\d{4}\s*$', '', merchant_name)
-    
+    merchant_name = re.sub(r"\s*\(?\d{3}\)?\s*\d{3}-\d{4}\s*$", "", merchant_name)
+
     # Remove state codes at the end (like "CA", "TX", "NY" etc)
-    merchant_name = re.sub(r'\s+[A-Z]{2}$', '', merchant_name)
-    
+    merchant_name = re.sub(r"\s+[A-Z]{2}$", "", merchant_name)
+
     # Title case the result for readability
-    merchant_name = ' '.join(word.title() for word in merchant_name.split())
-    
+    merchant_name = " ".join(word.title() for word in merchant_name.split())
+
     return merchant_name
 
 

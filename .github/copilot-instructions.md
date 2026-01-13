@@ -82,10 +82,17 @@ Sheet will update from local script execution.
 
 5. Project Structure
 
-Current structure (updated Jan 2026):
+Current structure (updated Jan 2026 - Phase 1 Complete):
 
 SplitwiseImporter/
 ├── src/
+│   ├── database/               # Local SQLite database layer (NEW - Phase 1)
+│   │   ├── __init__.py
+│   │   ├── schema.py           # Table definitions
+│   │   ├── models.py           # Transaction & ImportLog dataclasses
+│   │   └── db_manager.py       # DatabaseManager with CRUD operations
+│   ├── db_migration/           # Database migration tools (NEW - Phase 1)
+│   │   └── migrate_from_splitwise_api.py # Import from Splitwise API
 │   ├── import_statement/       # CSV statement parsing and import pipeline
 │   │   ├── pipeline.py         # Main ETL orchestrator
 │   │   ├── parse_statement.py  # CSV parsing
@@ -111,8 +118,10 @@ SplitwiseImporter/
 ├── data/
 │   ├── raw/                    # Raw CSV statements
 │   ├── processed/              # Processed outputs
-│   └── splitwise_expense_details_*.json  # Expense cache
+│   └── transactions.db         # SQLite database (NEW - Phase 1)
 └── docs/
+    ├── database_migration.md   # Phase 1 migration guide
+    └── ...
 
 🤖 AI Workflow
 You are using:
@@ -127,9 +136,17 @@ This summary provides everything Copilot needs.
 
 📝 Current Status (What Has Been Completed)
 
+✅ **Phase 1: Local Database as Source of Truth (Complete - Jan 2026)**
+- SQLite database (`data/transactions.db`) - Canonical source for all transactions
+- Database schema with comprehensive transaction model (deduplication, source tracking, sync status)
+- DatabaseManager API for CRUD operations
+- Direct Splitwise API migration tool (1,654 transactions imported: 2025 + 2026)
+- Google Sheets positioned as "view cache" not primary ledger
+- Import audit trail with import_log table
+
 ✅ **Core Infrastructure**
 - Set up development environment on Chromebook using Linux/PyCharm
-- Created modular project structure with `src/` subdirectories (import_statement, export, update, common, constants)
+- Created modular project structure with `src/` subdirectories
 - Implemented SplitwiseClient wrapper with API integration, caching, and deleted expense filtering
 - Built Google Sheets sync functionality with gspread
 - CSV parsing and normalization for credit card statements
@@ -159,26 +176,64 @@ This summary provides everything Copilot needs.
 ✅ **Configuration & Data**
 - Merchant category lookup with 216+ merchants
 - Category mappings: Transportation/Parking, Home/Household supplies, etc.
-- 2025 data fully imported (386 Amex transactions, 1,459 total Splitwise expenses)
+- 2025 data fully imported (1,609 Splitwise expenses in database)
+- 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-🔧 **Recent Session Changes (Jan 5, 2026)**
-- Updated SpotHero (15 expenses) → Transportation > Parking (subcategory ID: 9)
-- Updated Amazon marketplace (19 expenses, excluding AWS) → Home > Household supplies (subcategory ID: 14)
-- Updated Costco (17 expenses, only Home/Home - Other) → Home > Household supplies
-- Fixed date timezone issue in export (removed `utc=True` from pandas date parsing)
-- Updated config/.env: START_DATE=2026-01-01, END_DATE=2026-12-31, EXPENSES_WORKSHEET_NAME=Expenses 2026
+🔧 **Recent Session Changes (Jan 12, 2026 - Phase 1 Complete)**
+- ✅ Created SQLite database schema with transactions, duplicate_checks, and import_log tables
+- ✅ Built DatabaseManager with full CRUD operations and deduplication logic
+- ✅ Migrated 1,654 historical transactions from Splitwise API to database
+- ✅ Removed obsolete cache-based migration scripts
+- ✅ Reorganized structure: migration tools moved to `src/db_migration/`
+- ✅ Documentation updated to `docs/database_migration.md`
+- ✅ All transactions marked as unwritten to sheets (ready for Phase 2 sync)
 
-🚀 Next Steps for Future Development
+🚀 Next Steps - Phase 2: Refactor Pipeline to Use Database
 
-- Monitor 2026 expense imports and continue merchant review workflow
-- Add more merchants to lookup as new transactions are processed
-- Consider adding budget vs actual tracking visualization
-- Potential future: Plaid integration (deferred for now)
+**Import Pipeline Refactor:**
+- CSV → Database (with deduplication) → Splitwise → update DB with splitwise_id
+- Remove JSON cache dependency, use DatabaseManager instead
+
+**Export Pipeline Refactor:**
+- Database → Sheets (only unwritten rows) → mark as written_to_sheet=True
+- Implement append-only sheet writes with tracking
+
+**Analysis Layer:**
+- Keep raw transaction tabs (2024, 2025, 2026) in sheets
+- Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
+- Move rolling averages off transaction tabs
+
+See `docs/database_migration.md` for Phase 1 details.
 
 📋 Processing Pipeline Workflow
 
-**Critical order for data integrity:**
+**Phase 1 (Current): Database Migration**
+
+1. **Migrate historical Splitwise data to database** (One-time setup)
+   ```bash
+   source .venv/bin/activate
+   export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
+   
+   # Import by year
+   python src/db_migration/migrate_from_splitwise_api.py --year 2025
+   python src/db_migration/migrate_from_splitwise_api.py --year 2026
+   
+   # Or import multiple years
+   python src/db_migration/migrate_from_splitwise_api.py --years 2023 2024 2025 2026
+   
+   # Check database stats
+   python -c "from src.database import DatabaseManager; print(DatabaseManager().get_stats())"
+   ```
+
+**Phase 2 (Next): Refactored Pipeline Flow**
+The pipeline will be updated to:
+
+1. **Import statements to Database** - Parse CSV, dedupe, and store in DB
+2. **Sync Database to Splitwise** - Push unsynced transactions to Splitwise API
+3. **Export Database to Sheets** - Write only new/unwritten transactions to sheets
+
+**Current order for data integrity (until Phase 2):**
 
 1. **Import statements to Splitwise** - Parse CSV and add transactions using pipeline.py
 2. **Export Splitwise to Sheets** - Always use --overwrite mode after importing statements

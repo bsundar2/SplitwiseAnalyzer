@@ -2,6 +2,24 @@
 
 A Python project to import Splitwise expenses, process credit card statements, categorize expenses, and sync to Google Sheets for budget tracking.
 
+## 🎯 Project Architecture (Phase 1 Complete!)
+
+**Local Database = Source of Truth**  
+**Google Sheets = View Cache**
+
+Phase 1 introduces a local SQLite database that serves as the canonical source for all transaction data. Google Sheets becomes a human-readable mirror of this data, not the primary ledger.
+
+### What's New in Phase 1
+- ✅ SQLite database (`data/transactions.db`) for all transactions
+- ✅ Direct Splitwise API import (no cache file dependencies)
+- ✅ Comprehensive transaction model with deduplication
+- ✅ Simple migration tool for historical data
+- ✅ Source tracking and sync status
+- ✅ Import audit trail
+- ✅ Clean project structure with everything under `src/`
+
+See [docs/database_migration.md](docs/database_migration.md) for detailed migration guide.
+
 ## Setup
 1. Create a virtual environment: `python -m venv .venv`
 2. Activate the environment: `source .venv/bin/activate`
@@ -10,6 +28,27 @@ A Python project to import Splitwise expenses, process credit card statements, c
 5. Set PYTHONPATH: `export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter`
 
 ## Quick Start
+
+### Phase 1: Migrate Historical Data to Database
+
+```bash
+# Activate venv and set PYTHONPATH
+source .venv/bin/activate
+export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
+
+# Import Splitwise expenses by year
+python src/db_migration/migrate_from_splitwise_api.py --year 2025
+python src/db_migration/migrate_from_splitwise_api.py --year 2026
+
+# Or import multiple years at once
+python src/db_migration/migrate_from_splitwise_api.py --years 2023 2024 2025 2026
+
+# Or import a range
+python src/db_migration/migrate_from_splitwise_api.py --year-range 2020 2026
+
+# Check database stats
+python -c "from src.database import DatabaseManager; print(DatabaseManager().get_stats())"
+```
 
 ### Process a Credit Card Statement
 ```bash
