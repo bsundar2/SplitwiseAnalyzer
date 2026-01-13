@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""Fetch Splitwise expenses for a date range and write to Google Sheets.
+"""Export expenses to Google Sheets from Splitwise API or local database.
 
-Adds dedupe and append support. Tracks exported Splitwise IDs and fingerprints in data/splitwise_exported.json.
+Supports two data sources:
+1. Splitwise API (live data) - default behavior
+2. Local database (synced data) - Phase 3 database-first approach
+
+Key features:
+- Dedupe and append support for Splitwise API source
+- Database source exports unwritten transactions with write tracking
+- Overwrite mode for full refresh
+- Year-specific filtering
 """
 # Standard library
 import argparse
@@ -33,6 +41,39 @@ from src.common.utils import (
 )
 from src.constants.splitwise import ExcludedSplitwiseDescriptions
 from src.constants.export_columns import ExportColumns
+from src.database import DatabaseManager
+
+# Data source constants
+SOURCE_SPLITWISE = "splitwise"
+SOURCE_DATABASE = "database"
+
+# Worksheet name template for year-based exports
+WORKSHEET_NAME_TEMPLATE = "Expenses {year}"
+
+# Error messages
+ERROR_START_DATE_REQUIRED = "--start-date is required for Splitwise source (or set START_DATE env var)"
+ERROR_END_DATE_REQUIRED = "--end-date is required for Splitwise source (or set END_DATE env var)"
+ERROR_DATABASE_FILTER_REQUIRED = "Database source requires either --year or both --start-date and --end-date"
+ERROR_DATE_RANGE_INVALID = "Start date ({start_date}) cannot be after end date ({end_date})"
+ERROR_SHEET_KEY_REQUIRED = "--sheet-key must be provided (or set SPREADSHEET_KEY env var)"
+
+# Log messages
+LOG_NO_TRANSACTIONS_DB = "No transactions found in database for the specified filters"
+LOG_NO_EXPENSES_FOUND = "No expenses found for the date range %s to %s"
+LOG_FETCHED_FROM_DB = "Fetched %d transactions from database"
+LOG_FETCHING_FROM_DB = "Fetching expenses from local database..."
+LOG_FETCHING_FROM_API = "Fetching expenses from Splitwise API..."
+LOG_EXPORTING_FROM = "Exporting from %s source: %s to %s"
+LOG_MARKED_WRITTEN = "Marked %d transactions as written to sheet"
+LOG_EXPORT_CATEGORIES = "Exporting categories due to --export-categories flag"
+LOG_FILTERED_SETTLE = "Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export"
+LOG_FILTERED_PAYMENT = "Filtered out %d Splitwise 'Payment' transactions from API export"
+LOG_FILTERED_NO_PARTICIPATION = "Filtered out %d expenses where my_paid and my_owed were both zero (no participation)"
+
+# User messages
+MSG_NO_NEW_EXPENSES = "No new Splitwise expenses to export (all rows already exported or no participation)."
+MSG_PROCESSED_SUCCESS = "Successfully processed {count} expenses"
+MSG_NO_EXPENSES_PROCESSED = "No expenses found or processed"
 
 
 def load_exported_state() -> tuple[set, set]:
@@ -143,6 +184,165 @@ def export_categories(sheet_key: str = None) -> Optional[str]:
     return url
 
 
+def fetch_from_database(
+    start_date: Union[datetime, date, str],
+    end_date: Union[datetime, date, str],
+    year: Optional[int] = None,
+    include_written: bool = False,
+) -> pd.DataFrame:
+    """Fetch expenses from local database.
+
+    Args:
+        start_date: Start date for filtering
+        end_date: End date for filtering
+        year: Optional year filter (overrides date range)
+        include_written: If True, include already-written transactions
+
+    Returns:
+        DataFrame with database transactions matching Splitwise export format
+    """
+    import re
+    
+    db = DatabaseManager()
+
+    # Get transactions based on filters
+    if year and not include_written:
+        # Get unwritten for specific year (most common Phase 3 use case)
+        transactions = db.get_unwritten_transactions(year=year)
+    elif year:
+        # Get all transactions for year (for overwrite mode)
+        transactions = db.get_transactions_by_date_range(
+            start_date=f"{year}-01-01", end_date=f"{year}-12-31"
+        )
+    else:
+        # Get by date range
+        transactions = db.get_transactions_by_date_range(
+            start_date=str(start_date), end_date=str(end_date)
+        )
+
+    if not transactions:
+        return pd.DataFrame()
+
+    # Convert to DataFrame matching Splitwise export format (all columns)
+    rows = []
+    for txn in transactions:
+        # Skip deleted transactions
+        if txn.splitwise_deleted_at:
+            continue
+
+        # Parse notes field for payment information
+        # Format: "Imported from Splitwise API | Paid: $X.XX | Owe: $Y.YY | With: name1, name2"
+        # or: "cc_reference_id: XXX | Imported from Splitwise API | ..."
+        my_paid = 0.0
+        my_owed = 0.0
+        participant_names = ""
+        details = ""
+        
+        if txn.notes:
+            # Extract cc_reference_id for details (just the ID number)
+            cc_ref_match = re.search(r'cc_reference_id:\s*(\d+)', txn.notes)
+            if cc_ref_match:
+                details = cc_ref_match.group(1)
+            
+            # Extract MY_PAID
+            paid_match = re.search(r'Paid:\s*\$?([\d,]+\.?\d*)', txn.notes)
+            if paid_match:
+                my_paid = float(paid_match.group(1).replace(',', ''))
+            
+            # Extract MY_OWED
+            owe_match = re.search(r'Owe:\s*\$?([\d,]+\.?\d*)', txn.notes)
+            if owe_match:
+                my_owed = float(owe_match.group(1).replace(',', ''))
+            
+            # Extract participant names
+            with_match = re.search(r'With:\s*([^|]+?)(?:\s*$|\s*\|)', txn.notes)
+            if with_match:
+                participant_names = with_match.group(1).strip()
+
+        # Calculate MY_NET
+        my_net = my_paid - my_owed
+
+        # Determine split type
+        split_type = "split" if txn.is_shared else "self"
+
+        # Create row in exact column order to match existing exports
+        row = {
+            ExportColumns.DATE: txn.date,
+            ExportColumns.AMOUNT: abs(txn.raw_amount)
+            if txn.raw_amount
+            else abs(txn.amount),
+            ExportColumns.CATEGORY: txn.category or "Uncategorized",
+            ExportColumns.DESCRIPTION: txn.description or txn.merchant,
+            ExportColumns.DETAILS: details,
+            ExportColumns.SPLIT_TYPE: split_type,
+            ExportColumns.PARTICIPANT_NAMES: participant_names,
+            ExportColumns.MY_PAID: my_paid,
+            ExportColumns.MY_OWED: my_owed,
+            ExportColumns.MY_NET: my_net,
+            ExportColumns.ID: txn.splitwise_id or "",
+        }
+
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+
+    # Ensure proper data types
+    if not df.empty:
+        # Convert numeric columns
+        for col in [ExportColumns.AMOUNT, ExportColumns.MY_PAID, ExportColumns.MY_OWED, ExportColumns.MY_NET]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Generate fingerprints for consistency with Splitwise source
+        df[ExportColumns.FINGERPRINT] = df.apply(
+            lambda r: generate_fingerprint(
+                r.get(ExportColumns.DATE),
+                r.get(ExportColumns.AMOUNT),
+                r.get(ExportColumns.DESCRIPTION, ""),
+            ),
+            axis=1,
+        )
+
+        # Filter out payment/settlement transactions (same as Splitwise API filtering)
+        if ExportColumns.DESCRIPTION in df.columns:
+            # Filter "Settle all balances" transactions
+            settle_mask = (
+                df[ExportColumns.DESCRIPTION]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
+            )
+            num_settle = int(settle_mask.sum())
+            if num_settle > 0:
+                LOG.info(LOG_FILTERED_SETTLE, num_settle)
+                df = df[~settle_mask].reset_index(drop=True)
+
+            # Filter "Payment" transactions (General category only)
+            desc_series = df[ExportColumns.DESCRIPTION].astype(str).str.strip()
+            payment_exact = desc_series.str.lower().eq(
+                ExcludedSplitwiseDescriptions.PAYMENT.value.lower()
+            )
+            payment_word = desc_series.str.contains(
+                r"\bpayment\b", case=False, na=False
+            )
+
+            if ExportColumns.CATEGORY in df.columns:
+                category_general = (
+                    df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
+                )
+            else:
+                category_general = pd.Series(True, index=df.index)
+
+            payment_mask = (payment_exact | payment_word) & category_general
+            num_pay = int(payment_mask.sum())
+            if num_pay > 0:
+                LOG.info(LOG_FILTERED_PAYMENT, num_pay)
+                df = df[~payment_mask].reset_index(drop=True)
+
+    return df
+
+
 def fetch_and_write(
     start_date: Union[datetime, date, str],
     end_date: Union[datetime, date, str],
@@ -150,148 +350,190 @@ def fetch_and_write(
     worksheet_name: str = DEFAULT_WORKSHEET_NAME,
     append: bool = True,
     export_categories_flag: bool = False,
+    source: str = SOURCE_SPLITWISE,
+    year: Optional[int] = None,
+    dry_run: bool = False,
 ) -> tuple[pd.DataFrame, Optional[str]]:
-    """Fetch expenses, de-duplicate, and write to Google Sheets.
+    """Fetch expenses and write to Google Sheets.
 
-    Deduplication is always enabled. The function will fetch Splitwise
-    expenses for the given date range, remove known exported IDs/fingerprints,
-    and write the new rows to Google Sheets (or return them when no sheet is
-    provided).
+    Args:
+        start_date: Start date for date range
+        end_date: End date for date range
+        sheet_key: Google Sheets spreadsheet key
+        worksheet_name: Name of worksheet to write to
+        append: If True, append to existing data; if False, overwrite
+        export_categories_flag: If True, also export Splitwise categories
+        source: Data source - 'splitwise' for API or 'database' for local DB
+        year: Optional year filter (used with database source)
+        dry_run: If True, preview data without writing to sheets or updating state
 
     Returns:
         Tuple of (DataFrame with expenses, URL of the updated sheet or None)
     """
 
-    client = SplitwiseClient()
-    df = client.get_my_expenses_by_date_range(start_date, end_date)
-
-    # Filter out Splitwise-generated "Settle all balances" rows which are not useful for budgeting.
-    # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
-    if df is not None and not df.empty and ExportColumns.DESCRIPTION in df.columns:
-        # explicit exact-match checks using pandas Series.eq for clarity
-        settle_mask = (
-            df[ExportColumns.DESCRIPTION]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            .eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
+    # Fetch data based on source
+    if source == SOURCE_DATABASE:
+        LOG.info(LOG_FETCHING_FROM_DB)
+        is_overwrite = not append
+        df = fetch_from_database(
+            start_date=start_date,
+            end_date=end_date,
+            year=year,
+            include_written=is_overwrite,  # In overwrite mode, include all transactions
         )
 
-        num_settle = int(settle_mask.sum())
-        if num_settle > 0:
-            LOG.info(
-                "Filtered out %d Splitwise 'Settle all balances' exact-match transactions from API export",
-                num_settle,
-            )
-            df = df[~settle_mask].reset_index(drop=True)
+        if df.empty:
+            LOG.info(LOG_NO_TRANSACTIONS_DB)
+            return pd.DataFrame(), None
 
-        # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses).
-        # Only target the description field; if a `category` column exists require it to be 'General'
-        # to avoid removing other rows accidentally.
-        desc_series = df[ExportColumns.DESCRIPTION].astype(str).str.strip()
-        payment_exact = desc_series.str.lower().eq(
-            ExcludedSplitwiseDescriptions.PAYMENT.value.lower()
-        )
-        payment_word = desc_series.str.contains(r"\bpayment\b", case=False, na=False)
+        LOG.info(LOG_FETCHED_FROM_DB, len(df))
 
-        if ExportColumns.CATEGORY in df.columns:
-            category_general = (
-                df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
-            )
-        else:
-            category_general = pd.Series(True, index=df.index)
-
-        payment_mask = (payment_exact | payment_word) & category_general
-        num_pay = int(payment_mask.sum())
-        if num_pay > 0:
-            LOG.info(
-                "Filtered out %d Splitwise 'Payment' transactions from API export",
-                num_pay,
-            )
-            df = df[~payment_mask].reset_index(drop=True)
-    if df is None or df.empty:
-        LOG.info("No expenses found for the date range %s to %s", start_date, end_date)
-        return pd.DataFrame(), None
-
-    is_overwrite = not append
-
-    # Ensure all columns are strings for consistency
-    df = df.copy()
-    for col in df.columns:
-        df[col] = df[col].astype(str)
-
-    # Generate fingerprints using the utility function
-    df[ExportColumns.FINGERPRINT] = df.apply(
-        lambda r: generate_fingerprint(
-            r.get(ExportColumns.DATE),
-            r.get(ExportColumns.AMOUNT),
-            r.get(ExportColumns.DESCRIPTION) or r.get(ExportColumns.FRIENDS_SPLIT, ""),
-        ),
-        axis=1,
-    )
-
-    # In overwrite mode, we want a full refresh of the worksheet.
-    # That means we should not filter anything out based on prior exported state.
-    if is_overwrite:
-        exported_ids, exported_fps = set(), set()
-    else:
-        # Always load existing exported state when not overwriting
-        exported_ids, exported_fps = load_exported_state()
-        # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
-        # cases where the local state file is missing or inconsistent.
-        if sheet_key:
-            sheet_existing_fps = _read_existing_fingerprints(sheet_key, worksheet_name)
-            if sheet_existing_fps:
-                exported_fps = set(exported_fps) | set(sheet_existing_fps)
-                # Persist the discovered fingerprints so future runs don't recompute them each time
-                save_exported_state(exported_ids, exported_fps)
-
-    # Filter new rows: not in exported ids and not in exported fingerprints
-    if not is_overwrite:
-        mask_new = ~(
-            (df[ExportColumns.ID].isin(exported_ids))
-            | (df[ExportColumns.FINGERPRINT].isin(exported_fps))
-        )
-        new_df = df[mask_new].reset_index(drop=True)
-        skipped_df = df[~mask_new].reset_index(drop=True)
-    else:
+        # For database source in overwrite mode, skip deduplication
+        # Just write everything and mark as written
         new_df = df
-        skipped_df = pd.DataFrame()
 
-    # Convert my_paid/my_owed to numeric and filter out expenses where the
-    # user has no participation (both my_paid and my_owed are zero).
-    # This prevents exporting rows where the current user is not involved.
-    if (
-        not new_df.empty
-        and ExportColumns.MY_PAID in new_df.columns
-        and ExportColumns.MY_OWED in new_df.columns
-    ):
-        # Coerce to numeric (invalid -> 0.0) then filter
-        new_df = new_df.copy()
-        new_df[ExportColumns.MY_PAID] = pd.to_numeric(
-            new_df[ExportColumns.MY_PAID], errors="coerce"
-        ).fillna(0.0)
-        new_df[ExportColumns.MY_OWED] = pd.to_numeric(
-            new_df[ExportColumns.MY_OWED], errors="coerce"
-        ).fillna(0.0)
+    else:
+        # Original Splitwise API behavior
+        LOG.info(LOG_FETCHING_FROM_API)
+        client = SplitwiseClient()
+        df = client.get_my_expenses_by_date_range(start_date, end_date)
 
-        before_count = len(new_df)
-        # Keep rows where either my_paid or my_owed is non-zero
-        participation_mask = (new_df[ExportColumns.MY_PAID] != 0.0) | (
-            new_df[ExportColumns.MY_OWED] != 0.0
-        )
-        new_df = new_df[participation_mask].reset_index(drop=True)
-        filtered_count = before_count - len(new_df)
-        if filtered_count > 0:
-            LOG.info(
-                "Filtered out %d expenses where my_paid and my_owed were both zero (no participation)",
-                filtered_count,
+        # Filter out Splitwise-generated "Settle all balances" rows which are not useful for budgeting.
+        # Match the exact phrase (case-insensitive, trimmed) instead of a fuzzy regex.
+        if df is not None and not df.empty and ExportColumns.DESCRIPTION in df.columns:
+            # explicit exact-match checks using pandas Series.eq for clarity
+            settle_mask = (
+                df[ExportColumns.DESCRIPTION]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .eq(ExcludedSplitwiseDescriptions.SETTLE_ALL_BALANCES.value.lower())
             )
+
+            num_settle = int(settle_mask.sum())
+            if num_settle > 0:
+                LOG.info(LOG_FILTERED_SETTLE, num_settle)
+                df = df[~settle_mask].reset_index(drop=True)
+
+            # Also filter out explicit 'Payment' rows (these are payments/settlements, not expenses).
+            # Only target the description field; if a `category` column exists require it to be 'General'
+            # to avoid removing other rows accidentally.
+            desc_series = df[ExportColumns.DESCRIPTION].astype(str).str.strip()
+            payment_exact = desc_series.str.lower().eq(
+                ExcludedSplitwiseDescriptions.PAYMENT.value.lower()
+            )
+            payment_word = desc_series.str.contains(
+                r"\bpayment\b", case=False, na=False
+            )
+
+            if ExportColumns.CATEGORY in df.columns:
+                category_general = (
+                    df[ExportColumns.CATEGORY].astype(str).str.strip().eq("General")
+                )
+            else:
+                category_general = pd.Series(True, index=df.index)
+
+            payment_mask = (payment_exact | payment_word) & category_general
+            num_pay = int(payment_mask.sum())
+            if num_pay > 0:
+                LOG.info(LOG_FILTERED_PAYMENT, num_pay)
+                df = df[~payment_mask].reset_index(drop=True)
+
+        if df is None or df.empty:
+            LOG.info(LOG_NO_EXPENSES_FOUND, start_date, end_date)
+            return pd.DataFrame(), None
+
+        is_overwrite = not append
+
+        # Ensure all columns are strings for consistency
+        df = df.copy()
+        for col in df.columns:
+            df[col] = df[col].astype(str)
+
+        # Generate fingerprints using the utility function
+        df[ExportColumns.FINGERPRINT] = df.apply(
+            lambda r: generate_fingerprint(
+                r.get(ExportColumns.DATE),
+                r.get(ExportColumns.AMOUNT),
+                r.get(ExportColumns.DESCRIPTION)
+                or r.get(ExportColumns.FRIENDS_SPLIT, ""),
+            ),
+            axis=1,
+        )
+
+        # In overwrite mode, we want a full refresh of the worksheet.
+        # That means we should not filter anything out based on prior exported state.
+        if is_overwrite:
+            exported_ids, exported_fps = set(), set()
+        else:
+            # Always load existing exported state when not overwriting
+            exported_ids, exported_fps = load_exported_state()
+            # If appending to a live sheet, also read existing fingerprints from that worksheet to handle
+            # cases where the local state file is missing or inconsistent.
+            if sheet_key:
+                sheet_existing_fps = _read_existing_fingerprints(
+                    sheet_key, worksheet_name
+                )
+                if sheet_existing_fps:
+                    exported_fps = set(exported_fps) | set(sheet_existing_fps)
+                    # Persist the discovered fingerprints so future runs don't recompute them each time
+                    save_exported_state(exported_ids, exported_fps)
+
+        # Filter new rows: not in exported ids and not in exported fingerprints
+        if not is_overwrite:
+            mask_new = ~(
+                (df[ExportColumns.ID].isin(exported_ids))
+                | (df[ExportColumns.FINGERPRINT].isin(exported_fps))
+            )
+            new_df = df[mask_new].reset_index(drop=True)
+            skipped_df = df[~mask_new].reset_index(drop=True)
+        else:
+            new_df = df
+            skipped_df = pd.DataFrame()
+
+        # Convert my_paid/my_owed to numeric and filter out expenses where the
+        # user has no participation (both my_paid and my_owed are zero).
+        # This prevents exporting rows where the current user is not involved.
+        if (
+            not new_df.empty
+            and ExportColumns.MY_PAID in new_df.columns
+            and ExportColumns.MY_OWED in new_df.columns
+        ):
+            # Coerce to numeric (invalid -> 0.0) then filter
+            new_df = new_df.copy()
+            new_df[ExportColumns.MY_PAID] = pd.to_numeric(
+                new_df[ExportColumns.MY_PAID], errors="coerce"
+            ).fillna(0.0)
+            new_df[ExportColumns.MY_OWED] = pd.to_numeric(
+                new_df[ExportColumns.MY_OWED], errors="coerce"
+            ).fillna(0.0)
+
+            before_count = len(new_df)
+            # Keep rows where either my_paid or my_owed is non-zero
+            participation_mask = (new_df[ExportColumns.MY_PAID] != 0.0) | (
+                new_df[ExportColumns.MY_OWED] != 0.0
+            )
+            new_df = new_df[participation_mask].reset_index(drop=True)
+            filtered_count = before_count - len(new_df)
+            if filtered_count > 0:
+                LOG.info(LOG_FILTERED_NO_PARTICIPATION, filtered_count)
 
     if new_df.empty:
-        print(
-            "No new Splitwise expenses to export (all rows already exported or no participation)."
-        )
+        print(MSG_NO_NEW_EXPENSES)
+        return new_df, None
+
+    # In dry run mode, show preview and return early
+    if dry_run:
+        print(f"\n{'='*60}")
+        print(f"DRY RUN MODE - No changes will be made")
+        print(f"{'='*60}")
+        print(f"Source: {source}")
+        print(f"Worksheet: {worksheet_name}")
+        print(f"Mode: {'Overwrite' if not append else 'Append'}")
+        print(f"Transactions to export: {len(new_df)}")
+        print(f"\nPreview (first 10 rows):")
+        print(new_df.head(10).to_string(index=False))
+        print(f"\n{'='*60}")
         return new_df, None
 
     # Coerce types for better Sheets formatting: date -> datetime objects, amount -> numeric
@@ -321,20 +563,44 @@ def fetch_and_write(
         url = None
         print(new_df.head())
 
-    # Update exported state
-    if is_overwrite:
-        updated_ids = set(new_df[ExportColumns.ID].tolist())
-        updated_fps = set(new_df[ExportColumns.FINGERPRINT].tolist())
-    else:
-        updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
-        updated_fps = set(exported_fps) | set(
-            new_df[ExportColumns.FINGERPRINT].tolist()
-        )
-    save_exported_state(updated_ids, updated_fps)
+    # Update state based on source
+    if source == SOURCE_SPLITWISE:
+        # Update exported state for Splitwise source
+        is_overwrite = not append
+        if is_overwrite:
+            updated_ids = set(new_df[ExportColumns.ID].tolist())
+            updated_fps = set(new_df[ExportColumns.FINGERPRINT].tolist())
+        else:
+            exported_ids, exported_fps = load_exported_state()
+            updated_ids = set(exported_ids) | set(new_df[ExportColumns.ID].tolist())
+            updated_fps = set(exported_fps) | set(
+                new_df[ExportColumns.FINGERPRINT].tolist()
+            )
+        save_exported_state(updated_ids, updated_fps)
+
+    elif source == SOURCE_DATABASE:
+        # Mark transactions as written in database
+        db = DatabaseManager()
+        txn_ids = [
+            int(sid) for sid in new_df[ExportColumns.ID].tolist() if sid and sid != ""
+        ]
+
+        if txn_ids and sheet_key:
+            # Get transaction IDs from database by splitwise_id
+            db_txn_ids = []
+            for sw_id in txn_ids:
+                txn = db.get_transaction_by_splitwise_id(sw_id)
+                if txn and txn.id:
+                    db_txn_ids.append(txn.id)
+
+            if db_txn_ids:
+                mark_year = year if year else datetime.now().year
+                db.mark_written_to_sheet(db_txn_ids, year=mark_year)
+                LOG.info(LOG_MARKED_WRITTEN, len(db_txn_ids))
 
     # Export categories only when explicitly requested via flag
     if not append and export_categories_flag:
-        LOG.info("Exporting categories due to --export-categories flag")
+        LOG.info(LOG_EXPORT_CATEGORIES)
         export_categories(sheet_key=sheet_key)
 
     return new_df, url
@@ -343,7 +609,33 @@ def fetch_and_write(
 def main():
     """Main entry point for the script."""
     parser = argparse.ArgumentParser(
-        description="Export Splitwise expenses to Google Sheets"
+        description="Export expenses to Google Sheets from Splitwise API or local database",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Export from Splitwise API (default)
+  python src/export/splitwise_export.py --start-date 2026-01-01 --end-date 2026-12-31
+  
+  # Export from local database for 2026
+  python src/export/splitwise_export.py --source database --year 2026
+  
+  # Overwrite mode (full refresh)
+  python src/export/splitwise_export.py --source database --year 2026 --overwrite
+  
+  # Export to specific worksheet
+  python src/export/splitwise_export.py --source database --year 2026 --worksheet "Expenses 2026"
+        """,
+    )
+    parser.add_argument(
+        "--source",
+        choices=[SOURCE_SPLITWISE, SOURCE_DATABASE],
+        default=SOURCE_SPLITWISE,
+        help=f"Data source: '{SOURCE_SPLITWISE}' for live API or '{SOURCE_DATABASE}' for local DB (default: {SOURCE_SPLITWISE})",
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        help="Year filter (primarily for database source, e.g., 2026)",
     )
     parser.add_argument(
         "--start-date",
@@ -357,6 +649,8 @@ def main():
     )
     parser.add_argument(
         "--worksheet-name",
+        "--worksheet",
+        dest="worksheet_name",
         default=os.getenv("EXPENSES_WORKSHEET_NAME", DEFAULT_WORKSHEET_NAME),
         help=f"Worksheet name (default: EXPENSES_WORKSHEET_NAME env var or {DEFAULT_WORKSHEET_NAME})",
     )
@@ -385,44 +679,73 @@ def main():
         action="store_false",
         help=argparse.SUPPRESS,  # Hidden alias for backward compatibility
     )
-    # Deduplication is always enabled now; `--no-dedupe` removed.
+    parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Preview data without writing to sheets or updating state (no changes made)",
+    )
 
     args = parser.parse_args()
 
     try:
-        # Validate required arguments
-        if not args.start_date:
-            raise ValueError("--start-date is required (or set START_DATE env var)")
-        if not args.end_date:
-            raise ValueError("--end-date is required (or set END_DATE env var)")
+        # Determine worksheet name
+        worksheet_name = args.worksheet_name
+        if (
+            args.source == SOURCE_DATABASE
+            and args.year
+            and worksheet_name == DEFAULT_WORKSHEET_NAME
+        ):
+            # Default to "Expenses YYYY" for database year exports
+            worksheet_name = WORKSHEET_NAME_TEMPLATE.format(year=args.year)
+
+        # Validate required arguments based on source
+        if args.source == SOURCE_DATABASE and not args.year and not (
+            args.start_date and args.end_date
+        ):
+            raise ValueError(ERROR_DATABASE_FILTER_REQUIRED)
+
+        if args.source == SOURCE_SPLITWISE:
+            if not args.start_date:
+                raise ValueError(ERROR_START_DATE_REQUIRED)
+            if not args.end_date:
+                raise ValueError(ERROR_END_DATE_REQUIRED)
 
         # Parse dates (use shared parse_date in src.utils)
-        start_date = parse_date(args.start_date)
-        end_date = parse_date(args.end_date)
+        if args.year:
+            # Use year boundaries if year is specified
+            start_date = parse_date(f"{args.year}-01-01")
+            end_date = parse_date(f"{args.year}-12-31")
+        else:
+            start_date = parse_date(args.start_date) if args.start_date else None
+            end_date = parse_date(args.end_date) if args.end_date else None
 
-        if start_date > end_date:
+        if start_date and end_date and start_date > end_date:
             raise ValueError(
-                f"Start date ({start_date}) cannot be after end date ({end_date})"
+                ERROR_DATE_RANGE_INVALID.format(
+                    start_date=start_date, end_date=end_date
+                )
             )
 
-        # Ensure sheet_key is provided for writes
-        if not args.sheet_key:
-            raise ValueError(
-                "--sheet-key must be provided (or set SPREADSHEET_KEY env var)"
-            )
+        # Ensure sheet_key is provided for writes unless in dry run mode
+        if not args.sheet_key and not args.dry_run:
+            raise ValueError(ERROR_SHEET_KEY_REQUIRED)
 
-        LOG.info("Fetching expenses from %s to %s", start_date, end_date)
+        LOG.info(LOG_EXPORTING_FROM, args.source, start_date, end_date)
         new_df, url = fetch_and_write(
             start_date=start_date,
             end_date=end_date,
             sheet_key=args.sheet_key,
-            worksheet_name=args.worksheet_name,
+            worksheet_name=worksheet_name,
             append=args.append,
             export_categories_flag=args.export_categories,
+            source=args.source,
+            year=args.year,
+            dry_run=args.dry_run,
         )
 
         if new_df is not None and not new_df.empty:
-            print(f"Successfully processed {len(new_df)} expenses")
+            print(MSG_PROCESSED_SUCCESS.format(count=len(new_df)))
             if url:
                 print(f"Updated sheet: {url}")
 
@@ -430,7 +753,7 @@ def main():
                 print("\nSummary:")
                 print(new_df["status"].value_counts().to_string())
         else:
-            print("No expenses found or processed")
+            print(MSG_NO_EXPENSES_PROCESSED)
 
     except Exception as e:
         LOG.error("Error: %s", str(e), exc_info=True)
