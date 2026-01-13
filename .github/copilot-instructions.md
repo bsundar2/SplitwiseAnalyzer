@@ -82,7 +82,7 @@ Sheet will update from local script execution.
 
 5. Project Structure
 
-Current structure (updated Jan 2026 - Phase 1 Complete):
+Current structure (updated Jan 12, 2026 - Phase 2 Complete):
 
 SplitwiseImporter/
 ├── src/
@@ -95,7 +95,7 @@ SplitwiseImporter/
 │   │   ├── __init__.py
 │   │   └── sync_from_splitwise.py # Sync DB with Splitwise (insert/update/delete)
 │   ├── import_statement/       # CSV statement parsing and import pipeline
-│   │   ├── pipeline.py         # Main ETL orchestrator (UPDATED - Phase 2: saves to DB)
+│   │   ├── pipeline.py         # Main ETL orchestrator (Phase 2: Splitwise → DB)
 │   │   ├── parse_statement.py  # CSV parsing
 │   │   └── categorization.py   # Transaction categorization
 │   ├── export/
@@ -119,10 +119,15 @@ SplitwiseImporter/
 ├── data/
 │   ├── raw/                    # Raw CSV statements
 │   ├── processed/              # Processed outputs
-│   └── transactions.db         # SQLite database (Phase 1)
+│   └── transactions.db         # SQLite database (1,672 transactions)
 └── docs/
     ├── database_sync_guide.md  # Complete database & sync guide (Phase 1 & 2)
     └── ...
+
+**Removed Files (Phase 2 cleanup):**
+- review.sh (merchant review complete with 216+ merchants)
+- data/splitwise_cache.json (replaced with database duplicate detection)
+- src/constants/config.py:CACHE_PATH (no longer needed)
 
 🤖 AI Workflow
 You are using:
@@ -145,13 +150,16 @@ This summary provides everything Copilot needs.
 - Google Sheets positioned as "view cache" not primary ledger
 - Import audit trail with import_log table
 
-✅ **Phase 2: Splitwise-First Import Pipeline (Complete - Jan 2026)**
-- Import pipeline refactored to save to database after Splitwise API success
+✅ **Phase 2: Splitwise-First Import Pipeline (Complete - Jan 12, 2026)**
+- Import pipeline saves to database after successful Splitwise API creation
 - Splitwise is source of truth - database reflects Splitwise state
 - Sync script (`src/db_sync/sync_from_splitwise.py`) to pull updates/deletes from Splitwise
 - DatabaseManager extended with sync methods (update_transaction_from_splitwise, mark_deleted_by_splitwise_id)
 - Manual Splitwise edits (splits, deletes, categories) can be synced back to database
 - Workflow: CSV → Splitwise → Database → [manual edits in Splitwise] → Sync back to DB
+- JSON cache removed - pure database-driven duplicate detection by cc_reference_id
+- Category inference runs for all transactions (including duplicates) for proper sheet reporting
+- Fixed duplicate detection to only check cc_reference_id (allows legitimate duplicate transactions)
 
 ✅ **Core Infrastructure**
 - Set up development environment on Chromebook using Linux/PyCharm
@@ -189,23 +197,17 @@ This summary provides everything Copilot needs.
 - 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-🔧 **Recent Session Changes (Jan 12, 2026 - Phase 2 Complete)**
-- ✅ Extended DatabaseManager with Splitwise sync methods
-- ✅ Created sync script: `src/db_sync/sync_from_splitwise.py`
-- ✅ Refactored import pipeline to save transactions to DB after Splitwise creation
-- ✅ Added update_transaction_from_splitwise(), mark_deleted_by_splitwise_id()
-- ✅ Added get_transactions_with_splitwise_ids() for sync queries
-- ✅ Pipeline now saves: splitwise_id, source, source_file, category info to DB
-- ✅ Error handling: DB save failures logged but don't block Splitwise creation
-- ✅ Documentation: Consolidated into `docs/database_sync_guide.md`
-- ✅ Merged db_migration into db_sync for unified sync tool
-- ✅ Updated copilot-instructions.md with Phase 2 architecture
+**🔧 Recent Session Changes (Jan 12, 2026 - Phase 2 Complete)**
+- ✅ Fixed duplicate detection to ONLY check cc_reference_id (removed fuzzy date/merchant/amount matching)
+- ✅ Allows legitimate duplicate transactions (e.g., 2 plane tickets same day/amount)
+- ✅ Category inference moved before duplicate checks (ensures all transactions get category info for sheets)
+- ✅ Fixed sheet output: remote_exists transactions now have splitwise_id populated
+- ✅ Black formatting applied to codebase
+- ✅ Removed review.sh (merchant review complete with 216+ merchants configured)
+- ✅ Removed CACHE_PATH constant and splitwise_cache.json file
+- ✅ Successfully tested with jan2026.csv import (5 new transactions added correctly)
 
 🚀 Next Steps - Phase 3: Google Sheets Export & Budget Tracking
-
-**Import Pipeline Refactor:**
-- CSV → Database (with deduplication) → Splitwise → update DB with splitwise_id
-- Remove JSON cache dependency, use DatabaseManager instead
 
 **Export Pipeline Refactor:**
 - Database → Sheets (only unwritten rows) → mark as written_to_sheet=True
@@ -216,11 +218,15 @@ This summary provides everything Copilot needs.
 - Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
 - Move rolling averages off transaction tabs
 
-See `docs/database_sync_guide.md` for Phase 1 details.
+**Database Cleanup (Optional):**
+- Update migrated transaction notes to include cc_reference_id from statements
+- This will improve duplicate detection by using DB instead of remote API checks
 
-**Phase 2 (Current): Splitwise-First Pipeline Flow**
+See `docs/database_sync_guide.md` for Phase 1 & 2 architecture details.
 
-The pipeline now follows this flow:
+**Phase 2 (Complete): Splitwise-First Pipeline Flow**
+
+The pipeline follows this flow:
 
 1. **Import statements to Splitwise** - Parse CSV and add transactions using pipeline.py
 2. **Save to Database** - After successful Splitwise creation, save with splitwise_id
@@ -245,6 +251,21 @@ python src/db_sync/sync_from_splitwise.py --year 2026 --dry-run --verbose
 
 # Apply changes (inserts new, updates existing, marks deleted)
 python src/db_sync/sync_from_splitwise.py --year 2026 --live
+
+# Initial migration for historical data (same command)
+python src/db_sync/sync_from_splitwise.py --year 2025 --live
+```
+
+**Why this flow:**
+- Splitwise is the source of truth (manual edits happen there)
+- Database reflects current Splitwise state
+- Unified sync script handles:
+  - **New expenses**: Insert into DB (migration behavior)
+  - **Updated expenses**: Update amount, description, category, etc.
+  - **Deleted expenses**: Mark as deleted in DB
+- Can re-sync anytime to get latest Splitwise state
+- Same tool for both initial migration and ongoing sync
+- Duplicate detection: cc_reference_id only (allows legitimate duplicates like 2 plane tickets)
 
 # Initial migration for historical data (same command)
 python src/db_sync/sync_from_splitwise.py --year 2025 --live

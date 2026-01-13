@@ -148,9 +148,10 @@ def sync_from_splitwise(
     print(f"📥 Fetching expenses from Splitwise API...")
     # Convert string dates to datetime objects for the client
     from datetime import datetime as dt
+
     start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
     end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
-    
+
     splitwise_df = client.get_my_expenses_by_date_range(
         start_date=start_date_obj,
         end_date=end_date_obj,
