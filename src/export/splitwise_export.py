@@ -705,78 +705,72 @@ Examples:
 
     args = parser.parse_args()
 
-    try:
-        # Determine worksheet name
-        worksheet_name = args.worksheet_name
-        if (
-            args.source == SOURCE_DATABASE
-            and args.year
-            and worksheet_name == DEFAULT_WORKSHEET_NAME
-        ):
-            # Default to "Expenses YYYY" for database year exports
-            worksheet_name = WORKSHEET_NAME_TEMPLATE.format(year=args.year)
+    # Determine worksheet name
+    worksheet_name = args.worksheet_name
+    if (
+        args.source == SOURCE_DATABASE
+        and args.year
+        and worksheet_name == DEFAULT_WORKSHEET_NAME
+    ):
+        # Default to "Expenses YYYY" for database year exports
+        worksheet_name = WORKSHEET_NAME_TEMPLATE.format(year=args.year)
 
-        # Validate required arguments based on source
-        if args.source == SOURCE_DATABASE and not args.year and not (
-            args.start_date and args.end_date
-        ):
-            raise ValueError(ERROR_DATABASE_FILTER_REQUIRED)
+    # Validate required arguments based on source
+    if args.source == SOURCE_DATABASE and not args.year and not (
+        args.start_date and args.end_date
+    ):
+        raise ValueError(ERROR_DATABASE_FILTER_REQUIRED)
 
-        if args.source == SOURCE_SPLITWISE:
-            if not args.start_date:
-                raise ValueError(ERROR_START_DATE_REQUIRED)
-            if not args.end_date:
-                raise ValueError(ERROR_END_DATE_REQUIRED)
+    if args.source == SOURCE_SPLITWISE:
+        if not args.start_date:
+            raise ValueError(ERROR_START_DATE_REQUIRED)
+        if not args.end_date:
+            raise ValueError(ERROR_END_DATE_REQUIRED)
 
-        # Parse dates (use shared parse_date in src.utils)
-        if args.year:
-            # Use year boundaries if year is specified
-            start_date = parse_date(f"{args.year}-01-01")
-            end_date = parse_date(f"{args.year}-12-31")
-        else:
-            start_date = parse_date(args.start_date) if args.start_date else None
-            end_date = parse_date(args.end_date) if args.end_date else None
+    # Parse dates (use shared parse_date in src.utils)
+    if args.year:
+        # Use year boundaries if year is specified
+        start_date = parse_date(f"{args.year}-01-01")
+        end_date = parse_date(f"{args.year}-12-31")
+    else:
+        start_date = parse_date(args.start_date) if args.start_date else None
+        end_date = parse_date(args.end_date) if args.end_date else None
 
-        if start_date and end_date and start_date > end_date:
-            raise ValueError(
-                ERROR_DATE_RANGE_INVALID.format(
-                    start_date=start_date, end_date=end_date
-                )
+    if start_date and end_date and start_date > end_date:
+        raise ValueError(
+            ERROR_DATE_RANGE_INVALID.format(
+                start_date=start_date, end_date=end_date
             )
-
-        # Ensure sheet_key is provided for writes unless in dry run mode
-        if not args.sheet_key and not args.dry_run:
-            raise ValueError(ERROR_SHEET_KEY_REQUIRED)
-
-        LOG.info(LOG_EXPORTING_FROM, args.source, start_date, end_date)
-        new_df, url = fetch_and_write(
-            start_date=start_date,
-            end_date=end_date,
-            sheet_key=args.sheet_key,
-            worksheet_name=worksheet_name,
-            append=args.append,
-            export_categories_flag=args.export_categories,
-            source=args.source,
-            year=args.year,
-            dry_run=args.dry_run,
-            append_only=args.append_only,
         )
 
-        if new_df is not None and not new_df.empty:
-            print(MSG_PROCESSED_SUCCESS.format(count=len(new_df)))
-            if url:
-                print(f"Updated sheet: {url}")
+    # Ensure sheet_key is provided for writes unless in dry run mode
+    if not args.sheet_key and not args.dry_run:
+        raise ValueError(ERROR_SHEET_KEY_REQUIRED)
 
-            if "status" in new_df.columns:
-                print("\nSummary:")
-                print(new_df["status"].value_counts().to_string())
-        else:
-            print(MSG_NO_EXPENSES_PROCESSED)
+    LOG.info(LOG_EXPORTING_FROM, args.source, start_date, end_date)
+    new_df, url = fetch_and_write(
+        start_date=start_date,
+        end_date=end_date,
+        sheet_key=args.sheet_key,
+        worksheet_name=worksheet_name,
+        append=args.append,
+        export_categories_flag=args.export_categories,
+        source=args.source,
+        year=args.year,
+        dry_run=args.dry_run,
+        append_only=args.append_only,
+    )
 
-    except Exception as e:
-        LOG.error("Error: %s", str(e), exc_info=True)
-        print(f"Error: {str(e)}")
-        return 1
+    if new_df is not None and not new_df.empty:
+        print(MSG_PROCESSED_SUCCESS.format(count=len(new_df)))
+        if url:
+            print(f"Updated sheet: {url}")
+
+        if "status" in new_df.columns:
+            print("\nSummary:")
+            print(new_df["status"].value_counts().to_string())
+    else:
+        print(MSG_NO_EXPENSES_PROCESSED)
 
     return 0
 

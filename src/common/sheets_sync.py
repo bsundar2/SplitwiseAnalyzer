@@ -127,12 +127,20 @@ def write_to_sheets(
     worksheet_name: str,
     spreadsheet_key: str = None,
     append: bool = False,
+    skip_formatting: bool = False,
 ):
     """Write a DataFrame to a Google Sheets worksheet.
 
     If append=True, the data will be appended after existing rows (header not duplicated).
     Otherwise the worksheet is cleared (or created) and rewritten.
     After writing, attempt to format key columns (date, amount) and freeze the header row.
+    
+    Args:
+        write_data: DataFrame to write
+        worksheet_name: Name of the worksheet
+        spreadsheet_key: Google Sheets spreadsheet key
+        append: If True, append to existing data; if False, overwrite
+        skip_formatting: If True, skip column formatting (useful for non-transaction sheets)
     """
     if not spreadsheet_key:
         raise ValueError("spreadsheet_key is required")
@@ -199,7 +207,8 @@ def write_to_sheets(
         if hasattr(worksheet, "adjust_column_width"):
             worksheet.adjust_column_width(i, DEFAULT_COLUMN_WIDTH)
 
-    _apply_column_formats(worksheet, write_data)
+    if not skip_formatting:
+        _apply_column_formats(worksheet, write_data)
 
     LOG.info("Updated Google sheet successfully: %s", sheet.url)
     return sheet.url

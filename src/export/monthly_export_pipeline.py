@@ -67,16 +67,12 @@ def run_import_statement(
     if dry_run:
         sys.argv.append("--dry-run")
 
-    try:
-        result = import_main()
-        if result == 0:
-            LOG.info("✓ Statement import completed successfully\n")
-            return True
-        else:
-            LOG.error("✗ Statement import failed\n")
-            return False
-    except Exception as e:
-        LOG.error(f"✗ Statement import error: {e}\n")
+    result = import_main()
+    if result == 0:
+        LOG.info("✓ Statement import completed successfully\n")
+        return True
+    else:
+        LOG.error("✗ Statement import failed\n")
         return False
 
 
@@ -100,19 +96,15 @@ def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False) -
     start_date = f"{year}-01-01"
     end_date = f"{year}-12-31"
 
-    try:
-        stats = sync_from_splitwise(
-            start_date=start_date, end_date=end_date, dry_run=dry_run, verbose=verbose
-        )
+    stats = sync_from_splitwise(
+        start_date=start_date, end_date=end_date, dry_run=dry_run, verbose=verbose
+    )
 
-        LOG.info("✓ Database sync completed successfully")
-        LOG.info(
-            f"  Updated: {stats['updated']}, Inserted: {stats['inserted']}, Deleted: {stats['marked_deleted']}\n"
-        )
-        return True
-    except Exception as e:
-        LOG.error(f"✗ Database sync error: {e}\n")
-        return False
+    LOG.info("✓ Database sync completed successfully")
+    LOG.info(
+        f"  Updated: {stats['updated']}, Inserted: {stats['inserted']}, Deleted: {stats['marked_deleted']}\n"
+    )
+    return True
 
 
 def run_export_to_sheets(
@@ -161,16 +153,47 @@ def run_export_to_sheets(
     if dry_run:
         sys.argv.append("--dry-run")
 
-    try:
-        result = export_main()
-        if result == 0:
-            LOG.info("✓ Export to sheets completed successfully\n")
-            return True
-        else:
-            LOG.error("✗ Export to sheets failed\n")
-            return False
-    except Exception as e:
-        LOG.error(f"✗ Export error: {e}\n")
+    result = export_main()
+    if result == 0:
+        LOG.info("✓ Export to sheets completed successfully\n")
+        return True
+    else:
+        LOG.error("✗ Export to sheets failed\n")
+        return False
+
+
+def run_generate_summaries(year: int, dry_run: bool = False) -> bool:
+    """Run summary generation for budget analysis.
+
+    Args:
+        year: Year to generate summaries for
+        dry_run: If True, preview without making changes
+
+    Returns:
+        True if successful, False otherwise
+    """
+    from src.export.generate_summaries import main as summaries_main
+
+    LOG.info("=" * 60)
+    LOG.info("STEP 4: Generate Budget Summaries")
+    LOG.info("=" * 60)
+
+    # Build args for summary generation
+    sys.argv = [
+        "generate_summaries.py",
+        "--year",
+        str(year),
+    ]
+
+    if dry_run:
+        sys.argv.append("--dry-run")
+
+    result = summaries_main()
+    if result == 0:
+        LOG.info("✓ Summary generation completed successfully\n")
+        return True
+    else:
+        LOG.error("✗ Summary generation failed\n")
         return False
 
 
@@ -274,7 +297,7 @@ Examples:
     print("=" * 60 + "\n")
 
     success_count = 0
-    total_steps = 2 if args.sync_only else 3
+    total_steps = 3 if args.sync_only else 4  # Include summary generation step
 
     # Step 1: Import statement (optional)
     if not args.sync_only and args.statement:
@@ -298,6 +321,13 @@ Examples:
         success_count += 1
     else:
         LOG.error("Pipeline failed at export step")
+        return 1
+
+    # Step 4: Generate budget summaries
+    if run_generate_summaries(args.year, args.dry_run):
+        success_count += 1
+    else:
+        LOG.error("Pipeline failed at summary generation step")
         return 1
 
     # Final summary

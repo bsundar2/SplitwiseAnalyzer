@@ -199,18 +199,16 @@ This summary provides everything Copilot needs.
 - 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-**Recent Session Changes (Jan 12, 2026 - Phase 3 Complete)**
-- ✅ Created unified export script (splitwise_export.py) supporting both Splitwise API and database sources
-- ✅ Database export includes all 12 columns matching Splitwise format
-- ✅ Payment transactions filtered from sheets (remain in database)
-- ✅ Details column simplified (only cc_reference_id or blank)
-- ✅ Removed Friends Split column (redundant with Participant Names)
-- ✅ Updated sync script to populate payment information from Splitwise API
-- ✅ Created monthly_export_pipeline.py to automate full workflow
-- ✅ **Append-only mode implemented** - Tracks written_to_sheet flag, only exports new transactions
-- ✅ Added dry-run support to all export/sync scripts
-- ✅ Converted hardcoded strings to constants throughout codebase
-- ✅ Updated documentation with automated pipeline examples
+**Recent Session Changes (Jan 13, 2026 - Phase 4 Complete)**
+- ✅ Created `generate_summaries.py` with 5 analysis types (Monthly Summary, Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month)
+- ✅ Created `budget_2026.json` with $113,517 annual budget across 32 Splitwise categories
+- ✅ Implemented smart category mapping (20+ mappings from transaction categories to Splitwise budget format)
+- ✅ Fixed Google Sheets API error by adding `skip_formatting` parameter to `write_to_sheets()`
+- ✅ Integrated summary generation as Step 4 in monthly export pipeline
+- ✅ Pipeline now runs: Import → Sync → Export → Generate Summaries (4 steps)
+- ✅ Budget vs Actual analysis shows variance % and over/under budget status
+- ✅ January 2026 analysis: 42 transactions, $4,273 spent, 96% under budget
+- ✅ Only writes Monthly Summary sheet (other sheets available but not enabled)
 
 ✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
 - Unified export script supports both Splitwise API and database sources
@@ -220,29 +218,44 @@ This summary provides everything Copilot needs.
 - Sync script updates payment information from Splitwise API
 - **Automated monthly pipeline** - Single command runs import → sync → export
 - **Append-only mode** - Tracks written_to_sheet flag, only exports new transactions
-- **Budget summary generation** - Analyzes spending patterns and compares against budget targets
 - Column order: Date, Amount, Category, Description, Details, Split Type, Participant Names, My Paid, My Owed, My Net, Splitwise ID, Transaction Fingerprint
 
-🚀 Next Steps - Phase 4: Budget Tracking & Analysis
+✅ **Phase 4: Budget Tracking & Analysis (Complete - Jan 13, 2026)**
+- Budget summary generation integrated into monthly pipeline as Step 4
+- 5 analysis types: Monthly Summary, Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month
+- Smart category mapping (20+ transaction categories → Splitwise budget format)
+- Budget configuration in `config/budget_2026.json` ($113,517 annual budget across 32 categories)
+- Monthly Summary sheet: Month, Total Spent, Avg Transaction, Transaction Count, Total Paid, Total Owed, Cumulative Spending, MoM Change
+- Enhanced `write_to_sheets()` with `skip_formatting` parameter to prevent API errors on non-transaction sheets
+- **4-step automated pipeline** - Import → Sync → Export → Generate Summaries
+- Budget vs Actual analysis with variance % and over/under budget status
+- Spending pattern insights with 3-month rolling averages and YTD trends
 
-**Analysis Layer:**
-- Keep raw transaction tabs (2024, 2025, 2026) in sheets
-- Create separate aggregate tabs (monthly_summary, category_rollups, budget_tracking)
-- Move rolling averages off transaction tabs
+🚀 Next Steps - Phase 5: Advanced Analytics & Automation
 
-**Budget vs Actual:**
-- Load budget data from YAML/JSON
-- Compare with actual spending by category
-- Generate monthly and yearly summaries
+**Additional Summary Sheets:**
+- Enable Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month sheets
+- Add command-line flags to control which sheets to generate
+- Create summary dashboard with key metrics
+
+**Alerting & Notifications:**
+- Alert thresholds for over-budget categories
+- Email/Slack notifications for budget warnings
+- Monthly spending summary reports
+
+**Automation:**
+- GitHub Actions or cron-based scheduled runs
+- Automatic statement download integration
+- End-to-end monthly workflow automation
 
 See `docs/database_sync_guide.md` for Phase 1 & 2 architecture details.
 
 **Workflow - Automated Monthly Pipeline (Recommended)**
 
-The automated pipeline runs all three steps in sequence:
+The automated pipeline runs all four steps in sequence:
 
 ```bash
-# Full pipeline: Import new statement → Sync DB → Export to sheets
+# Full pipeline: Import new statement → Sync DB → Export to sheets → Generate summaries
 export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
 python src/export/monthly_export_pipeline.py \
   --statement data/raw/jan2026.csv \
@@ -262,6 +275,12 @@ python src/export/monthly_export_pipeline.py \
   --year 2026 \
   --dry-run
 ```
+
+**Pipeline Steps:**
+1. **Import** - Parse CSV and add transactions to Splitwise (optional, skipped with --sync-only)
+2. **Sync** - Pull updates/deletes from Splitwise to database, populate payment info
+3. **Export** - Write transactions to Google Sheets (overwrite or append mode)
+4. **Summaries** - Generate Monthly Summary with budget analysis (new in Phase 4)
 
 **Individual Commands (for troubleshooting):**
 

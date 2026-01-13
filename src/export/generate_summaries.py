@@ -293,14 +293,10 @@ def load_budget(budget_file: str) -> Dict[str, float]:
         LOG.warning(f"Budget file not found: {budget_file}")
         return {}
     
-    try:
-        with open(budget_file, "r") as f:
-            budget = json.load(f)
-        LOG.info(f"Loaded budget from {budget_file}")
-        return budget
-    except Exception as e:
-        LOG.error(f"Error loading budget file: {e}")
-        return {}
+    with open(budget_file, "r") as f:
+        budget = json.load(f)
+    LOG.info(f"Loaded budget from {budget_file}")
+    return budget
 
 
 def generate_budget_vs_actual(df: pd.DataFrame, year: int, budget: Dict[str, float]) -> pd.DataFrame:
@@ -506,27 +502,17 @@ Examples:
     # Write to Google Sheets
     print("Writing summaries to Google Sheets...\n")
     
-    summaries = [
-        (monthly_summary, WORKSHEET_MONTHLY_SUMMARY),
-        (category_breakdown, WORKSHEET_CATEGORY_BREAKDOWN),
-        (monthly_trends, WORKSHEET_MONTHLY_TRENDS),
-        (category_monthly, f"Category by Month {args.year}"),
-    ]
-    
-    if not budget_vs_actual.empty:
-        summaries.append((budget_vs_actual, WORKSHEET_BUDGET_VS_ACTUAL))
-    
-    for df_summary, worksheet_name in summaries:
-        try:
-            url = write_to_sheets(
-                df_summary,
-                worksheet_name=worksheet_name,
-                spreadsheet_key=args.sheet_key,
-                append=False  # Always overwrite summary sheets
-            )
-            print(f"✓ {worksheet_name}: {len(df_summary)} rows")
-        except Exception as e:
-            print(f"✗ {worksheet_name}: {e}")
+    # Only write Monthly Summary sheet
+    url = write_to_sheets(
+        monthly_summary,
+        worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
+        spreadsheet_key=args.sheet_key,
+        append=False,
+        skip_formatting=True  # Skip transaction-specific column formatting
+    )
+    print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: {len(monthly_summary)} rows")
+    if url:
+        print(f"   {url}")
     
     print(f"\n{'='*60}")
     print("Summary generation complete!")
