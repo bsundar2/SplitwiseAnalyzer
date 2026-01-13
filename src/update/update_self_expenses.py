@@ -17,6 +17,7 @@ from splitwise.user import ExpenseUser
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.common.splitwise_client import SplitwiseClient
+from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import SplitwiseUserId
 from src.common.utils import LOG
 
@@ -64,11 +65,11 @@ def update_self_expense(
         # Update the expense
         result = client.sObj.updateExpense(expense_obj)
 
-        LOG.info(f"✓ Updated expense {expense_id}: ${amount}")
+        LOG.info(f"Updated expense {expense_id}: ${amount}")
         return True
 
     except Exception as e:
-        LOG.error(f"✗ Failed to update expense {expense_id}: {str(e)}")
+        LOG.error(f"Failed to update expense {expense_id}: {str(e)}")
         return False
 
 

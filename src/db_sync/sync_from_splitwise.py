@@ -15,6 +15,9 @@ import sys
 from datetime import datetime
 from typing import Dict, List, Set, Any
 
+import traceback
+from datetime import datetime as dt
+
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager, Transaction
 from src.constants.export_columns import ExportColumns
@@ -136,7 +139,7 @@ def sync_from_splitwise(
     }
 
     # Get all transactions from DB that have Splitwise IDs in this date range
-    print(f"📊 Fetching transactions from database...")
+    print(f"Fetching transactions from database...")
     db_transactions = db.get_transactions_with_splitwise_ids(start_date, end_date)
     print(f"   Found {len(db_transactions)} transactions with Splitwise IDs in DB\n")
 
@@ -145,9 +148,8 @@ def sync_from_splitwise(
     db_splitwise_ids = set(db_by_splitwise_id.keys())
 
     # Fetch expenses from Splitwise
-    print(f"📥 Fetching expenses from Splitwise API...")
+    print(f"Fetching expenses from Splitwise API...")
     # Convert string dates to datetime objects for the client
-    from datetime import datetime as dt
 
     start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
     end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
@@ -159,7 +161,7 @@ def sync_from_splitwise(
     print(f"   Found {len(splitwise_df)} expenses in Splitwise\n")
 
     if splitwise_df.empty:
-        print("⚠️  No expenses found in Splitwise for this date range")
+        print("WARNING: No expenses found in Splitwise for this date range")
         return stats
 
     # Get splitwise_ids that exist in Splitwise
@@ -170,7 +172,7 @@ def sync_from_splitwise(
     # Convert to list of dicts for easier processing
     expenses = splitwise_df.to_dict("records")
 
-    print(f"🔄 Processing {len(expenses)} expenses from Splitwise...\n")
+    print(f"Processing {len(expenses)} expenses from Splitwise...\n")
 
     # Track new transactions to insert
     transactions_to_insert = []
@@ -190,7 +192,7 @@ def sync_from_splitwise(
             try:
                 txn = parse_expense_to_transaction(expense)
                 print(
-                    f"  ➕ NEW: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
+                    f"  NEW: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
                 )
 
                 if not dry_run:
@@ -199,7 +201,7 @@ def sync_from_splitwise(
                 stats["inserted"] += 1
 
             except Exception as e:
-                print(f"  ❌ Error parsing new expense {splitwise_id}: {e}")
+                print(f"  ERROR: Error parsing new expense {splitwise_id}: {e}")
                 stats["errors"] += 1
 
             continue
@@ -239,24 +241,24 @@ def sync_from_splitwise(
 
         if changes:
             print(
-                f"  ✏️  UPDATED: ID {splitwise_id} | {txn.merchant[:40]} | {', '.join(changes)}"
+                f"  UPDATED: ID {splitwise_id} | {txn.merchant[:40]} | {', '.join(changes)}"
             )
             if not dry_run:
                 db.update_transaction(txn.id, updates)
             stats["updated"] += 1
         else:
             if verbose:
-                print(f"  ✅ Unchanged: ID {splitwise_id} | {txn.merchant[:40]}")
+                print(f"  Unchanged: ID {splitwise_id} | {txn.merchant[:40]}")
             stats["unchanged"] += 1
 
     # Batch insert new transactions
     if not dry_run and transactions_to_insert:
-        print(f"\n💾 Inserting {len(transactions_to_insert)} new transactions...")
+        print(f"\nInserting {len(transactions_to_insert)} new transactions...")
         db.insert_transactions_batch(transactions_to_insert)
-        print(f"   ✅ Inserted successfully\n")
+        print(f"   Inserted successfully\n")
 
     # Check for deletions (transactions in DB but not in Splitwise)
-    print(f"\n🗑️  Checking for deletions...")
+    print(f"\nChecking for deletions...")
     deleted_ids = db_splitwise_ids - splitwise_ids_in_api
 
     if deleted_ids:
@@ -264,7 +266,7 @@ def sync_from_splitwise(
             txn = db_by_splitwise_id[splitwise_id]
             if not txn.splitwise_deleted_at:
                 print(
-                    f"  🗑️  DELETED: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
+                    f"  DELETED: ID {splitwise_id} | {txn.date} | {txn.merchant[:40]} | ${txn.amount:.2f}"
                 )
                 if not dry_run:
                     db.mark_deleted_by_splitwise_id(splitwise_id)
@@ -272,7 +274,7 @@ def sync_from_splitwise(
             else:
                 if verbose:
                     print(
-                        f"  ⏭️  Already marked deleted: ID {splitwise_id} | {txn.merchant[:40]}"
+                        f"  Already marked deleted: ID {splitwise_id} | {txn.merchant[:40]}"
                     )
     else:
         print(f"   No deletions detected")
@@ -290,7 +292,9 @@ def sync_from_splitwise(
     print(f"{'='*60}\n")
 
     if dry_run:
-        print("💡 This was a dry run. Use --live to apply changes to the database.\n")
+        print(
+            "NOTE: This was a dry run. Use --live to apply changes to the database.\n"
+        )
 
     return stats
 
@@ -399,9 +403,7 @@ Examples:
                 # Could add logging here for audit trail if needed
 
             except Exception as e:
-                print(f"\n❌ Error syncing year {year}: {e}", file=sys.stderr)
-                import traceback
-
+                print(f"\nERROR: Error syncing year {year}: {e}", file=sys.stderr)
                 traceback.print_exc()
                 total_stats["errors"] += 1
 
@@ -449,9 +451,7 @@ Examples:
                 sys.exit(1)
 
         except Exception as e:
-            print(f"\n❌ Error: {e}", file=sys.stderr)
-            import traceback
-
+            print(f"\nERROR: {e}", file=sys.stderr)
             traceback.print_exc()
             sys.exit(1)
 

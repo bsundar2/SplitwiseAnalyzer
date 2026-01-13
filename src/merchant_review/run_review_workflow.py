@@ -61,7 +61,7 @@ def run_workflow(
         if result.returncode != 0:
             LOG.error("Failed to generate review file")
             return False
-        LOG.info("✓ Review file generated\n")
+        LOG.info("Review file generated\n")
     else:
         LOG.info("Skipping generation step (using existing review file)\n")
 
@@ -82,7 +82,7 @@ def run_workflow(
         if result.returncode != 0:
             LOG.error("Review process was interrupted or failed")
             return False
-        LOG.info("✓ Review completed\n")
+        LOG.info("Review completed\n")
     else:
         LOG.info("Skipping review step (using existing reviewed file)\n")
 
@@ -101,7 +101,7 @@ def run_workflow(
         if result.returncode != 0:
             LOG.error("Failed to apply feedback")
             return False
-        LOG.info("✓ Feedback applied\n")
+        LOG.info("Feedback applied\n")
     else:
         LOG.info("Skipping apply step\n")
 

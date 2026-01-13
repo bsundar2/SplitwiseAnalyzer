@@ -161,11 +161,11 @@ def main():
     )
 
     if success:
-        print(f"\n✓ Generated review file: {args.output}")
+        print(f"\nGenerated review file: {args.output}")
         print("\nTo start reviewing:")
         print("  python src/merchant_review/review_merchants.py --batch 30")
     else:
-        print("\n✗ Failed to generate review file")
+        print("\nFailed to generate review file")
         return 1
 
     return 0

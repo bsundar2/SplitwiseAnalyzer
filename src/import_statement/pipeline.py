@@ -3,6 +3,7 @@
 # Standard library
 import argparse
 import os
+from datetime import datetime as dt
 
 # Third-party
 import pandas as pd
@@ -13,6 +14,7 @@ load_dotenv("config/.env")
 
 # Local application
 from src.constants.config import PROCESSED_DIR
+from src.constants.splitwise import SplitwiseUserId
 from src.import_statement.parse_statement import parse_statement
 from src.common.sheets_sync import write_to_sheets
 from src.common.splitwise_client import SplitwiseClient
@@ -99,15 +101,11 @@ def process_statement(
 
         # Check date filter if specified (filter transactions by date range)
         if date:
-            from datetime import datetime
-
             txn_date = (
-                datetime.strptime(date, "%Y-%m-%d").date()
-                if isinstance(date, str)
-                else date
+                dt.strptime(date, "%Y-%m-%d").date() if isinstance(date, str) else date
             )
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+            start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
+            end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
             if txn_date < start_date_obj or txn_date > end_date_obj:
                 LOG.debug(
                     f"Skipping transaction outside date range: {date} (range: {start_date} to {end_date})"
@@ -240,8 +238,6 @@ def process_statement(
             continue
 
         try:
-            from src.constants.splitwise import SplitwiseUserId
-
             # Get current user ID
             current_user_id = client.get_current_user_id()
 

@@ -4,7 +4,7 @@ import pandas as pd
 
 import dateparser
 from dotenv import load_dotenv
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import logging
 import yaml
 import hashlib
@@ -12,6 +12,8 @@ import re
 import tempfile
 from functools import cache
 from typing import Union, Optional, Dict, Any
+
+from src.constants.config import CFG_PATHS
 
 load_dotenv()
 
@@ -299,8 +301,6 @@ def mkdir_p(path):
 
 def now_iso():
     # Use timezone-aware UTC timestamp
-    from datetime import timezone
-
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -419,8 +419,6 @@ def generate_fingerprint(
     Returns:
         A stable fingerprint string for the transaction
     """
-    import hashlib
-
     try:
         # Parse and normalize date
         date_obj = dateparser.parse(str(date_val))
@@ -556,8 +554,6 @@ def _load_category_config() -> Dict:
     Returns:
         Dict containing the category configuration with default values if not found.
     """
-    from src.constants.config import CFG_PATHS
-
     default_config = {
         "default_category": {
             "id": 2,  # Uncategorized category

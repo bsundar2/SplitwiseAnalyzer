@@ -6,9 +6,12 @@ current category) and update them to a new category in bulk.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from datetime import datetime
+
+from dotenv import load_dotenv
 from splitwise.category import Category
 
 # Add src to path for imports
@@ -128,11 +131,11 @@ def update_expenses(
 
             client.sObj.updateExpense(exp)
             LOG.info(
-                f"✓ Updated expense {exp_id}: {row[ExportColumns.DESCRIPTION]} ({row[ExportColumns.DATE]})"
+                f"Updated expense {exp_id}: {row[ExportColumns.DESCRIPTION]} ({row[ExportColumns.DATE]})"
             )
             updated_count += 1
         except Exception as e:
-            LOG.error(f"✗ Failed to update expense {exp_id}: {str(e)}")
+            LOG.error(f"Failed to update expense {exp_id}: {str(e)}")
 
     return updated_count
 
@@ -226,9 +229,6 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
     if args.end_date:
         end_date = datetime.strptime(args.end_date, "%Y-%m-%d")
     else:
-        import os
-        from dotenv import load_dotenv
-
         load_dotenv("config/.env")
         end_date_str = os.getenv("END_DATE")
         end_date = (
@@ -240,9 +240,6 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
     if args.start_date:
         start_date = datetime.strptime(args.start_date, "%Y-%m-%d")
     else:
-        import os
-        from dotenv import load_dotenv
-
         load_dotenv("config/.env")
         start_date_str = os.getenv("START_DATE")
         start_date = (
@@ -312,7 +309,7 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
     if args.dry_run:
         LOG.info(f"DRY RUN: Would update {len(expenses_to_update)} expenses")
     else:
-        LOG.info(f"✅ Successfully updated {updated_count} expenses")
+        LOG.info(f"Successfully updated {updated_count} expenses")
 
     return updated_count
 

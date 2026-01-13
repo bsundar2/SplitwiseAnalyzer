@@ -12,11 +12,14 @@ Your feedback is saved to merchant_review_feedback.json which can be used to:
 - Improve the extraction algorithm
 """
 
-import os
+import argparse
 import json
-import pandas as pd
+import os
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
+
+import pandas as pd
+
 from src.common.utils import LOG, PROJECT_ROOT
 
 # File paths
@@ -145,13 +148,13 @@ def display_transaction(row: pd.Series, index: int, total: int):
         row["category_name"], row["subcategory_name"]
     )
     if not is_valid:
-        print(f"\n⚠️  WARNING: {error_msg}")
+        print(f"\nWARNING: {error_msg}")
 
     # Check if LODGING should be categorized as Hotel
     if detect_lodging_in_description(row["description_raw"]):
         if row["subcategory_name"] != "Hotel":
             print(
-                f"\n💡 SUGGESTION: This appears to be LODGING - should be 'Transportation > Hotel'"
+                f"\nSUGGESTION: This appears to be LODGING - should be 'Transportation > Hotel'"
             )
 
     print("=" * 80)
@@ -187,7 +190,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
 
     total = len(df_to_review)
     if total == 0:
-        print("\n✓ All transactions have been reviewed!")
+        print("\nAll transactions have been reviewed!")
         print(
             f"Total reviewed: {len(feedback['approved']) + len(feedback['corrected'])} transactions"
         )
@@ -231,7 +234,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
             continue
 
         if action == "q":
-            print("\n✓ Saving progress and exiting...")
+            print("\nSaving progress and exiting...")
             save_feedback(feedback)
             return
 
@@ -248,7 +251,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
         if action == "a":
             # Approve
             feedback["approved"].append(entry)
-            print("✓ Approved")
+            print("Approved")
 
         elif action == "c":
             # Correct
@@ -272,7 +275,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
                 corrected_category, corrected_subcategory
             )
             if not is_valid:
-                print(f"\n⚠️  ERROR: {error_msg}")
+                print(f"\nERROR: {error_msg}")
                 print("Please correct the category/subcategory.")
                 print(
                     f"\nValid categories: {', '.join(VALID_CATEGORY_SUBCATEGORIES.keys())}"
@@ -290,7 +293,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
                     continue
                 elif choice == "s":
                     feedback["skipped"].append(entry)
-                    print("⊘ Skipped")
+                    print("Skipped")
                     continue
 
             entry["corrected_merchant"] = corrected_merchant
@@ -298,7 +301,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
             entry["corrected_subcategory"] = corrected_subcategory
 
             feedback["corrected"].append(entry)
-            print("✓ Correction saved")
+            print("Correction saved")
 
         elif action == "s":
             # Skip
@@ -308,7 +311,7 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
         # Auto-save every 10 transactions
         if (idx + 1) % 10 == 0:
             save_feedback(feedback)
-            print(f"\n💾 Auto-saved progress ({idx + 1}/{total})")
+            print(f"\nAuto-saved progress ({idx + 1}/{total})")
 
     # Final save
     save_feedback(feedback)
@@ -331,8 +334,6 @@ def interactive_review(start_index: int = 0, batch_size: Optional[int] = None):
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Interactive review tool for merchant names and categories"
     )
