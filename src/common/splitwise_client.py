@@ -22,11 +22,10 @@ from splitwise.user import ExpenseUser
 # Local application
 from src.common.env import load_project_env
 from src.common.transaction_filters import is_deleted_expense
-from src.common.utils import LOG, infer_category, parse_float_safe, format_date
+from src.common.utils import LOG, infer_category, parse_float_safe
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import (
     DEFAULT_CURRENCY,
-    DEFAULT_LOOKBACK_DAYS,
     DELETED_AT_FIELD,
     DETAILS_COLUMN_NAME,
     REFUND_KEYWORDS,
@@ -717,11 +716,6 @@ if __name__ == "__main__":
             for c in categories
         ],
     )
-
-    # today = datetime.now().date()
-    # seven_days_ago = today - timedelta(days=25)
-    # df = client.get_my_expenses_by_date_range(seven_days_ago, today)
-    # print(df)
 
 
 def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:

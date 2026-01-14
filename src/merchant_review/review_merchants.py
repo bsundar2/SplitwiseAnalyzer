@@ -14,7 +14,6 @@ Your feedback is saved to merchant_review_feedback.json which can be used to:
 
 import argparse
 import json
-import os
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 

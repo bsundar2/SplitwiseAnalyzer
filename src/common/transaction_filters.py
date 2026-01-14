@@ -4,7 +4,7 @@ Provides common filtering logic for deleted expenses, payments, refunds, etc.
 Centralizes these checks to avoid duplication across the codebase.
 """
 
-from typing import Any, Optional
+from typing import Any
 from src.constants.splitwise import DELETED_AT_FIELD, REFUND_KEYWORDS
 
 

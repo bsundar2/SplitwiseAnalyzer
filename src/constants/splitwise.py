@@ -7,7 +7,6 @@ including payload keys, default values, and other configuration parameters.
 # Standard library
 import json
 from enum import IntEnum, StrEnum
-from functools import cache
 from pathlib import Path
 from typing import Dict
 
@@ -65,7 +64,7 @@ class SubcategoryMapper:
         # Build mapping from snake_case names to subcategory IDs
         category_mapping = data.get("category_mapping", {})
 
-        for full_path, info in category_mapping.items():
+        for _, info in category_mapping.items():
             subcategory = info.get("subcategory_name", "")
             subcategory_id = info.get("subcategory_id")
 

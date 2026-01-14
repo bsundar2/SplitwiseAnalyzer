@@ -13,7 +13,7 @@ It fetches expenses from Splitwise and:
 import argparse
 import sys
 from datetime import datetime
-from typing import Dict, List, Set, Any
+from typing import Dict, Set, Any
 
 import traceback
 from datetime import datetime as dt
@@ -186,7 +186,7 @@ def sync_from_splitwise(
     transactions_to_insert = []
 
     # Process each Splitwise expense
-    for idx, expense in enumerate(expenses, start=1):
+    for expense in expenses:
         splitwise_id = expense.get(ExportColumns.ID)
 
         if not splitwise_id:

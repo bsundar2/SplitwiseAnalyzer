@@ -10,8 +10,6 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
-from splitwise import Expense
-from splitwise.user import ExpenseUser
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -63,7 +61,7 @@ def update_self_expense(
                 user.setOwedShare("0.00")
 
         # Update the expense
-        result = client.sObj.updateExpense(expense_obj)
+        client.sObj.updateExpense(expense_obj)
 
         LOG.info(f"Updated expense {expense_id}: ${amount}")
         return True

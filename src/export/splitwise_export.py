@@ -17,7 +17,6 @@ import json
 import os
 from datetime import datetime, date
 from typing import List, Optional, Union
-import re
 
 # Third-party
 import pandas as pd
@@ -35,12 +34,9 @@ from src.common.splitwise_client import SplitwiseClient
 from src.common.utils import (
     load_state,
     save_state_atomic,
-    compute_import_id,
-    merchant_slug,
     LOG,
     generate_fingerprint,
     parse_date,
-    format_date,
 )
 from src.constants.splitwise import (
     ExcludedSplitwiseDescriptions,
@@ -536,10 +532,8 @@ def fetch_and_write(
                 | (df[ExportColumns.FINGERPRINT].isin(exported_fps))
             )
             new_df = df[mask_new].reset_index(drop=True)
-            skipped_df = df[~mask_new].reset_index(drop=True)
         else:
             new_df = df
-            skipped_df = pd.DataFrame()
 
         # Convert my_paid/my_owed to numeric and filter out expenses where the
         # user has no participation (both my_paid and my_owed are zero).

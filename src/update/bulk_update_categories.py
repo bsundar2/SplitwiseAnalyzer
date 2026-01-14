@@ -6,7 +6,6 @@ current category) and update them to a new category in bulk.
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -120,7 +119,7 @@ def update_expenses(
     )
 
     updated_count = 0
-    for idx, row in expenses_df.iterrows():
+    for _, row in expenses_df.iterrows():
         exp_id = row[ExportColumns.ID]
         try:
             exp = client.sObj.getExpense(exp_id)

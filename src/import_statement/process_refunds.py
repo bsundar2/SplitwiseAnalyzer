@@ -26,7 +26,7 @@ from src.common.utils import LOG
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager
 from src.database.models import Transaction
-from src.constants.splitwise import SplitwiseUserId, SUBCATEGORY_MAPPER
+from src.constants.splitwise import SplitwiseUserId
 
 
 class RefundProcessor:

@@ -76,7 +76,7 @@ def process_statement(
     added = 0
     attempted = 0
     skipped = 0
-    for idx, row in df.reset_index(drop=True).iterrows():
+    for _, row in df.reset_index(drop=True).iterrows():
         # Skip transactions before offset
         if skipped < offset:
             skipped += 1
