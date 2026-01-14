@@ -29,6 +29,9 @@ from src.constants.splitwise import (
     DELETED_AT_FIELD,
     DETAILS_COLUMN_NAME,
     REFUND_KEYWORDS,
+    SPLIT_TYPE_PARTNER,
+    SPLIT_TYPE_SELF,
+    SPLIT_TYPE_SHARED,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
@@ -329,15 +332,17 @@ class SplitwiseClient:
                 }
 
                 if has_self_user:
-                    split_type = "self"
+                    split_type = SPLIT_TYPE_SELF
                 elif is_partner_only:
-                    split_type = "partner"
+                    split_type = SPLIT_TYPE_PARTNER
                 else:
                     other_nonzero = any(
                         r["id"] != my_user_id and (r["paid"] > 0 or r["owed"] > 0)
                         for r in user_rows_sorted
                     )
-                    split_type = "shared" if bool(other_nonzero) else "self"
+                    split_type = (
+                        SPLIT_TYPE_SHARED if bool(other_nonzero) else SPLIT_TYPE_SELF
+                    )
 
                 data.append(
                     {

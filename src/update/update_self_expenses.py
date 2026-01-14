@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.common.splitwise_client import SplitwiseClient
 from src.constants.export_columns import ExportColumns
-from src.constants.splitwise import SplitwiseUserId
+from src.constants.splitwise import SplitwiseUserId, SPLIT_TYPE_SELF
 from src.common.utils import LOG
 
 
@@ -216,7 +216,7 @@ def main():
             # Self expenses have exactly 2 entries with the same name (or "Balaji, Balaji" pattern)
             participant_names = row.get(ExportColumns.PARTICIPANT_NAMES, "")
             return (
-                row.get(ExportColumns.SPLIT_TYPE) == "self"
+                row.get(ExportColumns.SPLIT_TYPE) == SPLIT_TYPE_SELF
                 and "," in participant_names
                 and len(participant_names.split(",")) == 2
                 and participant_names.split(",")[0].strip()

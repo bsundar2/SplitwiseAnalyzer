@@ -222,6 +222,7 @@ This summary provides everything Copilot needs.
 - ✅ **Historical backfill** - Synced 2,377 transactions from 2013-2024 Splitwise data
 - ✅ **Year-based tabs** - Exported 14 separate "Expenses YYYY" sheets (2013-2026, 3,992 total transactions)
 - ✅ **Code cleanup** - Moved REFUND_KEYWORDS to constants, fixed import organization per coding_style.md
+- ✅ **Split type constants** - Added SPLIT_TYPE_SELF, SPLIT_TYPE_SPLIT, SPLIT_TYPE_SHARED, SPLIT_TYPE_PARTNER to constants/splitwise.py
 
 ✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
 - Unified export script supports both Splitwise API and database sources

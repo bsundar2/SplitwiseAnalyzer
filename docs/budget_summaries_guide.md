@@ -1,6 +1,7 @@
 # Phase 4: Budget Tracking & Analysis
 
 **Status**: Complete (Jan 13, 2026)
+**Enhanced**: Phase 6 - Multi-year summaries (138 months: 2013-2026)
 
 ## Overview
 
@@ -44,6 +45,12 @@ CREATE TABLE monthly_summaries (
 - Only updates sheets when data actually changes
 - Uses 0.01 tolerance for floating-point comparisons
 - Tracks which months need updating vs appending
+
+**Phase 6 Enhancement:**
+- Historical backfill of 2,377 transactions (2013-2024)
+- Monthly Summary sheet now contains 138 months of data
+- Year-merging logic preserves all years when updating single year
+- Idempotent updates across 13+ years of data
 
 **Workflow:**
 1. Calculate monthly summary from transactions

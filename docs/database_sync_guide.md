@@ -47,6 +47,27 @@ The system uses a **Splitwise-as-source-of-truth** architecture:
    └─────────────┘
 ```
 
+## Constants & Configuration
+
+**Phase 6 Enhancement**: Key constants centralized in `src/constants/splitwise.py`:
+
+```python
+# Refund detection keywords
+REFUND_KEYWORDS = ("refund", "credit", "return")
+
+# Split type constants
+SPLIT_TYPE_SELF = "self"
+SPLIT_TYPE_SPLIT = "split"
+SPLIT_TYPE_SHARED = "shared"
+SPLIT_TYPE_PARTNER = "partner"
+```
+
+**Benefits:**
+- Eliminates magic strings throughout codebase
+- Single source of truth for transaction categorization
+- Easier to modify behavior (change keyword, update one place)
+- Follows coding_style.md Rule 5 (avoid magic strings)
+
 ## Database Schema
 
 ### `transactions` table

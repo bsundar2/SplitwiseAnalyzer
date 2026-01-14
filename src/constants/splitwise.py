@@ -32,6 +32,12 @@ DELETED_AT_FIELD = "deleted_at"
 # Keywords used to identify refund/credit transactions in descriptions
 REFUND_KEYWORDS = ("refund", "credit", "return")
 
+# Split type constants for transaction categorization
+SPLIT_TYPE_SELF = "self"
+SPLIT_TYPE_SPLIT = "split"
+SPLIT_TYPE_SHARED = "shared"
+SPLIT_TYPE_PARTNER = "partner"
+
 
 class SubcategoryMapper:
     """Manages Splitwise subcategory ID mappings.

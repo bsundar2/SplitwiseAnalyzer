@@ -39,7 +39,12 @@ from src.common.utils import (
     generate_fingerprint,
     parse_date,
 )
-from src.constants.splitwise import ExcludedSplitwiseDescriptions, REFUND_KEYWORDS
+from src.constants.splitwise import (
+    ExcludedSplitwiseDescriptions,
+    REFUND_KEYWORDS,
+    SPLIT_TYPE_SELF,
+    SPLIT_TYPE_SPLIT,
+)
 from src.constants.export_columns import ExportColumns
 from src.database import DatabaseManager
 
@@ -286,7 +291,7 @@ def fetch_from_database(
         my_net = my_paid - my_owed
 
         # Determine split type
-        split_type = "split" if txn.is_shared else "self"
+        split_type = SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF
 
         # Create row in exact column order to match existing exports
         row = {

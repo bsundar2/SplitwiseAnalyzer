@@ -4,10 +4,11 @@ This guide covers the automated monthly workflow for processing credit card stat
 
 ## Overview
 
-The monthly workflow consists of three steps:
+The monthly workflow consists of four steps:
 1. **Import** - Parse CSV statement and add transactions to Splitwise
 2. **Sync** - Pull latest data from Splitwise API to database (updates splits, payments)
 3. **Export** - Write filtered transactions from database to Google Sheets
+4. **Summaries** - Generate monthly budget analysis and spending patterns (Phase 4)
 
 ## Quick Reference
 

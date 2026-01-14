@@ -21,6 +21,7 @@ from datetime import datetime as dt
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager, Transaction
 from src.constants.export_columns import ExportColumns
+from src.constants.splitwise import SPLIT_TYPE_SELF
 
 
 def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
@@ -59,7 +60,7 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
 
     # Split type
     split_type = row.get(ExportColumns.SPLIT_TYPE, "unknown")
-    is_self = split_type == "self"
+    is_self = split_type == SPLIT_TYPE_SELF
 
     # Participants
     participant_names = row.get(ExportColumns.PARTICIPANT_NAMES, "")

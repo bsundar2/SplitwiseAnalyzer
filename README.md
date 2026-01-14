@@ -2,7 +2,7 @@
 
 A Python project to import Splitwise expenses, process credit card statements, categorize expenses, and sync to Google Sheets for budget tracking.
 
-## 🎯 Project Architecture (Phase 5 Complete!)
+## 🎯 Project Architecture (Phase 6 Complete!)
 
 **Splitwise = Source of Truth (Manual Edits)**  
 **Local Database = Synced Mirror (Fast Queries)**  
@@ -14,6 +14,7 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - ✅ **Phase 3**: Unified export & automated monthly pipeline (Database → Google Sheets with filtering)
 - ✅ **Phase 4**: Budget tracking & analysis (Monthly summaries, budget vs actual, spending patterns)
 - ✅ **Phase 5**: Refund/credit processing (Automatic detection & Splitwise creation)
+- ✅ **Phase 6**: Historical data & constants refactoring (2013-2026 backfill, year-based exports, code cleanup)
 
 ### Phase 3 Features
 - 🎯 **Automated monthly pipeline** - Single command runs import → sync → export → summaries
@@ -39,6 +40,14 @@ A Python project to import Splitwise expenses, process credit card statements, c
 - 💳 **Database tracking** - 8 refund columns for reconciliation (cc_reference_id, refund_for_txn_id, etc.)
 - 💳 **Batch processing** - Only processes refunds from current import to prevent duplicates
 - 💳 **UUID generation** - Creates unique cc_reference_id for refunds without statement reference
+
+### Phase 6 Features (Jan 2026)
+- 📜 **Historical backfill** - Synced 2,377 transactions from Splitwise (2013-2024)
+- 📜 **Year-based exports** - 14 separate "Expenses YYYY" tabs (2013-2026, 3,992 total transactions)
+- 📜 **Multi-year summaries** - Monthly Summary sheet with 138 months of data (13+ years)
+- 📜 **Constants refactoring** - REFUND_KEYWORDS and split type constants (SPLIT_TYPE_SELF, etc.) moved to src/constants/splitwise.py
+- 📜 **Import organization** - All inline imports moved to top per coding_style.md
+- 📜 **Code cleanup** - Removed magic strings, improved maintainability
 
 See [docs/database_sync_guide.md](docs/database_sync_guide.md) for detailed architecture guide.
 
@@ -333,7 +342,8 @@ SplitwiseImporter/
 │   └── gsheets_authentication.json    # Google Sheets credentials
 ├── data/
 │   ├── raw/                    # Raw credit card statements
-│   └── processed/              # Processed outputs and review files
+│   ├── processed/              # Processed outputs and review files
+│   └── transactions.db         # SQLite database (3,992 transactions: 2013-2026)
 ├── docs/                       # Documentation
 └── notebooks/                  # Jupyter analysis notebooks
 ```
@@ -356,7 +366,10 @@ SplitwiseImporter/
 ✅ **Category Export** - Export all Splitwise categories and subcategories to sheets  
 ✅ **Budget Tracking** - Automated monthly summaries with database-backed comparison  
 ✅ **Idempotent Updates** - Only writes changed data to sheets (0.01 tolerance)  
-✅ **Fail-fast Errors** - No exception catching, immediate crash for easier debugging
+✅ **Fail-fast Errors** - No exception catching, immediate crash for easier debugging  
+✅ **Historical Data** - Complete transaction history from 2013-2026 (3,992 transactions)  
+✅ **Year-based Exports** - Separate tabs per year for easy searching and auditing  
+✅ **Constants Management** - Centralized refund keywords and split type constants
 
 ## Common Workflows
 
@@ -487,6 +500,15 @@ The expense processing workflow can be automated with these steps:
 **Wrong year data**: Update `START_DATE`, `END_DATE`, and `EXPENSES_WORKSHEET_NAME` in `config/.env`
 
 ## Recent Updates (Jan 2026)
+
+### Phase 6: Historical Data & Code Quality (Jan 13, 2026)
+- ✅ **Historical backfill** - Synced 2,377 transactions from Splitwise spanning 2013-2024
+- ✅ **Year-based transaction exports** - Created 14 separate "Expenses YYYY" tabs (2013-2026)
+- ✅ **Multi-year Monthly Summary** - 138 months of spending data with year-merging logic
+- ✅ **Constants refactoring** - Moved REFUND_KEYWORDS tuple to src/constants/splitwise.py
+- ✅ **Split type constants** - Added SPLIT_TYPE_SELF, SPLIT_TYPE_SPLIT, SPLIT_TYPE_SHARED, SPLIT_TYPE_PARTNER
+- ✅ **Import organization** - Fixed all inline imports per coding_style.md Rule 0
+- ✅ **Code maintainability** - Removed magic strings, centralized configuration
 
 ### Merchant Extraction Overhaul
 - ✅ **Simplified merchant name extraction** - Rewrote `clean_merchant_name()` from 450+ lines to ~60 lines

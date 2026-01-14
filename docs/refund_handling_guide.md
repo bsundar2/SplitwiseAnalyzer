@@ -4,6 +4,8 @@
 
 The Splitwise Importer now includes a robust, idempotent system for handling refunds and credits from credit card statements. Refunds are automatically matched to their original transactions and created in Splitwise with the same category and split ratios.
 
+**Phase 6 Update**: Refund detection keywords now centralized in `src/constants/splitwise.py` as `REFUND_KEYWORDS` tuple for better maintainability.
+
 ## Key Principles
 
 1. **Refunds reduce actual spending** - Negative Splitwise expenses are created
