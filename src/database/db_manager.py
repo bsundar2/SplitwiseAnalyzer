@@ -238,6 +238,30 @@ class DatabaseManager:
 
         return [Transaction.from_row(dict(row)) for row in rows]
 
+    def get_transaction_by_cc_reference(
+        self, cc_reference_id: str
+    ) -> Optional[Transaction]:
+        """Get transaction by credit card reference ID.
+
+        Args:
+            cc_reference_id: Credit card reference/transaction ID
+
+        Returns:
+            Transaction object if found, None otherwise
+        """
+        if not cc_reference_id:
+            return None
+
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM transactions WHERE cc_reference_id = ? LIMIT 1"
+        cursor.execute(query, [cc_reference_id])
+        row = cursor.fetchone()
+        conn.close()
+
+        return Transaction.from_row(dict(row)) if row else None
+
     def get_unwritten_transactions(
         self, year: Optional[int] = None
     ) -> List[Transaction]:

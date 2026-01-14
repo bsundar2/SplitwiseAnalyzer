@@ -148,6 +148,11 @@ def process_statement(
             "is_credit": is_credit,
         }
 
+        # Clean cc_reference_id by stripping quotes (Amex CSV wraps in single quotes)
+        if cc_reference_id:
+            cc_reference_id = str(cc_reference_id).strip().strip("'\"")
+            entry["cc_reference_id"] = cc_reference_id
+
         # Infer category for ALL transactions (needed for sheet reporting even if duplicate)
         is_credit = row.get("is_credit", False)
         if is_credit:
@@ -185,18 +190,17 @@ def process_statement(
         # transactions can have identical details (e.g., 2 plane tickets on same day)
         db_found = None
 
-        # Check by cc_reference_id in notes - this is the ONLY reliable duplicate detection
+        # Check by cc_reference_id column - this is the ONLY reliable duplicate detection
         if cc_reference_id:
-            db_transactions = db.get_transactions_by_date_range(start_date, end_date)
-            for txn in db_transactions:
-                if txn.notes and f"cc_reference_id: {cc_reference_id}" in txn.notes:
-                    db_found = txn
-                    LOG.info(
-                        "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
-                        cc_reference_id,
-                        txn.splitwise_id,
-                    )
-                    break
+            # Strip quotes that might be in the CSV (Amex wraps in single quotes)
+            cc_ref_clean = str(cc_reference_id).strip().strip("'\"")
+            db_found = db.get_transaction_by_cc_reference(cc_ref_clean)
+            if db_found:
+                LOG.info(
+                    "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
+                    cc_ref_clean,
+                    db_found.splitwise_id,
+                )
 
         if db_found:
             entry["status"] = "db_exists"

@@ -46,19 +46,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     raw_amount REAL,                       -- Original amount before sign normalization
     cc_reference_id TEXT,                  -- Credit card reference/transaction ID for linking
     
-    -- Refund tracking
-    refund_for_txn_id INTEGER,             -- Links to original transaction DB ID (if this is a refund)
-    refund_for_splitwise_id INTEGER,       -- Links to original Splitwise expense ID (if this is a refund)
+    -- Refund tracking (simplified - refunds are standalone)
     refund_created_at TEXT,                -- When refund was created in Splitwise
-    reconciliation_status TEXT DEFAULT 'pending',  -- pending, matched, unmatched, manual_review
-    refund_match_method TEXT,              -- txn_id, merchant_amount, manual
-    is_partial_refund BOOLEAN DEFAULT 0,   -- True if refund amount < original amount
-    refund_percentage REAL,                -- Percentage of original amount (for partial refunds)
     
     -- Indexes for common queries
     CHECK (amount IS NOT NULL),
-    CHECK (date IS NOT NULL),
-    FOREIGN KEY (refund_for_txn_id) REFERENCES transactions(id)
+    CHECK (date IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS idx_date ON transactions(date);
@@ -70,8 +63,6 @@ CREATE INDEX IF NOT EXISTS idx_written_to_sheet ON transactions(written_to_sheet
 CREATE INDEX IF NOT EXISTS idx_date_merchant ON transactions(date, merchant);
 CREATE INDEX IF NOT EXISTS idx_cc_reference ON transactions(cc_reference_id);
 CREATE INDEX IF NOT EXISTS idx_is_refund ON transactions(is_refund);
-CREATE INDEX IF NOT EXISTS idx_refund_for_txn ON transactions(refund_for_txn_id);
-CREATE INDEX IF NOT EXISTS idx_reconciliation_status ON transactions(reconciliation_status);
 """
 
 DUPLICATES_TABLE = """

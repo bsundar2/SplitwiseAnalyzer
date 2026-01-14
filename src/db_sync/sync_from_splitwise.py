@@ -68,13 +68,17 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
     # Determine if refund/payment
     is_refund = total_cost < 0
 
+    # Extract cc_reference_id from details field (Splitwise stores it as the raw value)
+    cc_reference_id = None
+    if details:
+        # Details field contains the cc_reference_id directly (e.g., '320260110295060302')
+        # Strip quotes and whitespace
+        cc_ref_clean = str(details).strip().strip("'\"")
+        if cc_ref_clean and len(cc_ref_clean) > 5:  # Sanity check
+            cc_reference_id = cc_ref_clean
+
     # Build notes
     notes_parts = []
-
-    # Preserve cc_reference_id from details if it exists
-    if details and "cc_reference_id" in details:
-        notes_parts.append(details)
-
     notes_parts.append("Imported from Splitwise API")
 
     if my_paid > 0:
@@ -98,6 +102,7 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
         is_shared=not is_self,
         currency="USD",
         splitwise_id=expense_id,
+        cc_reference_id=cc_reference_id,
         imported_at=datetime.utcnow().isoformat(),
         notes=notes,
     )
@@ -247,29 +252,26 @@ def sync_from_splitwise(
             changes.append(f"category: '{txn.category}' → '{sw_category}'")
             updates["category"] = sw_category
 
+        # Check and update cc_reference_id from Splitwise details
+        sw_details = expense.get(ExportColumns.DETAILS, "")
+        sw_cc_reference_id = None
+        if sw_details:
+            cc_ref_clean = str(sw_details).strip().strip("'\"")
+            if cc_ref_clean and len(cc_ref_clean) > 5:
+                sw_cc_reference_id = cc_ref_clean
+
+        # Update cc_reference_id if missing or different
+        if sw_cc_reference_id and sw_cc_reference_id != txn.cc_reference_id:
+            changes.append(f"cc_ref: {txn.cc_reference_id or 'None'} → {sw_cc_reference_id}")
+            updates["cc_reference_id"] = sw_cc_reference_id
+
         # Check and update notes with payment information
         # Rebuild notes from Splitwise data to ensure it has payment info
-        sw_details = expense.get(ExportColumns.DETAILS, "")
         sw_my_paid = float(expense.get(ExportColumns.MY_PAID, 0))
         sw_my_owed = float(expense.get(ExportColumns.MY_OWED, 0))
         sw_participant_names = expense.get(ExportColumns.PARTICIPANT_NAMES, "")
 
         notes_parts = []
-
-        # Preserve cc_reference_id from existing notes or Splitwise details
-        cc_ref_from_notes = None
-        if txn.notes and "cc_reference_id" in txn.notes:
-            import re
-
-            match = re.search(r"cc_reference_id:\s*(\d+)", txn.notes)
-            if match:
-                cc_ref_from_notes = f"cc_reference_id: {match.group(1)}"
-
-        if cc_ref_from_notes:
-            notes_parts.append(cc_ref_from_notes)
-        elif sw_details and "cc_reference_id" in sw_details:
-            notes_parts.append(sw_details)
-
         notes_parts.append("Imported from Splitwise API")
 
         if sw_my_paid > 0:
