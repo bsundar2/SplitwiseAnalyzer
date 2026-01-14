@@ -271,6 +271,18 @@ def fetch_from_database(
             if with_match:
                 participant_names = with_match.group(1).strip()
 
+        # Check if this is a refund (either flagged in DB or detected by description)
+        description = txn.description or txn.merchant or ""
+        is_refund_by_description = any(
+            keyword in description.lower()
+            for keyword in ["refund", "credit", "return"]
+        )
+        
+        # For refunds, negate my_owed and my_paid to show as credits
+        if txn.is_refund or is_refund_by_description:
+            my_owed = -my_owed
+            my_paid = -my_paid
+
         # Calculate MY_NET
         my_net = my_paid - my_owed
 

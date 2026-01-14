@@ -305,6 +305,19 @@ class SplitwiseClient:
                 )
                 my_paid = my_row["paid"] if my_row else 0.0
                 my_owed = my_row["owed"] if my_row else 0.0
+
+                # Check if this is a refund by description keywords
+                description = expense.getDescription() or ""
+                is_refund = any(
+                    keyword in description.lower()
+                    for keyword in ["refund", "credit", "return"]
+                )
+
+                # For refunds, negate my_owed and my_paid to show as credits
+                if is_refund:
+                    my_owed = -my_owed
+                    my_paid = -my_paid
+
                 my_net = my_paid - my_owed
 
                 participant_ids = {r["id"] for r in user_rows_sorted}

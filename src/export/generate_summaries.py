@@ -75,6 +75,18 @@ def fetch_transactions_for_analysis(year: int) -> pd.DataFrame:
             if owe_match:
                 my_owed = float(owe_match.group(1).replace(",", ""))
 
+        # Check if this is a refund (either flagged in DB or detected by description)
+        description = txn.description or ""
+        is_refund_by_description = any(
+            keyword in description.lower()
+            for keyword in ["refund", "credit", "return"]
+        )
+        
+        # For refunds, negate my_owed and my_paid to show as credits
+        if txn.is_refund or is_refund_by_description:
+            my_owed = -my_owed
+            my_paid = -my_paid
+
         my_net = my_paid - my_owed
 
         data.append(
@@ -125,7 +137,7 @@ def generate_monthly_summary(df: pd.DataFrame, year: int) -> pd.DataFrame:
     # Group by month
     monthly = (
         df.groupby("year_month")
-        .agg({"my_net": ["sum", "mean", "count"], "my_paid": "sum", "my_owed": "sum"})
+        .agg({"my_owed": ["sum", "mean", "count"], "my_paid": "sum", "my_net": "sum"})
         .reset_index()
     )
 
@@ -136,7 +148,7 @@ def generate_monthly_summary(df: pd.DataFrame, year: int) -> pd.DataFrame:
         "Avg Transaction",
         "Transaction Count",
         "Total Paid",
-        "Total Owed",
+        "Total Net",
     ]
 
     # Format month as YYYY-MM
@@ -154,7 +166,7 @@ def generate_monthly_summary(df: pd.DataFrame, year: int) -> pd.DataFrame:
         "Total Spent (Net)",
         "Avg Transaction",
         "Total Paid",
-        "Total Owed",
+        "Total Net",
         "Cumulative Spending",
         "MoM Change",
     ]
@@ -179,7 +191,7 @@ def generate_category_breakdown(df: pd.DataFrame, year: int) -> pd.DataFrame:
 
     # Group by category
     category = (
-        df.groupby("category").agg({"my_net": ["sum", "mean", "count"]}).reset_index()
+        df.groupby("category").agg({"my_owed": ["sum", "mean", "count"]}).reset_index()
     )
 
     # Flatten column names
@@ -207,7 +219,7 @@ def generate_category_breakdown(df: pd.DataFrame, year: int) -> pd.DataFrame:
             {
                 "Category": "TOTAL",
                 "Total Spent": total_spent,
-                "Avg Transaction": df["my_net"].mean(),
+                "Avg Transaction": df["my_owed"].mean(),
                 "Transaction Count": len(df),
                 "% of Total": 100.0,
             }
@@ -233,7 +245,7 @@ def generate_monthly_trends(df: pd.DataFrame, year: int) -> pd.DataFrame:
         return pd.DataFrame()
 
     # Monthly spending
-    monthly = df.groupby("year_month").agg({"my_net": "sum"}).reset_index()
+    monthly = df.groupby("year_month").agg({"my_owed": "sum"}).reset_index()
 
     monthly.columns = ["Month", "Total Spent"]
     monthly["Month"] = monthly["Month"].astype(str)
@@ -568,7 +580,7 @@ Examples:
             or abs(existing["avg_transaction"] - row["Avg Transaction"]) > 0.01
             or existing["transaction_count"] != row["Transaction Count"]
             or abs(existing["total_paid"] - row["Total Paid"]) > 0.01
-            or abs(existing["total_owed"] - row["Total Owed"]) > 0.01
+            or abs(existing["total_owed"] - row["Total Net"]) > 0.01
             or abs(existing["cumulative_spending"] - row["Cumulative Spending"]) > 0.01
             or abs(existing["mom_change"] - row["MoM Change"]) > 0.01
         ):
@@ -608,7 +620,7 @@ Examples:
                 avg_transaction=row["Avg Transaction"],
                 transaction_count=int(row["Transaction Count"]),
                 total_paid=row["Total Paid"],
-                total_owed=row["Total Owed"],
+                total_owed=row["Total Net"],
                 cumulative_spending=row["Cumulative Spending"],
                 mom_change=row["MoM Change"],
                 written_to_sheet=True,
