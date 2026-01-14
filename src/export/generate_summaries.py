@@ -14,9 +14,11 @@ import re
 from typing import Dict
 
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv("config/.env")
+# Load environment variables
+from src.common.env import load_project_env
+
+load_project_env()
 
 from src.common.sheets_sync import write_to_sheets, read_from_sheets
 from src.common.utils import LOG

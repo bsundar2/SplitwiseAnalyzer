@@ -7,10 +7,11 @@ from datetime import datetime as dt
 
 # Third-party
 import pandas as pd
-from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv("config/.env")
+from src.common.env import load_project_env
+
+load_project_env()
 
 # Local application
 from src.constants.config import PROCESSED_DIR

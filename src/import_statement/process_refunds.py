@@ -323,8 +323,8 @@ def main():
 
 if __name__ == "__main__":
     # Load environment variables when run as script
-    from dotenv import load_dotenv
+    from src.common.env import load_project_env
 
-    load_dotenv("config/.env")
+    load_project_env()
 
     main()

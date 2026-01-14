@@ -21,11 +21,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv("config/.env")
-
+from src.common.env import load_project_env
 from src.common.utils import LOG
+
+# Load environment variables
+load_project_env()
 
 # Pipeline constants
 PIPELINE_NAME = "Monthly Export Pipeline"

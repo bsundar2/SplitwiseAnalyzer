@@ -3,7 +3,6 @@ import json
 import pandas as pd
 
 import dateparser
-from dotenv import load_dotenv
 from datetime import datetime, date, timezone
 import logging
 import yaml
@@ -14,8 +13,10 @@ from functools import cache
 from typing import Union, Optional, Dict, Any
 
 from src.constants.config import CFG_PATHS
+from src.common.env import load_project_env
 
-load_dotenv()
+# Load environment once
+load_project_env()
 
 LOG = logging.getLogger("cc_splitwise")
 handler = logging.StreamHandler()
