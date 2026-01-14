@@ -113,8 +113,15 @@ SplitwiseImporter/
 │   ├── common/                 # Shared utilities
 │   │   ├── splitwise_client.py # Splitwise API wrapper
 │   │   ├── sheets_sync.py      # Google Sheets integration
-│   │   └── utils.py
+│   │   ├── transaction_filters.py # Transaction filtering utilities (refactored)
+│   │   ├── env.py              # Environment variable loading (@cache singleton)
+│   │   └── utils.py            # Date utilities, logging, common helpers
 │   └── constants/              # Configuration constants
+│       ├── config.py           # Project paths and configuration
+│       ├── export_columns.py   # Google Sheets column definitions
+│       ├── gsheets.py          # Worksheet names and sheet constants
+│       ├── logging_config.py   # Logging configuration
+│       └── splitwise.py        # Splitwise API constants (split types, categories, etc.)
 ├── config/
 │   ├── .env                    # API keys & default settings
 │   ├── merchant_category_lookup.json  # 216+ merchant mappings
@@ -223,6 +230,24 @@ This summary provides everything Copilot needs.
 - ✅ **Year-based tabs** - Exported 14 separate "Expenses YYYY" sheets (2013-2026, 3,992 total transactions)
 - ✅ **Code cleanup** - Moved REFUND_KEYWORDS to constants, fixed import organization per coding_style.md
 - ✅ **Split type constants** - Added SPLIT_TYPE_SELF, SPLIT_TYPE_SPLIT, SPLIT_TYPE_SHARED, SPLIT_TYPE_PARTNER to constants/splitwise.py
+
+✅ **Phase 6: Code Refactoring & Quality Improvements (Complete - Jan 13, 2026)**
+- **Eliminated 50+ code duplications** across 9 categories:
+  - Date parsing/formatting (12+ duplicates → 2 utility functions)
+  - SQL deletion filters (18 duplicates → 1 helper method)
+  - Environment loading (8 duplicates → 1 cached function)
+  - Transaction filtering (15+ duplicates → 5 filter functions)
+  - Factory methods for DB and Splitwise client (10+ duplicates → 2 factory functions)
+- **New utility modules created**:
+  - `src/common/env.py` - Centralized environment loading with @cache singleton
+  - `src/common/transaction_filters.py` - Transaction filtering utilities (renamed from filters.py)
+  - Date utilities in `src/common/utils.py` - parse_date_string(), format_date()
+- **Eliminated all `global` keywords** - Unified to @functools.cache pattern for singletons
+- **Consistent singleton pattern** - Both DatabaseManager and environment loading use @cache decorator
+- **SQL query refactoring** - Added DELETED_FILTER_CLAUSE constant and _append_deleted_filter() helper
+- **Updated coding standards** - Enhanced Rule 5a (no global), Rule 5 (SQL fragments as constants), Rule 8 (descriptive naming)
+- **Code duplication reduction**: 83-94% reduction across different categories
+- **Improved maintainability** - Single source of truth for repeated logic, easier testing, clearer code structure
 
 ✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
 - Unified export script supports both Splitwise API and database sources

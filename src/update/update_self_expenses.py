@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.common.splitwise_client import SplitwiseClient
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import SplitwiseUserId, SPLIT_TYPE_SELF
-from src.common.utils import LOG
+from src.common.utils import LOG, parse_date_string
 
 
 def update_self_expense(
@@ -122,12 +122,12 @@ def main():
 
     # Parse dates
     if args.end_date:
-        end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+        end_date = parse_date_string(args.end_date)
     else:
         end_date = datetime.now().date()
 
     if args.start_date:
-        start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        start_date = parse_date_string(args.start_date)
     else:
         start_date = end_date - timedelta(days=30)
 

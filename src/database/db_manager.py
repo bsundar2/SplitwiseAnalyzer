@@ -3,11 +3,15 @@
 import sqlite3
 import os
 from datetime import datetime
+from functools import cache
 from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
 
 from .schema import init_database
 from .models import Transaction, ImportLog
+
+# SQL query constants
+DELETED_FILTER_CLAUSE = "(splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')"
 
 
 class DatabaseManager:
@@ -58,6 +62,21 @@ class DatabaseManager:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def _append_deleted_filter(query: str, include_deleted: bool = False) -> str:
+        """Append deleted transaction filter to SQL query if needed.
+
+        Args:
+            query: Base SQL query string
+            include_deleted: If False, append filter to exclude deleted transactions
+
+        Returns:
+            Query string with optional deletion filter appended
+        """
+        if not include_deleted:
+            return f"{query} AND {DELETED_FILTER_CLAUSE}"
+        return query
 
     # ==================== Transaction CRUD ====================
 
@@ -210,10 +229,7 @@ class DatabaseManager:
 
         query = "SELECT * FROM transactions WHERE date >= ? AND date <= ?"
         params = [start_date, end_date]
-
-        if not include_deleted:
-            query += " AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')"
-
+        query = self._append_deleted_filter(query, include_deleted)
         query += " ORDER BY date, merchant"
 
         cursor.execute(query, params)
@@ -237,10 +253,10 @@ class DatabaseManager:
         cursor = conn.cursor()
 
         query = """
-            SELECT * FROM transactions 
+            SELECT * FROM transactions
             WHERE written_to_sheet = 0
-            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
         """
+        query = self._append_deleted_filter(query.strip())
         params = []
 
         if year:
@@ -283,8 +299,8 @@ class DatabaseManager:
             WHERE merchant = ?
             AND ABS(julianday(date) - julianday(?)) <= ?
             AND ABS(amount - ?) <= ?
-            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
         """
+        query = self._append_deleted_filter(query.strip())
 
         cursor.execute(
             query, [merchant, date, tolerance_days, amount, amount_tolerance]
@@ -354,10 +370,9 @@ class DatabaseManager:
                     WHERE cc_reference_id = ?
                     AND is_refund = 0
                     AND amount >= ?
-                    AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
-                    ORDER BY date DESC
-                    LIMIT 1
                 """
+                query = self._append_deleted_filter(query.strip())
+                query += " ORDER BY date DESC LIMIT 1"
                 cursor.execute(query, (cc_reference_id, refund_amount - 0.01))
             else:
                 # Exact match only
@@ -366,10 +381,9 @@ class DatabaseManager:
                     WHERE cc_reference_id = ?
                     AND is_refund = 0
                     AND ABS(amount - ?) <= 0.01
-                    AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
-                    ORDER BY date DESC
-                    LIMIT 1
                 """
+                query = self._append_deleted_filter(query.strip())
+                query += " ORDER BY date DESC LIMIT 1"
                 cursor.execute(query, (cc_reference_id, refund_amount))
 
             row = cursor.fetchone()
@@ -388,10 +402,9 @@ class DatabaseManager:
                 AND amount >= ?
                 AND date <= ?
                 AND julianday(?) - julianday(date) <= ?
-                AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
-                ORDER BY date DESC, ABS(amount - ?) ASC
-                LIMIT 1
             """
+            query = self._append_deleted_filter(query.strip())
+            query += " ORDER BY date DESC, ABS(amount - ?) ASC LIMIT 1"
             cursor.execute(
                 query,
                 (
@@ -412,10 +425,9 @@ class DatabaseManager:
                 AND ABS(amount - ?) <= 0.01
                 AND date <= ?
                 AND julianday(?) - julianday(date) <= ?
-                AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
-                ORDER BY date DESC
-                LIMIT 1
             """
+            query = self._append_deleted_filter(query.strip())
+            query += " ORDER BY date DESC LIMIT 1"
             cursor.execute(
                 query,
                 (merchant, refund_amount, refund_date, refund_date, date_window_days),
@@ -442,9 +454,9 @@ class DatabaseManager:
             SELECT * FROM transactions
             WHERE is_refund = 1
             AND (reconciliation_status = 'pending' OR reconciliation_status = 'unmatched')
-            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
-            ORDER BY date
         """
+        query = self._append_deleted_filter(query.strip())
+        query += " ORDER BY date"
         cursor.execute(query)
         rows = cursor.fetchall()
         conn.close()
@@ -539,8 +551,8 @@ class DatabaseManager:
         query = """
             SELECT COUNT(*) as count FROM transactions
             WHERE refund_for_txn_id = ?
-            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
         """
+        query = self._append_deleted_filter(query.strip())
         cursor.execute(query, (original_txn_id,))
         row = cursor.fetchone()
         conn.close()
@@ -566,8 +578,8 @@ class DatabaseManager:
             FROM transactions
             WHERE refund_for_txn_id = ?
             AND is_refund = 1
-            AND (splitwise_deleted_at IS NULL OR splitwise_deleted_at = '')
         """
+        query = self._append_deleted_filter(query.strip())
         cursor.execute(query, (original_txn_id,))
         row = cursor.fetchone()
         conn.close()
@@ -916,3 +928,19 @@ class DatabaseManager:
 
         conn.commit()
         conn.close()
+
+
+@cache
+def get_database() -> DatabaseManager:
+    """Get singleton DatabaseManager instance.
+
+    Uses @cache decorator for automatic memoization - creates instance once,
+    subsequent calls return the same instance. Thread-safe and simple.
+
+    Note: Uses default database path. For custom paths, instantiate
+    DatabaseManager directly.
+
+    Returns:
+        Shared DatabaseManager instance
+    """
+    return DatabaseManager()

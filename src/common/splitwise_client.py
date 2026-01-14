@@ -15,13 +15,14 @@ from typing import Any, Dict, List, Optional, Union
 # Third-party
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
 from splitwise.category import Category
 from splitwise.user import ExpenseUser
 
 # Local application
-from src.common.utils import LOG, infer_category, parse_float_safe
+from src.common.env import load_project_env
+from src.common.transaction_filters import is_deleted_expense
+from src.common.utils import LOG, infer_category, parse_float_safe, format_date
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import (
     DEFAULT_CURRENCY,
@@ -36,7 +37,7 @@ from src.constants.splitwise import (
     SplitwiseUserId,
 )
 
-load_dotenv("config/.env")
+load_project_env()
 
 
 # Handles Splitwise API/CSV integration
@@ -109,14 +110,7 @@ class SplitwiseClient:
                     break
 
                 # Filter out deleted expenses from the basic list
-                non_deleted = [
-                    exp
-                    for exp in expenses
-                    if not (
-                        hasattr(exp, DELETED_AT_FIELD)
-                        and getattr(exp, DELETED_AT_FIELD)
-                    )
-                ]
+                non_deleted = [exp for exp in expenses if not is_deleted_expense(exp)]
 
                 all_expenses.extend(non_deleted)
 
@@ -728,3 +722,15 @@ if __name__ == "__main__":
     # seven_days_ago = today - timedelta(days=25)
     # df = client.get_my_expenses_by_date_range(seven_days_ago, today)
     # print(df)
+
+
+def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:
+    """Get SplitwiseClient instance (None in dry-run mode).
+
+    Args:
+        dry_run: If True, returns None (no API calls will be made)
+
+    Returns:
+        SplitwiseClient instance or None
+    """
+    return None if dry_run else SplitwiseClient()

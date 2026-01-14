@@ -17,17 +17,19 @@ import json
 import os
 from datetime import datetime, date
 from typing import List, Optional, Union
+import re
 
 # Third-party
 import pandas as pd
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv("config/.env")
 
 # Local application
+from src.common.env import load_project_env, get_env
 from src.constants.config import STATE_PATH
 from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
+
+# Load environment variables
+load_project_env()
+
 from src.common.sheets_sync import write_to_sheets, read_from_sheets
 from src.common.splitwise_client import SplitwiseClient
 from src.common.utils import (
@@ -38,13 +40,14 @@ from src.common.utils import (
     LOG,
     generate_fingerprint,
     parse_date,
+    format_date,
 )
 from src.constants.splitwise import (
     ExcludedSplitwiseDescriptions,
-    REFUND_KEYWORDS,
     SPLIT_TYPE_SELF,
     SPLIT_TYPE_SPLIT,
 )
+from src.constants.config import REFUND_KEYWORDS
 from src.constants.export_columns import ExportColumns
 from src.database import DatabaseManager
 
@@ -691,19 +694,19 @@ Examples:
     )
     parser.add_argument(
         "--start-date",
-        default=os.getenv("START_DATE"),
+        default=get_env("START_DATE"),
         help="Start date (any parseable date string, e.g., '2023-01-01' or '3 months ago'). Defaults to START_DATE env var.",
     )
     parser.add_argument(
         "--end-date",
-        default=os.getenv("END_DATE"),
+        default=get_env("END_DATE"),
         help="End date (any parseable date string, e.g., '2023-12-31' or 'today'). Defaults to END_DATE env var.",
     )
     parser.add_argument(
         "--worksheet-name",
         "--worksheet",
         dest="worksheet_name",
-        default=os.getenv("EXPENSES_WORKSHEET_NAME", DEFAULT_WORKSHEET_NAME),
+        default=get_env("EXPENSES_WORKSHEET_NAME", DEFAULT_WORKSHEET_NAME),
         help=f"Worksheet name (default: EXPENSES_WORKSHEET_NAME env var or {DEFAULT_WORKSHEET_NAME})",
     )
     parser.add_argument(

@@ -114,10 +114,16 @@ Rule 5 — Avoid magic strings and numbers; use constants
 ------------------------------------------------------
 Do not sprinkle identical literal strings or numeric literals across the codebase. Pull repeated or meaningful literals into module-level constants with descriptive names.
 
+This includes SQL query fragments, UI strings, configuration values, and any repeated literals.
+
 Bad:
 ```python
 worksheet = sheet.worksheet_by_title("Splitwise Expenses")
 parser.add_argument("--worksheet-name", default="Splitwise Expenses")
+
+# Bad: SQL fragments as magic strings
+query = "SELECT * FROM transactions ORDER BY date"
+query2 = "SELECT * FROM users ORDER BY date"
 ```
 
 Good:
@@ -126,9 +132,71 @@ DEFAULT_WORKSHEET_NAME = "Splitwise Expenses"
 # ... later ...
 worksheet = sheet.worksheet_by_title(DEFAULT_WORKSHEET_NAME)
 parser.add_argument("--worksheet-name", default=DEFAULT_WORKSHEET_NAME)
+
+# Good: SQL fragments as constants
+SQL_ORDER_BY_DATE = "ORDER BY date"
+SQL_ORDER_BY_DATE_MERCHANT = "ORDER BY date, merchant"
+query = f"SELECT * FROM transactions {SQL_ORDER_BY_DATE}"
+query2 = f"SELECT * FROM users {SQL_ORDER_BY_DATE}"
 ```
 
-Rule 5 — Small helpers and flattened control flow
+Rule 5a — Never use the `global` keyword
+-----------------------------------------
+Avoid using the `global` keyword in functions. Global mutable state makes code harder to test, debug, and reason about.
+
+Instead, use these patterns:
+- **Cached functions** (preferred): Use `@functools.cache` or `@functools.lru_cache` decorators
+- **Class-based state**: Encapsulate state in a class with class-level attributes
+- **Dependency injection**: Pass dependencies as parameters
+
+Bad:
+```python
+_db_instance = None
+
+def get_database():
+    global _db_instance  # Bad: Uses global keyword
+    if _db_instance is None:
+        _db_instance = DatabaseManager()
+    return _db_instance
+```
+
+Good:
+```python
+# Option 1: Cached function (preferred - simple, thread-safe, Pythonic)
+from functools import cache
+
+@cache
+def get_database() -> DatabaseManager:
+    """Get singleton DatabaseManager (cached automatically)."""
+    return DatabaseManager()
+
+@cache
+def load_project_env() -> None:
+    """Load .env file once (cached automatically)."""
+    project_root = Path(__file__).parent.parent.parent
+    env_path = project_root / "config" / "..env"
+    load_dotenv(env_path)
+
+# Option 2: Class-based singleton
+class DatabaseManager:
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls) -> 'DatabaseManager':
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+# Option 3: Dependency injection (most flexible)
+def process_transactions(db: DatabaseManager = None):
+    """Process transactions using provided or default database."""
+    db = db or get_database()  # Allow injection for testing
+    # ... use db ...
+```
+
+Note: The `@cache` decorator is preferred for singleton patterns as it's simpler, thread-safe, and follows Python conventions. Never use `global` keyword anywhere in the codebase.
+
+Rule 5b — Small helpers and flattened control flow
 ------------------------------------------------
 Avoid deeply nested try/except blocks. Break functionality into small helper functions with a single responsibility (e.g., `_apply_column_formats`). Helpers make try/except scoping explicit and easier to test.
 
@@ -145,6 +213,8 @@ If you implement best-effort fallbacks (e.g., try `worksheet.format` and fall ba
 Rule 8 — Group related constants and utilities in classes
 ----------------------------------------------------------
 When you have multiple related constants or utilities that work together (e.g., mappings and their reverse lookups, ID-to-name conversions), consider grouping them in a simple class rather than using module-level functions and dictionaries.
+
+Use descriptive module names that clearly indicate their purpose (e.g., `transaction_filters.py` instead of `filters.py`).
 
 Benefits:
 - Encapsulates related data and behavior

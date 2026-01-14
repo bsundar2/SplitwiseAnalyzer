@@ -11,13 +11,14 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-from dotenv import load_dotenv
 from splitwise.category import Category
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.common.splitwise_client import SplitwiseClient
+from src.common.utils import parse_date_string
+from src.common.env import get_env
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import SUBCATEGORY_IDS
 from src.common.utils import LOG
@@ -227,23 +228,17 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
 
     # Parse dates
     if args.end_date:
-        end_date = datetime.strptime(args.end_date, "%Y-%m-%d")
+        end_date = parse_date_string(args.end_date)
     else:
-        load_dotenv("config/.env")
-        end_date_str = os.getenv("END_DATE")
-        end_date = (
-            datetime.strptime(end_date_str, "%Y-%m-%d")
-            if end_date_str
-            else datetime.now()
-        )
+        end_date_str = get_env("END_DATE")
+        end_date = parse_date_string(end_date_str) if end_date_str else datetime.now()
 
     if args.start_date:
-        start_date = datetime.strptime(args.start_date, "%Y-%m-%d")
+        start_date = parse_date_string(args.start_date)
     else:
-        load_dotenv("config/.env")
-        start_date_str = os.getenv("START_DATE")
+        start_date_str = get_env("START_DATE")
         start_date = (
-            datetime.strptime(start_date_str, "%Y-%m-%d")
+            parse_date_string(start_date_str)
             if start_date_str
             else datetime(end_date.year, 1, 1)
         )

@@ -26,6 +26,38 @@ LOG.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
+# Date format constants
+DATE_FORMAT = "%Y-%m-%d"
+
+
+def parse_date_string(date_str: str) -> date:
+    """Parse YYYY-MM-DD date string to date object.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format
+
+    Returns:
+        date object
+
+    Raises:
+        ValueError: If date_str is not in valid format
+    """
+    return datetime.strptime(date_str, DATE_FORMAT).date()
+
+
+def format_date(date_obj: Union[date, datetime]) -> str:
+    """Format date/datetime object to YYYY-MM-DD string.
+
+    Args:
+        date_obj: date or datetime object
+
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    if isinstance(date_obj, datetime):
+        date_obj = date_obj.date()
+    return date_obj.strftime(DATE_FORMAT)
+
 
 def load_yaml(path):
     with open(path, "r") as f:
