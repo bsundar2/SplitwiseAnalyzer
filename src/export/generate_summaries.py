@@ -10,23 +10,23 @@ Creates multiple analysis tabs:
 
 import argparse
 import os
+import re
 from typing import Dict
 
 import pandas as pd
-import pygsheets
 from dotenv import load_dotenv
 
 load_dotenv("config/.env")
 
-from src.common.sheets_sync import write_to_sheets
+from src.common.sheets_sync import write_to_sheets, read_from_sheets
 from src.common.utils import LOG
 from src.constants.gsheets import (
-    SHEETS_AUTHENTICATION_FILE,
     WORKSHEET_MONTHLY_SUMMARY,
     WORKSHEET_CATEGORY_BREAKDOWN,
     WORKSHEET_BUDGET_VS_ACTUAL,
     WORKSHEET_MONTHLY_TRENDS,
 )
+from src.constants.splitwise import REFUND_KEYWORDS
 from src.database import DatabaseManager
 
 # Constants
@@ -65,8 +65,6 @@ def fetch_transactions_for_analysis(year: int) -> pd.DataFrame:
         my_owed = 0.0
 
         if txn.notes:
-            import re
-
             paid_match = re.search(r"Paid: \$?([\d,]+\.?\d*)", txn.notes)
             owe_match = re.search(r"Owe: \$?([\d,]+\.?\d*)", txn.notes)
 
@@ -78,10 +76,9 @@ def fetch_transactions_for_analysis(year: int) -> pd.DataFrame:
         # Check if this is a refund (either flagged in DB or detected by description)
         description = txn.description or ""
         is_refund_by_description = any(
-            keyword in description.lower()
-            for keyword in ["refund", "credit", "return"]
+            keyword in description.lower() for keyword in REFUND_KEYWORDS
         )
-        
+
         # For refunds, negate my_owed and my_paid to show as credits
         if txn.is_refund or is_refund_by_description:
             my_owed = -my_owed
@@ -559,7 +556,7 @@ Examples:
         print("\n" + "=" * 60)
         return 0
 
-    # Write to Google Sheets (clear and rewrite to avoid duplicates)
+    # Write to Google Sheets (merge with existing data from other years)
     print("Writing summaries to Google Sheets...\n")
 
     db = DatabaseManager()
@@ -590,29 +587,40 @@ Examples:
     if not any_changes:
         print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: No changes needed")
     else:
-        # Open sheet and clear/rewrite
-        gc = pygsheets.authorize(service_file=SHEETS_AUTHENTICATION_FILE)
-        sheet = gc.open_by_key(args.sheet_key)
+        # Read existing data from sheet to preserve other years
+        existing_df = read_from_sheets(
+            spreadsheet_key=args.sheet_key,
+            worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
+            numerize=False,
+        )
 
-        try:
-            worksheet = sheet.worksheet_by_title(WORKSHEET_MONTHLY_SUMMARY)
-            # Clear existing content
-            worksheet.clear()
-        except pygsheets.WorksheetNotFound:
-            # Create worksheet if it doesn't exist
-            worksheet = sheet.add_worksheet(WORKSHEET_MONTHLY_SUMMARY)
+        if existing_df is not None and not existing_df.empty:
+            # Remove rows for the current year being updated
+            current_year_months = set(monthly_summary["Month"].astype(str))
+            existing_df = existing_df[
+                ~existing_df["Month"].astype(str).isin(current_year_months)
+            ]
 
-        # Write header
-        worksheet.update_row(1, list(monthly_summary.columns))
+            # Combine existing data with new data
+            combined_df = pd.concat([existing_df, monthly_summary], ignore_index=True)
 
-        # Write all data rows
-        for idx, row in monthly_summary.iterrows():
-            row_values = [row[col] for col in monthly_summary.columns]
-            worksheet.update_row(
-                idx + 2, row_values
-            )  # +2 because row 1 is header, idx is 0-based
+            # Sort by month chronologically
+            combined_df["Month"] = combined_df["Month"].astype(str)
+            combined_df = combined_df.sort_values("Month").reset_index(drop=True)
+        else:
+            combined_df = monthly_summary
 
-            # Save to database and mark as written
+        # Use shared write_to_sheets utility for efficient bulk write
+        write_to_sheets(
+            combined_df,
+            worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
+            spreadsheet_key=args.sheet_key,
+            append=False,  # Overwrite mode with merged data
+            skip_formatting=True,  # Skip transaction-specific formatting
+        )
+
+        # Save all rows to database and mark as written
+        for _, row in monthly_summary.iterrows():
             year_month = str(row["Month"])
             db.save_monthly_summary(
                 year_month=year_month,
@@ -627,7 +635,7 @@ Examples:
             )
 
         print(
-            f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Cleared and rewrote {len(monthly_summary)} rows"
+            f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Cleared and rewrote {len(combined_df)} rows"
         )
 
     url = f"https://docs.google.com/spreadsheets/d/{args.sheet_key}"

@@ -39,7 +39,7 @@ from src.common.utils import (
     generate_fingerprint,
     parse_date,
 )
-from src.constants.splitwise import ExcludedSplitwiseDescriptions
+from src.constants.splitwise import ExcludedSplitwiseDescriptions, REFUND_KEYWORDS
 from src.constants.export_columns import ExportColumns
 from src.database import DatabaseManager
 
@@ -274,10 +274,9 @@ def fetch_from_database(
         # Check if this is a refund (either flagged in DB or detected by description)
         description = txn.description or txn.merchant or ""
         is_refund_by_description = any(
-            keyword in description.lower()
-            for keyword in ["refund", "credit", "return"]
+            keyword in description.lower() for keyword in REFUND_KEYWORDS
         )
-        
+
         # For refunds, negate my_owed and my_paid to show as credits
         if txn.is_refund or is_refund_by_description:
             my_owed = -my_owed

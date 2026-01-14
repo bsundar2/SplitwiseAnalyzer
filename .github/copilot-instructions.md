@@ -204,7 +204,7 @@ This summary provides everything Copilot needs.
 - 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
-**Recent Session Changes (Jan 13, 2026 - Phase 4 Complete)**
+**Recent Session Changes (Jan 13, 2026 - Phase 6 Complete)**
 - ✅ Created `generate_summaries.py` with 5 analysis types (Monthly Summary, Category Breakdown, Budget vs Actual, Monthly Trends, Category x Month)
 - ✅ Created `budget_2026.json` with $113,517 annual budget across 32 Splitwise categories
 - ✅ Implemented smart category mapping (20+ mappings from transaction categories to Splitwise budget format)
@@ -219,6 +219,9 @@ This summary provides everything Copilot needs.
 - ✅ **Constants organization** - Moved worksheet constants to `src/constants/gsheets.py`
 - ✅ **Exception handling** - Removed try-catch blocks to fail fast (follows coding_style.md)
 - ✅ **Append-only mode** - Transactions and summaries only write new/changed data
+- ✅ **Historical backfill** - Synced 2,377 transactions from 2013-2024 Splitwise data
+- ✅ **Year-based tabs** - Exported 14 separate "Expenses YYYY" sheets (2013-2026, 3,992 total transactions)
+- ✅ **Code cleanup** - Moved REFUND_KEYWORDS to constants, fixed import organization per coding_style.md
 
 ✅ **Phase 3: Google Sheets Export & Monthly Pipeline (Complete - Jan 12, 2026)**
 - Unified export script supports both Splitwise API and database sources

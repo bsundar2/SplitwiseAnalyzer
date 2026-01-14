@@ -28,6 +28,7 @@ from src.constants.splitwise import (
     DEFAULT_LOOKBACK_DAYS,
     DELETED_AT_FIELD,
     DETAILS_COLUMN_NAME,
+    REFUND_KEYWORDS,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
@@ -309,8 +310,7 @@ class SplitwiseClient:
                 # Check if this is a refund by description keywords
                 description = expense.getDescription() or ""
                 is_refund = any(
-                    keyword in description.lower()
-                    for keyword in ["refund", "credit", "return"]
+                    keyword in description.lower() for keyword in REFUND_KEYWORDS
                 )
 
                 # For refunds, negate my_owed and my_paid to show as credits
