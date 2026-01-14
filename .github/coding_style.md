@@ -34,6 +34,14 @@ Rule 1 — Remove unused imports and variables
 - Use your IDE's "Optimize Imports" feature before committing.
 - If you're temporarily commenting out code that uses certain imports, remove those imports and add them back when needed.
 
+**Automated Detection:**
+Run pylint to detect all unused imports and variables:
+```bash
+pylint --disable=all --enable=unused-import,unused-variable src/
+```
+
+This command will scan the entire `src/` directory and report only unused imports and unused variables. Run this periodically during refactoring to maintain code cleanliness.
+
 Bad:
 ```python
 import os  # unused import
