@@ -1,5 +1,8 @@
 """Process refund transactions and create corresponding Splitwise expenses.
 
+Refunds are created in Splitwise with their original cc_reference_id from the statement.
+No matching to original transactions is performed - refunds are standalone expenses.
+
 This module can be used in two ways:
 1. Import RefundProcessor class for programmatic use
 2. Run as standalone script with CLI arguments
@@ -27,7 +30,7 @@ from src.constants.splitwise import SplitwiseUserId, SUBCATEGORY_MAPPER
 
 
 class RefundProcessor:
-    """Handles refund detection, matching, and Splitwise creation."""
+    """Handles refund detection and Splitwise creation (no matching logic)."""
 
     def __init__(self, db: DatabaseManager, client: SplitwiseClient = None):
         """Initialize refund processor.
@@ -46,8 +49,8 @@ class RefundProcessor:
     ) -> Dict[str, Any]:
         """Process a single refund transaction.
 
-        Creates a Splitwise expense with default split (SELF paid 100%, SELF_EXPENSE owes 100%).
-        No matching or linking to original transactions.
+        Creates a Splitwise expense with the original cc_reference_id from the statement.
+        Uses default split: SELF paid 100%, SELF_EXPENSE owes 100%.
 
         Args:
             refund_txn: Transaction object for the refund (is_refund=True)
@@ -70,8 +73,9 @@ class RefundProcessor:
                 splitwise_id = self._create_refund_in_splitwise(refund_txn)
 
                 LOG.info(
-                    "Created refund in Splitwise: ID %s",
+                    "Created refund in Splitwise: ID %s for cc_ref %s",
                     splitwise_id,
+                    refund_txn.cc_reference_id,
                 )
 
                 # Update refund transaction with Splitwise ID
@@ -79,7 +83,6 @@ class RefundProcessor:
                     refund_txn.id,
                     {
                         "splitwise_id": splitwise_id,
-                        "reconciliation_status": "matched",
                         "updated_at": datetime.now().isoformat(),
                     },
                 )
@@ -97,8 +100,6 @@ class RefundProcessor:
                 result["error"] = str(e)
         else:
             result["status"] = "would_create"
-
-        return result
 
         return result
 
@@ -166,7 +167,7 @@ class RefundProcessor:
         return splitwise_id
 
     def process_all_pending_refunds(self, dry_run: bool = False) -> Dict[str, Any]:
-        """Process all pending unmatched refunds.
+        """Process all pending refunds that haven't been added to Splitwise yet.
 
         Args:
             dry_run: If True, don't create Splitwise expenses
@@ -174,15 +175,13 @@ class RefundProcessor:
         Returns:
             Summary of processing results
         """
-        pending_refunds = self.db.get_unmatched_refunds()
+        pending_refunds = self.db.get_pending_refunds()
 
         LOG.info("Found %d pending refunds to process", len(pending_refunds))
 
         summary = {
             "total": len(pending_refunds),
             "created": 0,
-            "duplicate": 0,
-            "unmatched": 0,
             "errors": 0,
             "would_create": 0,
             "results": [],
@@ -195,20 +194,14 @@ class RefundProcessor:
             status = result.get("status")
             if status == "created":
                 summary["created"] += 1
-            elif status == "duplicate":
-                summary["duplicate"] += 1
-            elif status == "unmatched":
-                summary["unmatched"] += 1
             elif status == "error":
                 summary["errors"] += 1
             elif status == "would_create":
                 summary["would_create"] += 1
 
         LOG.info(
-            "Refund processing complete: %d created, %d duplicates, %d unmatched, %d errors",
+            "Refund processing complete: %d created, %d errors",
             summary["created"],
-            summary["duplicate"],
-            summary["unmatched"],
             summary["errors"],
         )
 
@@ -218,7 +211,7 @@ class RefundProcessor:
 def main():
     """Main entry point for standalone script execution."""
     parser = argparse.ArgumentParser(
-        description="Process pending refunds - match to originals and create in Splitwise"
+        description="Process pending refunds and create them in Splitwise with their cc_reference_id"
     )
     parser.add_argument(
         "--dry-run",
@@ -253,7 +246,7 @@ def main():
     LOG.info("=" * 60)
 
     # Get pending refunds count
-    all_pending = db.get_unmatched_refunds()
+    all_pending = db.get_pending_refunds()
 
     # Filter by year if specified
     if args.year:
@@ -279,13 +272,12 @@ def main():
         LOG.info("\nPending refunds:")
         for i, refund in enumerate(pending_refunds[:5], 1):
             LOG.info(
-                "  %d. ID=%s, Date=%s, Merchant=%s, Amount=$%.2f, Status=%s",
+                "  %d. ID=%s, Date=%s, Merchant=%s, Amount=$%.2f",
                 i,
                 refund.id,
                 refund.date,
                 refund.merchant,
                 refund.amount,
-                refund.reconciliation_status,
             )
         if len(pending_refunds) > 5:
             LOG.info("  ... and %d more", len(pending_refunds) - 5)
@@ -306,24 +298,8 @@ def main():
     else:
         LOG.info("Successfully created: %d", summary["created"])
 
-    LOG.info("Duplicates (already processed): %d", summary["duplicate"])
-    LOG.info("Unmatched (manual review needed): %d", summary["unmatched"])
     LOG.info("Errors: %d", summary["errors"])
     LOG.info("=" * 60)
-
-    # Show details of unmatched refunds
-    if summary["unmatched"] > 0 and args.verbose:
-        LOG.info("\nUnmatched refunds requiring manual review:")
-        for result in summary["results"]:
-            if result.get("status") == "unmatched":
-                LOG.info(
-                    "  - ID=%s, Date=%s, Merchant=%s, Amount=$%.2f",
-                    result.get("refund_txn_id"),
-                    result.get("date"),
-                    result.get("merchant"),
-                    result.get("amount"),
-                )
-                LOG.info("    Error: %s", result.get("error"))
 
     # Show details of errors
     if summary["errors"] > 0 and args.verbose:

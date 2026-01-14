@@ -254,7 +254,7 @@ def process_statement(
             entry["status"] = "added"
             entry["splitwise_id"] = None  # Will be set by refund processor
 
-            # Save to database with pending status
+            # Save to database
             txn = Transaction(
                 date=date,
                 merchant=merchant,
@@ -263,7 +263,6 @@ def process_statement(
                 notes=f"cc_reference_id: {cc_reference_id}",
                 description=desc_clean,
                 is_refund=True,
-                reconciliation_status="pending",
                 category_id=entry.get("category_id"),
                 subcategory_id=entry.get("subcategory_id"),
             )
@@ -347,15 +346,13 @@ def process_statement(
                     splitwise_id=sid,
                     imported_at=now_iso(),
                     notes=f"cc_reference_id: {cc_reference_id}",
-                    reconciliation_status="pending" if is_credit else "matched",
                 )
                 db_txn_id = db.insert_transaction(db_txn)
                 entry["db_id"] = db_txn_id
                 LOG.info(
-                    "Saved transaction to database with ID %s (Splitwise ID: %s)%s",
+                    "Saved transaction to database with ID %s (Splitwise ID: %s)",
                     db_txn_id,
                     sid,
-                    " [REFUND - pending matching]" if is_credit else "",
                 )
             except Exception as db_error:
                 LOG.warning(
@@ -412,7 +409,6 @@ def process_statement(
         refund_summary = {
             "total": len(imported_refund_ids),
             "created": 0,
-            "duplicate": 0,
             "errors": 0,
             "results": [],
         }
@@ -431,15 +427,12 @@ def process_statement(
 
             if result["status"] == "created":
                 refund_summary["created"] += 1
-            elif result["status"] == "duplicate":
-                refund_summary["duplicate"] += 1
             elif result["status"] == "error":
                 refund_summary["errors"] += 1
 
         LOG.info("Refund processing summary:")
         LOG.info("  Total refunds from this batch: %d", refund_summary["total"])
         LOG.info("  Successfully created: %d", refund_summary["created"])
-        LOG.info("  Duplicates skipped: %d", refund_summary["duplicate"])
         LOG.info("  Errors: %d", refund_summary["errors"])
     elif dry_run and len(imported_refund_ids) > 0:
         LOG.info("=" * 60)

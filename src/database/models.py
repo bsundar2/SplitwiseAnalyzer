@@ -53,14 +53,8 @@ class Transaction:
     updated_at: Optional[str] = None
     notes: Optional[str] = None
 
-    # Refund tracking
-    refund_for_txn_id: Optional[int] = None  # Links to original transaction DB ID
-    refund_for_splitwise_id: Optional[int] = None  # Links to original Splitwise expense
-    refund_created_at: Optional[str] = None  # When refund was created
-    reconciliation_status: str = "pending"  # pending, matched, unmatched, manual_review
-    refund_match_method: Optional[str] = None  # txn_id, merchant_amount, manual
-    is_partial_refund: bool = False  # True if refund amount < original amount
-    refund_percentage: Optional[float] = None  # Percentage of original amount
+    # Refund tracking (minimal - refunds are standalone expenses)
+    refund_created_at: Optional[str] = None  # When refund was created in Splitwise
 
     def to_dict(self) -> dict:
         """Convert to dictionary, filtering None values for DB insert."""
@@ -90,35 +84,6 @@ class Transaction:
         """Mark transaction as deleted in Splitwise."""
         self.splitwise_deleted_at = datetime.utcnow().isoformat()
         self.updated_at = datetime.utcnow().isoformat()
-
-    def link_to_original_transaction(
-        self,
-        original_txn_id: int,
-        original_splitwise_id: Optional[int],
-        match_method: str,
-        original_amount: Optional[float] = None,
-    ):
-        """Link this refund to its original transaction.
-
-        Args:
-            original_txn_id: Database ID of original transaction
-            original_splitwise_id: Splitwise expense ID of original transaction
-            match_method: How the match was made (txn_id, merchant_amount, manual)
-            original_amount: Original transaction amount (to calculate if partial)
-        """
-        self.refund_for_txn_id = original_txn_id
-        self.refund_for_splitwise_id = original_splitwise_id
-        self.refund_match_method = match_method
-        self.reconciliation_status = "matched"
-        self.refund_created_at = datetime.utcnow().isoformat()
-        self.updated_at = datetime.utcnow().isoformat()
-
-        # Calculate if this is a partial refund
-        if original_amount and abs(self.amount) > 0:
-            refund_amt = abs(self.amount)
-            self.refund_percentage = (refund_amt / original_amount) * 100
-            # Consider partial if less than 95% of original (allows for return fees, restocking fees, etc.)
-            self.is_partial_refund = self.refund_percentage < 95.0
 
 
 @dataclass
