@@ -124,13 +124,13 @@ SplitwiseImporter/
 │       └── splitwise.py        # Splitwise API constants (split types, categories, etc.)
 ├── config/
 │   ├── .env                    # API keys & default settings
-│   ├── merchant_category_lookup.json  # 216+ merchant mappings
+│   ├── merchant_category_lookup.json  # 219+ merchant mappings
 │   ├── amex_category_mapping.json
 │   └── gsheets_authentication.json
 ├── data/
 │   ├── raw/                    # Raw CSV statements
 │   ├── processed/              # Processed outputs
-│   └── transactions.db         # SQLite database (1,672 transactions)
+│   └── transactions.db         # SQLite database (4,889 transactions)
 └── docs/
     ├── database_sync_guide.md  # Complete database & sync guide (Phase 1 & 2)
     └── ...
@@ -157,7 +157,7 @@ This summary provides everything Copilot needs.
 - SQLite database (`data/transactions.db`) - Canonical source for all transactions
 - Database schema with comprehensive transaction model (deduplication, source tracking, sync status)
 - DatabaseManager API for CRUD operations
-- Direct Splitwise API migration tool (1,654 transactions imported: 2025 + 2026)
+- Direct Splitwise API migration tool (4,889 transactions imported: 2013-2026)
 - Google Sheets positioned as "view cache" not primary ledger
 - Import audit trail with import_log table
 
@@ -207,7 +207,7 @@ This summary provides everything Copilot needs.
 ✅ **Configuration & Data**
 - Merchant category lookup with 216+ merchants
 - Category mappings: Transportation/Parking, Home/Household supplies, etc.
-- 2025 data fully imported (1,609 Splitwise expenses in database)
+- 2025 data fully imported (4,872 Splitwise expenses in database)
 - 2026 data imported (45 Splitwise expenses in database)
 - Now tracking 2026 expenses in new "Expenses 2026" sheet tab
 
@@ -227,7 +227,7 @@ This summary provides everything Copilot needs.
 - ✅ **Exception handling** - Removed try-catch blocks to fail fast (follows coding_style.md)
 - ✅ **Append-only mode** - Transactions and summaries only write new/changed data
 - ✅ **Historical backfill** - Synced 2,377 transactions from 2013-2024 Splitwise data
-- ✅ **Year-based tabs** - Exported 14 separate "Expenses YYYY" sheets (2013-2026, 3,992 total transactions)
+- ✅ **Year-based tabs** - Exported 14 separate "Expenses YYYY" sheets (2013-2026, 4,889 total transactions)
 - ✅ **Code cleanup** - Moved REFUND_KEYWORDS to constants, fixed import organization per coding_style.md
 - ✅ **Split type constants** - Added SPLIT_TYPE_SELF, SPLIT_TYPE_SPLIT, SPLIT_TYPE_SHARED, SPLIT_TYPE_PARTNER to constants/splitwise.py
 

@@ -43,7 +43,7 @@ A Python project to import Splitwise expenses, process credit card statements, c
 
 ### Phase 6 Features (Jan 2026)
 - 📜 **Historical backfill** - Synced 2,377 transactions from Splitwise (2013-2024)
-- 📜 **Year-based exports** - 14 separate "Expenses YYYY" tabs (2013-2026, 3,992 total transactions)
+- 📜 **Year-based exports** - 14 separate "Expenses YYYY" tabs (2013-2026, 4,889 total transactions)
 - 📜 **Multi-year summaries** - Monthly Summary sheet with 138 months of data (13+ years)
 - 📜 **Constants refactoring** - REFUND_KEYWORDS and split type constants (SPLIT_TYPE_SELF, etc.) moved to src/constants/splitwise.py
 - 📜 **Import organization** - All inline imports moved to top per coding_style.md
@@ -343,7 +343,7 @@ SplitwiseImporter/
 ├── data/
 │   ├── raw/                    # Raw credit card statements
 │   ├── processed/              # Processed outputs and review files
-│   └── transactions.db         # SQLite database (3,992 transactions: 2013-2026)
+│   └── transactions.db         # SQLite database (4,889 transactions: 2013-2026)
 ├── docs/                       # Documentation
 └── notebooks/                  # Jupyter analysis notebooks
 ```
@@ -522,7 +522,7 @@ The expense processing workflow can be automated with these steps:
 - ✅ Fixed date timezone issue causing one-day discrepancy between Splitwise UI and sheets
 - ✅ Updated merchant categories: SpotHero → Transportation/Parking, Amazon → Home/Household supplies, Costco → Home/Household supplies
 - ✅ Switched to 2026 tracking (config/.env updated with new dates and "Expenses 2026" worksheet)
-- ✅ Successfully imported January 2026 transactions (12 transactions processed)
+- ✅ Successfully imported January 2026 transactions (81+ transactions processed)
 - ✅ Added bulk category update workflow documentation
 
 ### Technical Improvements
