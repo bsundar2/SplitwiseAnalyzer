@@ -81,9 +81,12 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
     notes_parts = []
     notes_parts.append("Imported from Splitwise API")
 
-    if my_paid > 0:
+    # For refunds, if my_paid is negative and my_owed is 0, treat abs(my_paid) as the amount owed back
+    if is_refund and my_paid < 0 and my_owed == 0:
+        notes_parts.append(f"Owe: ${abs(my_paid):.2f}")
+    elif my_paid != 0:
         notes_parts.append(f"Paid: ${my_paid:.2f}")
-    if my_owed > 0:
+    if my_owed != 0:
         notes_parts.append(f"Owe: ${my_owed:.2f}")
     if participant_names:
         notes_parts.append(f"With: {participant_names}")
@@ -280,16 +283,16 @@ def sync_from_splitwise(
         is_refund_desc = any(
             keyword in sw_description.lower() for keyword in REFUND_KEYWORDS
         )
-        if is_refund_desc:
-            original_my_paid = -original_my_paid
-            original_my_owed = -original_my_owed
 
         notes_parts = []
         notes_parts.append("Imported from Splitwise API")
 
-        if original_my_paid > 0:
+        # For refunds, if my_paid is negative and my_owed is 0, treat abs(my_paid) as the amount owed back
+        if is_refund_desc and original_my_paid < 0 and original_my_owed == 0:
+            notes_parts.append(f"Owe: ${abs(original_my_paid):.2f}")
+        elif original_my_paid != 0:
             notes_parts.append(f"Paid: ${original_my_paid:.2f}")
-        if original_my_owed > 0:
+        if original_my_owed != 0:
             notes_parts.append(f"Owe: ${original_my_owed:.2f}")
         if sw_participant_names:
             notes_parts.append(f"With: {sw_participant_names}")
