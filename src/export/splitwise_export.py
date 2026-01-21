@@ -15,6 +15,7 @@ Key features:
 import argparse
 import json
 import os
+import re
 from datetime import datetime, date
 from typing import List, Optional, Union
 
@@ -46,6 +47,13 @@ from src.constants.splitwise import (
 )
 from src.constants.export_columns import ExportColumns
 from src.database import DatabaseManager
+
+
+def get_current_user_name() -> str:
+    """Get current user's first name from Splitwise API."""
+    client = SplitwiseClient()
+    current_user = client.get_current_user()
+    return current_user.getFirstName() if current_user else ""
 
 # Data source constants
 SOURCE_SPLITWISE = "splitwise"
@@ -217,11 +225,7 @@ def fetch_from_database(
     Returns:
         DataFrame with database transactions matching Splitwise export format
     """
-    import re
-
-    client = SplitwiseClient()
-    current_user = client.get_current_user()
-    current_user_name = current_user.getFirstName() if current_user else ""
+    current_user_name = get_current_user_name()
 
     db = DatabaseManager()
 
