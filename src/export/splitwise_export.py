@@ -43,7 +43,7 @@ from src.constants.splitwise import (
     ExcludedSplitwiseDescriptions,
     SPLIT_TYPE_SELF,
     SPLIT_TYPE_SPLIT,
-    REFUND_KEYWORDS
+    REFUND_KEYWORDS,
 )
 from src.constants.export_columns import ExportColumns
 from src.database import DatabaseManager
@@ -54,6 +54,7 @@ def get_current_user_name() -> str:
     client = SplitwiseClient()
     current_user = client.get_current_user()
     return current_user.getFirstName() if current_user else ""
+
 
 # Data source constants
 SOURCE_SPLITWISE = "splitwise"

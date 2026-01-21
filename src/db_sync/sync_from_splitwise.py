@@ -262,7 +262,9 @@ def sync_from_splitwise(
 
         # Update cc_reference_id if missing or different
         if sw_cc_reference_id and sw_cc_reference_id != txn.cc_reference_id:
-            changes.append(f"cc_ref: {txn.cc_reference_id or 'None'} → {sw_cc_reference_id}")
+            changes.append(
+                f"cc_ref: {txn.cc_reference_id or 'None'} → {sw_cc_reference_id}"
+            )
             updates["cc_reference_id"] = sw_cc_reference_id
 
         # Check and update notes with payment information
@@ -275,7 +277,9 @@ def sync_from_splitwise(
         # For notes, use original values (not negated for refunds)
         original_my_paid = sw_my_paid
         original_my_owed = sw_my_owed
-        is_refund_desc = any(keyword in sw_description.lower() for keyword in REFUND_KEYWORDS)
+        is_refund_desc = any(
+            keyword in sw_description.lower() for keyword in REFUND_KEYWORDS
+        )
         if is_refund_desc:
             original_my_paid = -original_my_paid
             original_my_owed = -original_my_owed
