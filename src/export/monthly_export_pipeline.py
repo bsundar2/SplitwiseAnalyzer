@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Monthly export pipeline - Import statement, sync DB, export to sheets.
+"""Monthly export pipeline - Sync DB, import statement, sync again, export to sheets.
 
 This pipeline automates the Phase 3 workflow:
-1. Import CSV statement to Splitwise (optional)
-2. Sync database with latest Splitwise data
-3. Export from database to Google Sheets
+1. Sync database with latest Splitwise data
+2. Import CSV statement to Splitwise (optional)
+3. Sync database again to capture newly created expenses
+4. Export from database to Google Sheets
+5. Generate budget summaries
 
 Usage examples:
   # Full pipeline with statement import
@@ -49,7 +51,7 @@ def run_import_statement(
     from src.import_statement.pipeline import main as import_main
 
     LOG.info("=" * 60)
-    LOG.info("STEP 1: Import statement to Splitwise")
+    LOG.info("STEP 2: Import statement to Splitwise")
     LOG.info("=" * 60)
 
     # Build args for import pipeline
@@ -75,13 +77,14 @@ def run_import_statement(
         return False
 
 
-def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False) -> bool:
+def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False, step_number: int = 1) -> bool:
     """Run database sync with Splitwise.
 
     Args:
         year: Year to sync
         dry_run: If True, preview without making changes
         verbose: If True, show detailed output
+        step_number: Step number for logging
 
     Returns:
         True if successful, False otherwise
@@ -89,7 +92,7 @@ def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False) -
     from src.db_sync.sync_from_splitwise import sync_from_splitwise
 
     LOG.info("=" * 60)
-    LOG.info("STEP 2: Sync database with Splitwise")
+    LOG.info(f"STEP {step_number}: Sync database with Splitwise")
     LOG.info("=" * 60)
 
     start_date = f"{year}-01-01"
@@ -299,9 +302,16 @@ Examples:
     print("=" * 60 + "\n")
 
     success_count = 0
-    total_steps = 3 if args.sync_only else 4  # Include summary generation step
+    total_steps = 3 if args.sync_only else 5  # sync_only: sync + export + summaries (3 steps), full: sync + import + sync + export + summaries (5 steps)
 
-    # Step 1: Import statement (optional)
+    # Step 1: Sync database (always first to ensure latest data)
+    if run_sync_database(args.year, args.dry_run, args.verbose, step_number=1):
+        success_count += 1
+    else:
+        LOG.error("Pipeline failed at database sync step")
+        return 1
+
+    # Step 2: Import statement (optional, now after sync to avoid duplicates)
     if not args.sync_only and args.statement:
         if run_import_statement(
             args.statement, args.start_date, args.end_date, args.dry_run
@@ -311,21 +321,24 @@ Examples:
             LOG.error("Pipeline failed at statement import step")
             return 1
 
-    # Step 2: Sync database
-    if run_sync_database(args.year, args.dry_run, args.verbose):
-        success_count += 1
+        # Step 3: Sync database again (to capture newly created expenses from import)
+        if run_sync_database(args.year, args.dry_run, args.verbose, step_number=3):
+            success_count += 1
+        else:
+            LOG.error("Pipeline failed at post-import database sync step")
+            return 1
     else:
-        LOG.error("Pipeline failed at database sync step")
-        return 1
+        # When sync_only, export is step 2
+        pass
 
-    # Step 3: Export to sheets
+    # Step 4/2: Export to sheets
     if run_export_to_sheets(args.year, args.worksheet, args.dry_run, args.append_only):
         success_count += 1
     else:
         LOG.error("Pipeline failed at export step")
         return 1
 
-    # Step 4: Generate budget summaries
+    # Step 5/3: Generate budget summaries
     if run_generate_summaries(args.year, args.dry_run):
         success_count += 1
     else:

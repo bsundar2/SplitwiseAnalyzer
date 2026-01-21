@@ -264,6 +264,8 @@ def process_statement(
                 date=date,
                 merchant=merchant,
                 amount=-float(amount),  # Store as negative for refunds
+                source="amex",  # TODO: Make this configurable based on statement source
+                imported_at=now_iso(),
                 cc_reference_id=cc_reference_id,
                 notes=f"cc_reference_id: {cc_reference_id}",
                 description=desc_clean,
@@ -483,70 +485,72 @@ def process_statement(
     return out_df
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the pipeline script."""
     parser = argparse.ArgumentParser(
-        description="Process a CSV statement and add new expenses to Splitwise"
+        description="Import credit card statements to Splitwise",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python src/import_statement/pipeline.py --statement data/raw/amex2025.csv --dry-run
+  python src/import_statement/pipeline.py --statement data/raw/amex2025.csv --start-date 2025-01-01 --end-date 2025-12-31
+        """,
     )
     parser.add_argument(
-        "--statement", "-s", required=True, help="Path to CSV statement"
+        "--statement",
+        required=True,
+        help="Path to CSV statement file",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Don't actually add to Splitwise; sheet writes will still occur unless you pass --no-sheet",
-    )
-    parser.add_argument(
-        "--no-sheet",
-        action="store_true",
-        help="Do not write processed output to Google Sheets (useful for dry runs)",
-    )
-    parser.add_argument(
-        "--append",
-        action="store_true",
-        help="Append to existing Google Sheet instead of overwriting (useful for batch imports)",
+        help="Preview changes without creating expenses",
     )
     parser.add_argument(
         "--limit",
         type=int,
-        default=None,
-        help="Limit number of expenses to add in a run",
+        help="Limit number of transactions to process",
+    )
+    parser.add_argument(
+        "--sheet-key",
+        default=os.getenv("SPREADSHEET_KEY"),
+        help="Google Sheets spreadsheet key for logging",
+    )
+    parser.add_argument(
+        "--worksheet-name",
+        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports"),
+        help="Worksheet name for dry-run logging",
+    )
+    parser.add_argument(
+        "--no-sheet",
+        action="store_true",
+        help="Skip writing to Google Sheets",
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Start date filter (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="End date filter (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        dest="append_to_sheet",
+        help="Append to existing sheet instead of overwriting",
     )
     parser.add_argument(
         "--offset",
         type=int,
         default=0,
-        help="Skip the first N transactions (useful for batch processing)",
+        help="Skip first N transactions",
     )
     parser.add_argument(
         "--merchant-filter",
-        type=str,
-        default=None,
-        help="Only process transactions matching this merchant name (case-insensitive substring match)",
+        help="Only process transactions containing this merchant name",
     )
-    parser.add_argument(
-        "--sheet-key",
-        type=str,
-        default=os.getenv("SPREADSHEET_KEY"),
-        help="Spreadsheet key/ID to write processed output to (default: SPREADSHEET_KEY env var)",
-    )
-    parser.add_argument(
-        "--worksheet-name",
-        type=str,
-        default=None,
-        help="Name of the worksheet/tab to write processed output into (default: DRY_RUN_WORKSHEET_NAME env var for dry runs, 'Imported Transactions' otherwise)",
-    )
-    parser.add_argument(
-        "--start-date",
-        type=str,
-        default=None,
-        help="Start date for duplicate detection range (YYYY-MM-DD, default: START_DATE from .env or 2026-01-01)",
-    )
-    parser.add_argument(
-        "--end-date",
-        type=str,
-        default=None,
-        help="End date for duplicate detection range (YYYY-MM-DD, default: END_DATE from .env or 2026-12-31)",
-    )
+
     args = parser.parse_args()
 
     # Validate sheet_key if we're going to write to sheets
@@ -564,7 +568,12 @@ if __name__ == "__main__":
         no_sheet=args.no_sheet,
         start_date=args.start_date,
         end_date=args.end_date,
-        append_to_sheet=args.append,
+        append_to_sheet=args.append_to_sheet,
         offset=args.offset,
         merchant_filter=args.merchant_filter,
     )
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())
