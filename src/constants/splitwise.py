@@ -34,7 +34,6 @@ REFUND_KEYWORDS = ("refund", "credit", "return")
 # Split type constants for transaction categorization
 SPLIT_TYPE_SELF = "self"
 SPLIT_TYPE_SPLIT = "split"
-SPLIT_TYPE_SHARED = "shared"
 SPLIT_TYPE_PARTNER = "partner"
 
 

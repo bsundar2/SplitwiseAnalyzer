@@ -31,7 +31,7 @@ from src.constants.splitwise import (
     REFUND_KEYWORDS,
     SPLIT_TYPE_PARTNER,
     SPLIT_TYPE_SELF,
-    SPLIT_TYPE_SHARED,
+    SPLIT_TYPE_SPLIT,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
@@ -334,7 +334,7 @@ class SplitwiseClient:
                         for r in user_rows_sorted
                     )
                     split_type = (
-                        SPLIT_TYPE_SHARED if bool(other_nonzero) else SPLIT_TYPE_SELF
+                        SPLIT_TYPE_SPLIT if bool(other_nonzero) else SPLIT_TYPE_SELF
                     )
 
                 data.append(
