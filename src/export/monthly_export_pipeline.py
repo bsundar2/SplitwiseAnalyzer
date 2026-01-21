@@ -77,7 +77,9 @@ def run_import_statement(
         return False
 
 
-def run_sync_database(year: int, dry_run: bool = False, verbose: bool = False, step_number: int = 1) -> bool:
+def run_sync_database(
+    year: int, dry_run: bool = False, verbose: bool = False, step_number: int = 1
+) -> bool:
     """Run database sync with Splitwise.
 
     Args:
@@ -302,7 +304,9 @@ Examples:
     print("=" * 60 + "\n")
 
     success_count = 0
-    total_steps = 3 if args.sync_only else 5  # sync_only: sync + export + summaries (3 steps), full: sync + import + sync + export + summaries (5 steps)
+    total_steps = (
+        3 if args.sync_only else 5
+    )  # sync_only: sync + export + summaries (3 steps), full: sync + import + sync + export + summaries (5 steps)
 
     # Step 1: Sync database (always first to ensure latest data)
     if run_sync_database(args.year, args.dry_run, args.verbose, step_number=1):
