@@ -15,24 +15,28 @@ from typing import Any, Dict, List, Optional, Union
 # Third-party
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 from splitwise import Expense, Splitwise
 from splitwise.category import Category
 from splitwise.user import ExpenseUser
 
 # Local application
+from src.common.env import load_project_env
+from src.common.transaction_filters import is_deleted_expense
 from src.common.utils import LOG, infer_category, parse_float_safe
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import (
     DEFAULT_CURRENCY,
-    DEFAULT_LOOKBACK_DAYS,
     DELETED_AT_FIELD,
     DETAILS_COLUMN_NAME,
+    REFUND_KEYWORDS,
+    SPLIT_TYPE_PARTNER,
+    SPLIT_TYPE_SELF,
+    SPLIT_TYPE_SPLIT,
     SPLITWISE_PAGE_SIZE,
     SplitwiseUserId,
 )
 
-load_dotenv("config/.env")
+load_project_env()
 
 
 # Handles Splitwise API/CSV integration
@@ -51,8 +55,22 @@ class SplitwiseClient:
         )
 
     @cache
+    def get_current_user(self):
+        """Get current user from Splitwise API.
+
+        Returns:
+            Splitwise User object
+        """
+        return self.sObj.getCurrentUser()
+
+    @cache
     def get_current_user_id(self):
-        return self.sObj.getCurrentUser().getId()
+        """Get current user ID from Splitwise API.
+
+        Returns:
+            int: User ID
+        """
+        return self.get_current_user().getId()
 
     def _fetch_expenses_paginated(
         self, start_date_str: str, end_date_str: str, fetch_full_details: bool = False
@@ -91,14 +109,7 @@ class SplitwiseClient:
                     break
 
                 # Filter out deleted expenses from the basic list
-                non_deleted = [
-                    exp
-                    for exp in expenses
-                    if not (
-                        hasattr(exp, DELETED_AT_FIELD)
-                        and getattr(exp, DELETED_AT_FIELD)
-                    )
-                ]
+                non_deleted = [exp for exp in expenses if not is_deleted_expense(exp)]
 
                 all_expenses.extend(non_deleted)
 
@@ -291,6 +302,18 @@ class SplitwiseClient:
                 )
                 my_paid = my_row["paid"] if my_row else 0.0
                 my_owed = my_row["owed"] if my_row else 0.0
+
+                # Check if this is a refund by description keywords
+                description = expense.getDescription() or ""
+                is_refund = any(
+                    keyword in description.lower() for keyword in REFUND_KEYWORDS
+                )
+
+                # For refunds, negate my_owed and my_paid to show as credits
+                if is_refund:
+                    my_owed = -my_owed
+                    my_paid = -my_paid
+
                 my_net = my_paid - my_owed
 
                 participant_ids = {r["id"] for r in user_rows_sorted}
@@ -302,15 +325,17 @@ class SplitwiseClient:
                 }
 
                 if has_self_user:
-                    split_type = "self"
+                    split_type = SPLIT_TYPE_SELF
                 elif is_partner_only:
-                    split_type = "partner"
+                    split_type = SPLIT_TYPE_PARTNER
                 else:
                     other_nonzero = any(
                         r["id"] != my_user_id and (r["paid"] > 0 or r["owed"] > 0)
                         for r in user_rows_sorted
                     )
-                    split_type = "shared" if bool(other_nonzero) else "self"
+                    split_type = (
+                        SPLIT_TYPE_SPLIT if bool(other_nonzero) else SPLIT_TYPE_SELF
+                    )
 
                 data.append(
                     {
@@ -692,7 +717,14 @@ if __name__ == "__main__":
         ],
     )
 
-    # today = datetime.now().date()
-    # seven_days_ago = today - timedelta(days=25)
-    # df = client.get_my_expenses_by_date_range(seven_days_ago, today)
-    # print(df)
+
+def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:
+    """Get SplitwiseClient instance (None in dry-run mode).
+
+    Args:
+        dry_run: If True, returns None (no API calls will be made)
+
+    Returns:
+        SplitwiseClient instance or None
+    """
+    return None if dry_run else SplitwiseClient()

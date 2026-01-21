@@ -10,6 +10,12 @@ SHEETS_AUTHENTICATION_FILE = os.path.abspath(
     )
 )
 
+# Worksheet names for summary sheets
+WORKSHEET_MONTHLY_SUMMARY = "Monthly Summary"
+WORKSHEET_CATEGORY_BREAKDOWN = "Category Breakdown"
+WORKSHEET_BUDGET_VS_ACTUAL = "Budget vs Actual"
+WORKSHEET_MONTHLY_TRENDS = "Monthly Trends"
+
 # Column formatting constants
 CURRENCY_COLUMNS = ["B", "H", "I", "J"]  # amount, my_paid, my_owed, my_net
 CURRENCY_FORMAT_PATTERN = '"$"#,##0.00'

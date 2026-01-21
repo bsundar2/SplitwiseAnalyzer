@@ -3,8 +3,11 @@
 Show sample merchants from the review file to preview what needs reviewing.
 """
 
+import argparse
+
 import pandas as pd
 from pathlib import Path
+
 from src.common.utils import PROJECT_ROOT
 
 REVIEW_FILE = (
@@ -15,7 +18,7 @@ REVIEW_FILE = (
 def show_samples(n=10):
     """Show sample merchants from review file."""
     if not REVIEW_FILE.exists():
-        print(f"❌ Review file not found: {REVIEW_FILE}")
+        print(f"ERROR: Review file not found: {REVIEW_FILE}")
         print("Run the pipeline first to generate review data:")
         print("  python src/pipeline.py --statement data/raw/your_statement.csv")
         return
@@ -56,8 +59,6 @@ def show_samples(n=10):
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Preview merchants in review file")
     parser.add_argument(
         "-n",

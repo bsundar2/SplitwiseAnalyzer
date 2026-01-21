@@ -7,7 +7,6 @@ including payload keys, default values, and other configuration parameters.
 # Standard library
 import json
 from enum import IntEnum, StrEnum
-from functools import cache
 from pathlib import Path
 from typing import Dict
 
@@ -28,6 +27,14 @@ DETAILS_COLUMN_NAME = "Details"
 
 # Field name for deleted expense timestamp in Splitwise API response
 DELETED_AT_FIELD = "deleted_at"
+
+# Keywords used to identify refund/credit transactions in descriptions
+REFUND_KEYWORDS = ("refund", "credit", "return")
+
+# Split type constants for transaction categorization
+SPLIT_TYPE_SELF = "self"
+SPLIT_TYPE_SPLIT = "split"
+SPLIT_TYPE_PARTNER = "partner"
 
 
 class SubcategoryMapper:
@@ -56,7 +63,7 @@ class SubcategoryMapper:
         # Build mapping from snake_case names to subcategory IDs
         category_mapping = data.get("category_mapping", {})
 
-        for full_path, info in category_mapping.items():
+        for _, info in category_mapping.items():
             subcategory = info.get("subcategory_name", "")
             subcategory_id = info.get("subcategory_id")
 

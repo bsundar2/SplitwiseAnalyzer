@@ -10,15 +10,14 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
-from splitwise import Expense
-from splitwise.user import ExpenseUser
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.common.splitwise_client import SplitwiseClient
-from src.constants.splitwise import SplitwiseUserId
-from src.common.utils import LOG
+from src.constants.export_columns import ExportColumns
+from src.constants.splitwise import SplitwiseUserId, SPLIT_TYPE_SELF
+from src.common.utils import LOG, parse_date_string
 
 
 def update_self_expense(
@@ -62,13 +61,13 @@ def update_self_expense(
                 user.setOwedShare("0.00")
 
         # Update the expense
-        result = client.sObj.updateExpense(expense_obj)
+        client.sObj.updateExpense(expense_obj)
 
-        LOG.info(f"✓ Updated expense {expense_id}: ${amount}")
+        LOG.info(f"Updated expense {expense_id}: ${amount}")
         return True
 
     except Exception as e:
-        LOG.error(f"✗ Failed to update expense {expense_id}: {str(e)}")
+        LOG.error(f"Failed to update expense {expense_id}: {str(e)}")
         return False
 
 
@@ -121,12 +120,12 @@ def main():
 
     # Parse dates
     if args.end_date:
-        end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+        end_date = parse_date_string(args.end_date)
     else:
         end_date = datetime.now().date()
 
     if args.start_date:
-        start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        start_date = parse_date_string(args.start_date)
     else:
         start_date = end_date - timedelta(days=30)
 
@@ -215,7 +214,7 @@ def main():
             # Self expenses have exactly 2 entries with the same name (or "Balaji, Balaji" pattern)
             participant_names = row.get(ExportColumns.PARTICIPANT_NAMES, "")
             return (
-                row.get(ExportColumns.SPLIT_TYPE) == "self"
+                row.get(ExportColumns.SPLIT_TYPE) == SPLIT_TYPE_SELF
                 and "," in participant_names
                 and len(participant_names.split(",")) == 2
                 and participant_names.split(",")[0].strip()

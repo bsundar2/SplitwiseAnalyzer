@@ -9,12 +9,15 @@ import argparse
 import sys
 from pathlib import Path
 from datetime import datetime
+
 from splitwise.category import Category
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.common.splitwise_client import SplitwiseClient
+from src.common.utils import parse_date_string
+from src.common.env import get_env
 from src.constants.export_columns import ExportColumns
 from src.constants.splitwise import SUBCATEGORY_IDS
 from src.common.utils import LOG
@@ -116,7 +119,7 @@ def update_expenses(
     )
 
     updated_count = 0
-    for idx, row in expenses_df.iterrows():
+    for _, row in expenses_df.iterrows():
         exp_id = row[ExportColumns.ID]
         try:
             exp = client.sObj.getExpense(exp_id)
@@ -128,11 +131,11 @@ def update_expenses(
 
             client.sObj.updateExpense(exp)
             LOG.info(
-                f"✓ Updated expense {exp_id}: {row[ExportColumns.DESCRIPTION]} ({row[ExportColumns.DATE]})"
+                f"Updated expense {exp_id}: {row[ExportColumns.DESCRIPTION]} ({row[ExportColumns.DATE]})"
             )
             updated_count += 1
         except Exception as e:
-            LOG.error(f"✗ Failed to update expense {exp_id}: {str(e)}")
+            LOG.error(f"Failed to update expense {exp_id}: {str(e)}")
 
     return updated_count
 
@@ -224,29 +227,17 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
 
     # Parse dates
     if args.end_date:
-        end_date = datetime.strptime(args.end_date, "%Y-%m-%d")
+        end_date = parse_date_string(args.end_date)
     else:
-        import os
-        from dotenv import load_dotenv
-
-        load_dotenv("config/.env")
-        end_date_str = os.getenv("END_DATE")
-        end_date = (
-            datetime.strptime(end_date_str, "%Y-%m-%d")
-            if end_date_str
-            else datetime.now()
-        )
+        end_date_str = get_env("END_DATE")
+        end_date = parse_date_string(end_date_str) if end_date_str else datetime.now()
 
     if args.start_date:
-        start_date = datetime.strptime(args.start_date, "%Y-%m-%d")
+        start_date = parse_date_string(args.start_date)
     else:
-        import os
-        from dotenv import load_dotenv
-
-        load_dotenv("config/.env")
-        start_date_str = os.getenv("START_DATE")
+        start_date_str = get_env("START_DATE")
         start_date = (
-            datetime.strptime(start_date_str, "%Y-%m-%d")
+            parse_date_string(start_date_str)
             if start_date_str
             else datetime(end_date.year, 1, 1)
         )
@@ -312,7 +303,7 @@ See src/constants/splitwise.py for full list of available subcategory IDs.
     if args.dry_run:
         LOG.info(f"DRY RUN: Would update {len(expenses_to_update)} expenses")
     else:
-        LOG.info(f"✅ Successfully updated {updated_count} expenses")
+        LOG.info(f"Successfully updated {updated_count} expenses")
 
     return updated_count
 

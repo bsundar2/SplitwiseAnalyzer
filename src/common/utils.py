@@ -3,8 +3,7 @@ import json
 import pandas as pd
 
 import dateparser
-from dotenv import load_dotenv
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import logging
 import yaml
 import hashlib
@@ -13,7 +12,11 @@ import tempfile
 from functools import cache
 from typing import Union, Optional, Dict, Any
 
-load_dotenv()
+from src.constants.config import CFG_PATHS
+from src.common.env import load_project_env
+
+# Load environment once
+load_project_env()
 
 LOG = logging.getLogger("cc_splitwise")
 handler = logging.StreamHandler()
@@ -23,6 +26,38 @@ LOG.addHandler(handler)
 LOG.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+# Date format constants
+DATE_FORMAT = "%Y-%m-%d"
+
+
+def parse_date_string(date_str: str) -> date:
+    """Parse YYYY-MM-DD date string to date object.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format
+
+    Returns:
+        date object
+
+    Raises:
+        ValueError: If date_str is not in valid format
+    """
+    return datetime.strptime(date_str, DATE_FORMAT).date()
+
+
+def format_date(date_obj: Union[date, datetime]) -> str:
+    """Format date/datetime object to YYYY-MM-DD string.
+
+    Args:
+        date_obj: date or datetime object
+
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    if isinstance(date_obj, datetime):
+        date_obj = date_obj.date()
+    return date_obj.strftime(DATE_FORMAT)
 
 
 def load_yaml(path):
@@ -67,7 +102,9 @@ def clean_description_for_splitwise(
         # Use canonical_name if available, otherwise title-case the merchant key
         canonical_name = merchant_info.get("canonical_name")
         if not canonical_name:
-            canonical_name = " ".join(word.title() for word in normalized_merchant.split())
+            canonical_name = " ".join(
+                word.title() for word in normalized_merchant.split()
+            )
         LOG.info(f"Using canonical merchant name: '{canonical_name}' (from lookup)")
         return canonical_name
 
@@ -231,10 +268,10 @@ def clean_description_for_splitwise(
 
 def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
     """Clean up and standardize merchant names from transaction descriptions.
-    
+
     Simplified approach: Extract merchant name from Description field only.
     Format: "MERCHANT_NAME   LOCATION_INFO   STATE"
-    
+
     Examples:
         "AMERICAN AIRLINES   800-433-7300        TX" → "American Airlines"
         "SP BERNAL CUTLERY   SAN FRANCISCO       CA" → "Bernal Cutlery"
@@ -242,6 +279,8 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
         "LULULEMON ATHLETICA (877)263-9300       CA" → "Lululemon Athletica"
 
     Args:
+        description: Raw description string from the transaction (Description field from CSV)
+        config: Optional configuration dictionary (unused in simplified version)
         description: Raw description string from the transaction (Description field from CSV)
         config: Optional configuration dictionary (unused in simplified version)
 
@@ -253,39 +292,39 @@ def clean_merchant_name(description: str, config: Optional[Dict] = None) -> str:
 
     # Remove prefixes that aren't part of merchant name
     description = description.strip()
-    
+
     # Remove common payment processor prefixes
     prefixes_to_remove = [
-        r'^SP\s+',  # Square point of sale prefix
-        r'^GglPay\s+',  # Google Pay prefix
-        r'^PayPal\s*\*\s*',  # PayPal prefix
-        r'^SQ\s*\*\s*',  # Square prefix
+        r"^SP\s+",  # Square point of sale prefix
+        r"^GglPay\s+",  # Google Pay prefix
+        r"^PayPal\s*\*\s*",  # PayPal prefix
+        r"^SQ\s*\*\s*",  # Square prefix
     ]
-    
+
     for prefix_pattern in prefixes_to_remove:
-        description = re.sub(prefix_pattern, '', description, flags=re.IGNORECASE)
-    
+        description = re.sub(prefix_pattern, "", description, flags=re.IGNORECASE)
+
     description = description.strip()
-    
+
     # Split on multiple spaces (typically separates merchant from location/phone)
     # The pattern "  " (2+ spaces) typically separates sections
-    parts = re.split(r'\s{2,}', description)
-    
+    parts = re.split(r"\s{2,}", description)
+
     if not parts:
         return description
-    
+
     # First part is typically the merchant name
     merchant_name = parts[0].strip()
-    
+
     # Remove phone numbers in format (XXX)XXX-XXXX or XXX-XXX-XXXX at the end
-    merchant_name = re.sub(r'\s*\(?\d{3}\)?\s*\d{3}-\d{4}\s*$', '', merchant_name)
-    
+    merchant_name = re.sub(r"\s*\(?\d{3}\)?\s*\d{3}-\d{4}\s*$", "", merchant_name)
+
     # Remove state codes at the end (like "CA", "TX", "NY" etc)
-    merchant_name = re.sub(r'\s+[A-Z]{2}$', '', merchant_name)
-    
+    merchant_name = re.sub(r"\s+[A-Z]{2}$", "", merchant_name)
+
     # Title case the result for readability
-    merchant_name = ' '.join(word.title() for word in merchant_name.split())
-    
+    merchant_name = " ".join(word.title() for word in merchant_name.split())
+
     return merchant_name
 
 
@@ -295,8 +334,6 @@ def mkdir_p(path):
 
 def now_iso():
     # Use timezone-aware UTC timestamp
-    from datetime import timezone
-
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -415,8 +452,6 @@ def generate_fingerprint(
     Returns:
         A stable fingerprint string for the transaction
     """
-    import hashlib
-
     try:
         # Parse and normalize date
         date_obj = dateparser.parse(str(date_val))
@@ -552,8 +587,6 @@ def _load_category_config() -> Dict:
     Returns:
         Dict containing the category configuration with default values if not found.
     """
-    from src.constants.config import CFG_PATHS
-
     default_config = {
         "default_category": {
             "id": 2,  # Uncategorized category

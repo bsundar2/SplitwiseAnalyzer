@@ -21,6 +21,10 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 DEFAULT_PROCESSED_CSV = "jan2026.csv.processed.csv"
 DEFAULT_REVIEW_FILE = "merchant_names_for_review.csv"
 DEFAULT_FULL_REVIEW_FILE = "merchant_names_full_review.csv"
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+DEFAULT_PROCESSED_CSV = "jan2026.csv.processed.csv"
+DEFAULT_REVIEW_FILE = "merchant_names_for_review.csv"
+DEFAULT_FULL_REVIEW_FILE = "merchant_names_full_review.csv"
 
 
 def generate_review_file(
@@ -38,7 +42,7 @@ def generate_review_file(
     processed_path = Path(processed_csv)
     if not processed_path.is_absolute():
         processed_path = PROJECT_ROOT / "data" / "processed" / processed_csv
-    
+
     if not processed_path.exists():
         LOG.error(f"Processed CSV not found: {processed_path}")
         LOG.error(
@@ -52,9 +56,11 @@ def generate_review_file(
         if not output_path.is_absolute():
             output_path = PROJECT_ROOT / "data" / "processed" / output_file
     else:
-        default_name = DEFAULT_FULL_REVIEW_FILE if include_known else DEFAULT_REVIEW_FILE
+        default_name = (
+            DEFAULT_FULL_REVIEW_FILE if include_known else DEFAULT_REVIEW_FILE
+        )
         output_path = PROJECT_ROOT / "data" / "processed" / default_name
-    
+
     # Load merchant lookup
     merchant_lookup_path = PROJECT_ROOT / "config" / "merchant_category_lookup.json"
     merchant_lookup = {}
@@ -155,11 +161,11 @@ def main():
     )
 
     if success:
-        print(f"\n✓ Generated review file: {args.output}")
+        print(f"\nGenerated review file: {args.output}")
         print("\nTo start reviewing:")
         print("  python src/merchant_review/review_merchants.py --batch 30")
     else:
-        print("\n✗ Failed to generate review file")
+        print("\nFailed to generate review file")
         return 1
 
     return 0

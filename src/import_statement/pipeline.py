@@ -3,28 +3,31 @@
 # Standard library
 import argparse
 import os
+from datetime import datetime as dt
 
 # Third-party
 import pandas as pd
-from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv("config/.env")
+from src.common.env import load_project_env
+
+load_project_env()
 
 # Local application
-from src.constants.config import CACHE_PATH, PROCESSED_DIR
-from src.constants.gsheets import DEFAULT_WORKSHEET_NAME
+from src.constants.config import PROCESSED_DIR
+from src.constants.splitwise import SplitwiseUserId
 from src.import_statement.parse_statement import parse_statement
+from src.import_statement.process_refunds import RefundProcessor
 from src.common.sheets_sync import write_to_sheets
 from src.common.splitwise_client import SplitwiseClient
+from src.database import DatabaseManager
+from src.database.models import Transaction
 from src.common.utils import (
     LOG,
     clean_merchant_name,
     infer_category,
-    load_state,
     mkdir_p,
     now_iso,
-    save_state_atomic,
 )
 
 
@@ -56,8 +59,8 @@ def process_statement(
         return
 
     mkdir_p(PROCESSED_DIR)
-    cache = load_state(CACHE_PATH)
     client = None
+    db = DatabaseManager()  # Initialize database manager
 
     if not dry_run:
         client = SplitwiseClient()
@@ -74,7 +77,7 @@ def process_statement(
     added = 0
     attempted = 0
     skipped = 0
-    for idx, row in df.reset_index(drop=True).iterrows():
+    for _, row in df.reset_index(drop=True).iterrows():
         # Skip transactions before offset
         if skipped < offset:
             skipped += 1
@@ -100,15 +103,11 @@ def process_statement(
 
         # Check date filter if specified (filter transactions by date range)
         if date:
-            from datetime import datetime
-
             txn_date = (
-                datetime.strptime(date, "%Y-%m-%d").date()
-                if isinstance(date, str)
-                else date
+                dt.strptime(date, "%Y-%m-%d").date() if isinstance(date, str) else date
             )
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+            start_date_obj = dt.strptime(start_date, "%Y-%m-%d").date()
+            end_date_obj = dt.strptime(end_date, "%Y-%m-%d").date()
             if txn_date < start_date_obj or txn_date > end_date_obj:
                 LOG.debug(
                     f"Skipping transaction outside date range: {date} (range: {start_date} to {end_date})"
@@ -125,67 +124,36 @@ def process_statement(
             if s and s.lower() != "nan":
                 cc_reference_id = s
 
+        # Extract cc_reference_id from row if parsed (from detail column)
+        if not cc_reference_id and "cc_reference_id" in row:
+            cc_reference_id = row.get("cc_reference_id")
+
         if not cc_reference_id:
             error_msg = f"Transaction is missing required cc_reference_id (date={date}, amount={amount}, description='{desc}')"
             raise ValueError(error_msg)
+
+        # Detect if this is a refund/credit (negative amount OR explicit is_credit flag)
+        is_credit = row.get("is_credit", False) or float(amount) < 0
+
+        # For refunds, use absolute value for amount
+        amount_abs = abs(float(amount))
 
         entry = {
             "date": date,
             "description": desc_clean,  # Clean version for Splitwise
             "description_raw": desc_raw,  # Raw version for debugging in sheets
-            "amount": float(amount),
+            "amount": amount_abs,
             "detail": cc_reference_id,
             "cc_reference_id": cc_reference_id,
-            "is_credit": row.get("is_credit", False),
+            "is_credit": is_credit,
         }
-        # check cache
-        if cc_reference_id in cache:
-            entry["status"] = "cached"
-            LOG.info("Skipping cached txn %s %s %s", date, amount, desc)
-            results.append(entry)
-            continue
 
-        # check remote (only if not dry_run and client exists)
-        remote_found = None
-        if client:
-            try:
-                remote_found = client.find_expense_by_cc_reference(
-                    cc_reference_id,
-                    amount=amount,
-                    date=date,
-                    merchant=merchant,
-                    use_detailed_search=True,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            except (RuntimeError, ValueError) as e:
-                LOG.warning(
-                    "Error searching remote for cc_reference_id %s: %s",
-                    cc_reference_id,
-                    str(e),
-                )
-                remote_found = None
-        if remote_found:
-            entry["status"] = "remote_exists"
-            entry["remote_id"] = remote_found.get("id")
-            LOG.info(
-                "Found existing Splitwise expense for txn %s -> id %s",
-                cc_reference_id,
-                remote_found.get("id"),
-            )
-            # save to cache for idempotency
-            cache[cc_reference_id] = {
-                "splitwise_id": remote_found.get("id"),
-                "amount": amount,
-                "date": date,
-                "description": remote_found.get("description"),
-                "added_at": now_iso(),
-            }
-            save_state_atomic(CACHE_PATH, cache)  # Save cache immediately
-            results.append(entry)
-            continue
+        # Clean cc_reference_id by stripping quotes (Amex CSV wraps in single quotes)
+        if cc_reference_id:
+            cc_reference_id = str(cc_reference_id).strip().strip("'\"")
+            entry["cc_reference_id"] = cc_reference_id
 
-        # Infer category for the transaction
+        # Infer category for ALL transactions (needed for sheet reporting even if duplicate)
         is_credit = row.get("is_credit", False)
         if is_credit:
             # All credits should be categorized as Uncategorized > General
@@ -217,58 +185,123 @@ def process_statement(
             }
         )
 
+        # Check database for duplicate by cc_reference_id ONLY
+        # Do NOT use fuzzy matching (date/merchant/amount) because legitimate separate
+        # transactions can have identical details (e.g., 2 plane tickets on same day)
+        db_found = None
+
+        # Check by cc_reference_id column - this is the ONLY reliable duplicate detection
+        if cc_reference_id:
+            # Strip quotes that might be in the CSV (Amex wraps in single quotes)
+            cc_ref_clean = str(cc_reference_id).strip().strip("'\"")
+            db_found = db.get_transaction_by_cc_reference(cc_ref_clean)
+            if db_found:
+                LOG.info(
+                    "Found existing transaction by cc_reference_id in DB: %s (SW ID: %s)",
+                    cc_ref_clean,
+                    db_found.splitwise_id,
+                )
+
+        if db_found:
+            entry["status"] = "db_exists"
+            entry["db_id"] = db_found.id
+            entry["splitwise_id"] = db_found.splitwise_id
+            results.append(entry)
+            continue
+
+        # check remote (only if not dry_run and client exists)
+        remote_found = None
+        if client:
+            try:
+                remote_found = client.find_expense_by_cc_reference(
+                    cc_reference_id,
+                    amount=amount,
+                    date=date,
+                    merchant=merchant,
+                    use_detailed_search=True,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            except (RuntimeError, ValueError) as e:
+                LOG.warning(
+                    "Error searching remote for cc_reference_id %s: %s",
+                    cc_reference_id,
+                    str(e),
+                )
+                remote_found = None
+
+        # If found in remote, skip adding to Splitwise
+        if remote_found:
+            entry["status"] = "remote_exists"
+            entry["splitwise_id"] = remote_found.get(
+                "id"
+            )  # Use splitwise_id for consistency
+            entry["remote_id"] = remote_found.get(
+                "id"
+            )  # Keep remote_id for backward compatibility
+            LOG.info(
+                "Found existing Splitwise expense for txn %s -> id %s",
+                cc_reference_id,
+                remote_found.get("id"),
+            )
+            results.append(entry)
+            continue
+
         # create expense (unless dry_run)
         if dry_run:
             entry["status"] = "would_add"
             results.append(entry)
             continue
 
-        try:
-            from src.constants.splitwise import SplitwiseUserId
+        # Skip creating expense for refunds/credits here - they'll be handled by refund processor
+        is_credit = entry.get("is_credit", False)
+        if is_credit:
+            entry["status"] = "added"
+            entry["splitwise_id"] = None  # Will be set by refund processor
 
+            # Save to database
+            txn = Transaction(
+                date=date,
+                merchant=merchant,
+                amount=-float(amount),  # Store as negative for refunds
+                source="amex",  # TODO: Make this configurable based on statement source
+                imported_at=now_iso(),
+                cc_reference_id=cc_reference_id,
+                notes=f"cc_reference_id: {cc_reference_id}",
+                description=desc_clean,
+                is_refund=True,
+                category_id=entry.get("category_id"),
+                subcategory_id=entry.get("subcategory_id"),
+            )
+
+            txn_id = db.insert_transaction(txn)
+            entry["status"] = "added"
+            entry["db_id"] = txn_id
+            entry["splitwise_id"] = None  # Will be set by refund processor
+            LOG.info(
+                "Saved CREDIT transaction to database with ID %d (pending refund processing)",
+                txn_id,
+            )
+            results.append(entry)
+            continue
+
+        try:
             # Get current user ID
             current_user_id = client.get_current_user_id()
 
-            # Create split based on whether this is a credit or debit
-            # For credits (refunds/returns): current_user paid (received credit), SELF_EXPENSE owes
-            # For debits (regular expenses): SELF_EXPENSE paid, current_user owes
-            is_credit = entry.get("is_credit", False)
-
-            if is_credit:
-                # Credit: User received money back, SELF_EXPENSE account owes user
-                users = [
-                    {
-                        "user_id": SplitwiseUserId.SELF_EXPENSE,
-                        "paid_share": 0.0,
-                        "owed_share": float(amount),
-                    },
-                    {
-                        "user_id": current_user_id,
-                        "paid_share": float(amount),
-                        "owed_share": 0.0,
-                    },
-                ]
-                LOG.info(
-                    "Adding CREDIT: %s paid $%.2f, %s owes $%.2f",
-                    current_user_id,
-                    amount,
-                    SplitwiseUserId.SELF_EXPENSE,
-                    amount,
-                )
-            else:
-                # Regular expense: SELF_EXPENSE paid, user owes
-                users = [
-                    {
-                        "user_id": SplitwiseUserId.SELF_EXPENSE,
-                        "paid_share": float(amount),
-                        "owed_share": 0.0,
-                    },
-                    {
-                        "user_id": current_user_id,
-                        "paid_share": 0.0,
-                        "owed_share": float(amount),
-                    },
-                ]
+            # Regular expense: SELF_EXPENSE paid, user owes
+            users = [
+                {
+                    "user_id": SplitwiseUserId.SELF_EXPENSE,
+                    "paid_share": float(amount),
+                    "owed_share": 0.0,
+                },
+                {
+                    "user_id": current_user_id,
+                    "paid_share": 0.0,
+                    "owed_share": float(amount),
+                },
+            ]
 
             # Build transaction dict with category info
             txn_dict = {
@@ -290,14 +323,6 @@ def process_statement(
             )
             entry["status"] = "added"
             entry["splitwise_id"] = sid
-            cache[cc_reference_id] = {
-                "splitwise_id": sid,
-                "amount": amount,
-                "date": date,
-                "description": desc,
-                "added_at": now_iso(),
-            }
-            save_state_atomic(CACHE_PATH, cache)
             LOG.info(
                 "Added expense to Splitwise id=%s for txn %s (%s/%s)",
                 sid,
@@ -305,6 +330,45 @@ def process_statement(
                 category_info.get("category_name", "Unknown"),
                 category_info.get("subcategory_name", "Unknown"),
             )
+
+            # Save to database after successful Splitwise creation
+            try:
+                db_txn = Transaction(
+                    date=date,
+                    merchant=merchant,
+                    description=desc_clean,
+                    raw_description=desc_raw,
+                    amount=amount_abs,
+                    raw_amount=float(amount),  # Store original signed amount
+                    statement_date=date,
+                    cc_reference_id=cc_reference_id,
+                    source="amex",  # TODO: Make this configurable based on statement source
+                    source_file=os.path.basename(path),
+                    category=entry.get("category_name"),
+                    subcategory=entry.get("subcategory_name"),
+                    category_id=entry.get("category_id"),
+                    subcategory_id=entry.get("subcategory_id"),
+                    is_refund=is_credit,
+                    is_shared=True,
+                    splitwise_id=sid,
+                    imported_at=now_iso(),
+                    notes=f"cc_reference_id: {cc_reference_id}",
+                )
+                db_txn_id = db.insert_transaction(db_txn)
+                entry["db_id"] = db_txn_id
+                LOG.info(
+                    "Saved transaction to database with ID %s (Splitwise ID: %s)",
+                    db_txn_id,
+                    sid,
+                )
+            except Exception as db_error:
+                LOG.warning(
+                    "Failed to save transaction to database: %s (Splitwise ID: %s)",
+                    str(db_error),
+                    sid,
+                )
+                entry["db_error"] = str(db_error)
+
             added += 1
         except (RuntimeError, ValueError) as e:
             entry["status"] = "error"
@@ -312,12 +376,78 @@ def process_statement(
             LOG.exception("Failed to add txn %s: %s", cc_reference_id, str(e))
         results.append(entry)
 
+    # Collect refund transaction IDs from this batch that need Splitwise processing
+    # Include: newly added ("added") OR already in DB but not yet in Splitwise ("db_exists" with no splitwise_id)
+    imported_refund_ids = [
+        entry.get("db_id")
+        for entry in results
+        if entry.get("db_id")
+        and entry.get("is_credit")
+        and (
+            entry.get("status") == "added"
+            or (entry.get("status") == "db_exists" and not entry.get("splitwise_id"))
+        )
+    ]
+
+    LOG.info(
+        "Found %d refund transactions in this batch that need Splitwise processing",
+        len(imported_refund_ids),
+    )
+
     # write processed CSV (with statuses)
     out_df = pd.DataFrame(results)
     base = os.path.basename(path)
     out_path = os.path.join(PROCESSED_DIR, base + ".processed.csv")
     out_df.to_csv(out_path, index=False)
     LOG.info("Wrote processed output to %s", out_path)
+
+    # Process refunds (match to originals and create in Splitwise if needed)
+    # Only process refunds that were imported in THIS batch (not all pending refunds)
+    if not dry_run and client and imported_refund_ids:
+        LOG.info("=" * 60)
+        LOG.info(
+            "Processing %d refunds from this import batch...", len(imported_refund_ids)
+        )
+        LOG.info("=" * 60)
+
+        refund_processor = RefundProcessor(db=db, client=client)
+
+        # Process only the refunds imported in this batch
+        refund_summary = {
+            "total": len(imported_refund_ids),
+            "created": 0,
+            "errors": 0,
+            "results": [],
+        }
+
+        for refund_id in imported_refund_ids:
+            # Get the transaction from database
+            refund_txn = db.get_transaction_by_id(refund_id)
+            if not refund_txn:
+                LOG.warning(
+                    "Could not find refund transaction ID %s in database", refund_id
+                )
+                continue
+
+            result = refund_processor.process_refund(refund_txn, dry_run=False)
+            refund_summary["results"].append(result)
+
+            if result["status"] == "created":
+                refund_summary["created"] += 1
+            elif result["status"] == "error":
+                refund_summary["errors"] += 1
+
+        LOG.info("Refund processing summary:")
+        LOG.info("  Total refunds from this batch: %d", refund_summary["total"])
+        LOG.info("  Successfully created: %d", refund_summary["created"])
+        LOG.info("  Errors: %d", refund_summary["errors"])
+    elif dry_run and len(imported_refund_ids) > 0:
+        LOG.info("=" * 60)
+        LOG.info("Refund processing (would run in live mode):")
+        LOG.info(
+            "  %d refunds from this batch would be processed", len(imported_refund_ids)
+        )
+        LOG.info("=" * 60)
 
     # If requested, push the processed output to Google Sheets
     if sheet_key and not no_sheet:
@@ -355,70 +485,72 @@ def process_statement(
     return out_df
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the pipeline script."""
     parser = argparse.ArgumentParser(
-        description="Process a CSV statement and add new expenses to Splitwise"
+        description="Import credit card statements to Splitwise",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python src/import_statement/pipeline.py --statement data/raw/amex2025.csv --dry-run
+  python src/import_statement/pipeline.py --statement data/raw/amex2025.csv --start-date 2025-01-01 --end-date 2025-12-31
+        """,
     )
     parser.add_argument(
-        "--statement", "-s", required=True, help="Path to CSV statement"
+        "--statement",
+        required=True,
+        help="Path to CSV statement file",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Don't actually add to Splitwise; sheet writes will still occur unless you pass --no-sheet",
-    )
-    parser.add_argument(
-        "--no-sheet",
-        action="store_true",
-        help="Do not write processed output to Google Sheets (useful for dry runs)",
-    )
-    parser.add_argument(
-        "--append",
-        action="store_true",
-        help="Append to existing Google Sheet instead of overwriting (useful for batch imports)",
+        help="Preview changes without creating expenses",
     )
     parser.add_argument(
         "--limit",
         type=int,
-        default=None,
-        help="Limit number of expenses to add in a run",
+        help="Limit number of transactions to process",
+    )
+    parser.add_argument(
+        "--sheet-key",
+        default=os.getenv("SPREADSHEET_KEY"),
+        help="Google Sheets spreadsheet key for logging",
+    )
+    parser.add_argument(
+        "--worksheet-name",
+        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports"),
+        help="Worksheet name for dry-run logging",
+    )
+    parser.add_argument(
+        "--no-sheet",
+        action="store_true",
+        help="Skip writing to Google Sheets",
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Start date filter (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="End date filter (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        dest="append_to_sheet",
+        help="Append to existing sheet instead of overwriting",
     )
     parser.add_argument(
         "--offset",
         type=int,
         default=0,
-        help="Skip the first N transactions (useful for batch processing)",
+        help="Skip first N transactions",
     )
     parser.add_argument(
         "--merchant-filter",
-        type=str,
-        default=None,
-        help="Only process transactions matching this merchant name (case-insensitive substring match)",
+        help="Only process transactions containing this merchant name",
     )
-    parser.add_argument(
-        "--sheet-key",
-        type=str,
-        default=os.getenv("SPREADSHEET_KEY"),
-        help="Spreadsheet key/ID to write processed output to (default: SPREADSHEET_KEY env var)",
-    )
-    parser.add_argument(
-        "--worksheet-name",
-        type=str,
-        default=None,
-        help="Name of the worksheet/tab to write processed output into (default: DRY_RUN_WORKSHEET_NAME env var for dry runs, 'Imported Transactions' otherwise)",
-    )
-    parser.add_argument(
-        "--start-date",
-        type=str,
-        default=None,
-        help="Start date for duplicate detection range (YYYY-MM-DD, default: START_DATE from .env or 2026-01-01)",
-    )
-    parser.add_argument(
-        "--end-date",
-        type=str,
-        default=None,
-        help="End date for duplicate detection range (YYYY-MM-DD, default: END_DATE from .env or 2026-12-31)",
-    )
+
     args = parser.parse_args()
 
     # Validate sheet_key if we're going to write to sheets
@@ -436,7 +568,12 @@ if __name__ == "__main__":
         no_sheet=args.no_sheet,
         start_date=args.start_date,
         end_date=args.end_date,
-        append_to_sheet=args.append,
+        append_to_sheet=args.append_to_sheet,
         offset=args.offset,
         merchant_filter=args.merchant_filter,
     )
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

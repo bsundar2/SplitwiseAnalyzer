@@ -9,11 +9,14 @@ This script:
 4. Moves reviewed entries to done_merchant_names_for_review.csv
 """
 
+import argparse
 import json
-import pandas as pd
-from pathlib import Path
-from typing import Dict, List
 from collections import defaultdict
+from pathlib import Path
+from typing import Dict
+
+import pandas as pd
+
 from src.common.utils import LOG, PROJECT_ROOT
 
 # File paths
@@ -207,7 +210,7 @@ def generate_report(stats: Dict):
             by_action[change["action"]].append(change)
 
         if "added" in by_action:
-            print(f"\n✓ Added ({len(by_action['added'])} merchants):")
+            print(f"\nAdded ({len(by_action['added'])} merchants):")
             for change in by_action["added"][:10]:  # Show first 10
                 merchant = change.get("corrected_merchant", change["merchant"])
                 print(f"  • {merchant}")
@@ -216,7 +219,7 @@ def generate_report(stats: Dict):
                 print(f"  ... and {len(by_action['added']) - 10} more")
 
         if "updated" in by_action:
-            print(f"\n✓ Updated ({len(by_action['updated'])} merchants):")
+            print(f"\nUpdated ({len(by_action['updated'])} merchants):")
             for change in by_action["updated"][:10]:  # Show first 10
                 print(f"  • {change['merchant']} → {change['corrected_merchant']}")
                 if change["old_category"] != change["new_category"]:
@@ -277,8 +280,6 @@ def analyze_correction_patterns(feedback: Dict):
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Apply feedback from merchant review to update configurations"
     )
@@ -298,7 +299,7 @@ def main():
     feedback = load_feedback()
 
     if not feedback["approved"] and not feedback["corrected"]:
-        print("\n⚠ No feedback to apply yet.")
+        print("\nWARNING: No feedback to apply yet.")
         print("Run: python src/review_merchants.py")
         return
 
@@ -308,7 +309,7 @@ def main():
     print(f"  Skipped:   {len(feedback['skipped'])} entries")
 
     if args.dry_run:
-        print("\n🔍 DRY RUN - No changes will be saved")
+        print("\nDRY RUN - No changes will be saved")
 
     # Apply corrections
     stats = apply_corrections(feedback, dry_run=args.dry_run)
@@ -323,13 +324,13 @@ def main():
     # Move reviewed entries
     if not args.dry_run:
         move_reviewed_to_done(feedback)
-        print(f"\n✓ All changes applied successfully!")
+        print(f"\nAll changes applied successfully!")
         print(f"\nNext steps:")
         print(f"  1. Review the changes in: {MERCHANT_LOOKUP_FILE}")
         print(f"  2. Re-run the pipeline to apply new mappings")
         print(f"  3. Continue reviewing remaining merchants if any")
     else:
-        print(f"\n💡 Run without --dry-run to apply these changes")
+        print(f"\nNOTE: Run without --dry-run to apply these changes")
 
 
 if __name__ == "__main__":
