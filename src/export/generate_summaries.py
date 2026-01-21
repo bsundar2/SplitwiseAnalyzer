@@ -142,7 +142,7 @@ def generate_monthly_summary(df: pd.DataFrame, year: int) -> pd.DataFrame:
 
     # Flatten column names
     monthly.columns = [
-        "Month",
+        "year_month",
         "Total Spent (Net)",
         "Avg Transaction",
         "Transaction Count",
@@ -150,8 +150,8 @@ def generate_monthly_summary(df: pd.DataFrame, year: int) -> pd.DataFrame:
         "Total Net",
     ]
 
-    # Format month as YYYY-MM
-    monthly["Month"] = monthly["Month"].astype(str)
+    # Format month as "YYYY-MM" for better sorting in sheets
+    monthly["Month"] = monthly["year_month"].dt.strftime("%Y-%m")
 
     # Calculate cumulative spending
     monthly["Cumulative Spending"] = monthly["Total Spent (Net)"].cumsum()
@@ -419,7 +419,7 @@ def generate_budget_vs_actual(
         variance = actual_amt - budget_amt
         variance_pct = (variance / budget_amt * 100) if budget_amt > 0 else 0.0
 
-        status = "✓ Under Budget" if variance <= 0 else "✗ Over Budget"
+        status = "Under Budget" if variance <= 0 else "Over Budget"
 
         data.append(
             {
@@ -459,7 +459,7 @@ def generate_budget_vs_actual(
                 "Actual": total_actual,
                 "Variance": total_variance,
                 "Variance %": total_variance_pct,
-                "Status": "✓ Under Budget" if total_variance <= 0 else "✗ Over Budget",
+                "Status": "Under Budget" if total_variance <= 0 else "Over Budget",
             }
         ]
     )
@@ -563,66 +563,31 @@ Examples:
 
     db = DatabaseManager()
 
-    # Check if any data changed
-    any_changes = False
+    # Filter out months that have already been written to avoid duplicates
+    unwritten_months = []
     for _, row in monthly_summary.iterrows():
         year_month = str(row["Month"])
         existing = db.get_monthly_summary(year_month)
+        if not existing or not existing.get("written_to_sheet", False):
+            unwritten_months.append(row)
 
-        if not existing:
-            any_changes = True
-            break
-
-        # Compare numeric values with tolerance
-        if (
-            abs(existing["total_spent_net"] - row["Total Spent (Net)"]) > 0.01
-            or abs(existing["avg_transaction"] - row["Avg Transaction"]) > 0.01
-            or existing["transaction_count"] != row["Transaction Count"]
-            or abs(existing["total_paid"] - row["Total Paid"]) > 0.01
-            or abs(existing["total_owed"] - row["Total Net"]) > 0.01
-            or abs(existing["cumulative_spending"] - row["Cumulative Spending"]) > 0.01
-            or abs(existing["mom_change"] - row["MoM Change"]) > 0.01
-        ):
-            any_changes = True
-            break
-
-    if not any_changes:
-        print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: No changes needed")
+    if not unwritten_months:
+        print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: All months already written")
     else:
-        # Read existing data from sheet to preserve other years
-        existing_df = read_from_sheets(
-            spreadsheet_key=args.sheet_key,
-            worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
-            numerize=False,
-        )
+        # Create DataFrame with only unwritten months
+        unwritten_df = pd.DataFrame(unwritten_months)
 
-        if existing_df is not None and not existing_df.empty:
-            # Remove rows for the current year being updated
-            current_year_months = set(monthly_summary["Month"].astype(str))
-            existing_df = existing_df[
-                ~existing_df["Month"].astype(str).isin(current_year_months)
-            ]
-
-            # Combine existing data with new data
-            combined_df = pd.concat([existing_df, monthly_summary], ignore_index=True)
-
-            # Sort by month chronologically
-            combined_df["Month"] = combined_df["Month"].astype(str)
-            combined_df = combined_df.sort_values("Month").reset_index(drop=True)
-        else:
-            combined_df = monthly_summary
-
-        # Use shared write_to_sheets utility for efficient bulk write
+        # Write only the unwritten months
         write_to_sheets(
-            combined_df,
+            unwritten_df,
             worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
             spreadsheet_key=args.sheet_key,
-            append=False,  # Overwrite mode with merged data
+            append=True,  # Append new months to existing sheet
             skip_formatting=True,  # Skip transaction-specific formatting
         )
 
-        # Save all rows to database and mark as written
-        for _, row in monthly_summary.iterrows():
+        # Save the written rows to database
+        for row in unwritten_months:
             year_month = str(row["Month"])
             db.save_monthly_summary(
                 year_month=year_month,
@@ -637,7 +602,7 @@ Examples:
             )
 
         print(
-            f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Cleared and rewrote {len(combined_df)} rows"
+            f"✓ {WORKSHEET_MONTHLY_SUMMARY}: Added {len(unwritten_months)} new months"
         )
 
     url = f"https://docs.google.com/spreadsheets/d/{args.sheet_key}"
