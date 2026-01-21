@@ -21,7 +21,7 @@ from datetime import datetime as dt
 from src.common.splitwise_client import SplitwiseClient
 from src.database import DatabaseManager, Transaction
 from src.constants.export_columns import ExportColumns
-from src.constants.splitwise import SPLIT_TYPE_SELF
+from src.constants.splitwise import SPLIT_TYPE_SELF, REFUND_KEYWORDS
 
 
 def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
@@ -270,14 +270,23 @@ def sync_from_splitwise(
         sw_my_paid = float(expense.get(ExportColumns.MY_PAID, 0))
         sw_my_owed = float(expense.get(ExportColumns.MY_OWED, 0))
         sw_participant_names = expense.get(ExportColumns.PARTICIPANT_NAMES, "")
+        sw_description = expense.get(ExportColumns.DESCRIPTION, "")
+
+        # For notes, use original values (not negated for refunds)
+        original_my_paid = sw_my_paid
+        original_my_owed = sw_my_owed
+        is_refund_desc = any(keyword in sw_description.lower() for keyword in REFUND_KEYWORDS)
+        if is_refund_desc:
+            original_my_paid = -original_my_paid
+            original_my_owed = -original_my_owed
 
         notes_parts = []
         notes_parts.append("Imported from Splitwise API")
 
-        if sw_my_paid > 0:
-            notes_parts.append(f"Paid: ${sw_my_paid:.2f}")
-        if sw_my_owed > 0:
-            notes_parts.append(f"Owe: ${sw_my_owed:.2f}")
+        if original_my_paid > 0:
+            notes_parts.append(f"Paid: ${original_my_paid:.2f}")
+        if original_my_owed > 0:
+            notes_parts.append(f"Owe: ${original_my_owed:.2f}")
         if sw_participant_names:
             notes_parts.append(f"With: {sw_participant_names}")
 

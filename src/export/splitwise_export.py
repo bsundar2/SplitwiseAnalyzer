@@ -219,6 +219,10 @@ def fetch_from_database(
     """
     import re
 
+    client = SplitwiseClient()
+    current_user = client.get_current_user()
+    current_user_name = current_user.getFirstName() if current_user else ""
+
     db = DatabaseManager()
 
     # Get transactions based on filters
@@ -275,16 +279,39 @@ def fetch_from_database(
             if with_match:
                 participant_names = with_match.group(1).strip()
 
+        # Skip transactions where the current user is not a participant
+        if current_user_name and current_user_name not in participant_names:
+            continue
+
         # Check if this is a refund (either flagged in DB or detected by description)
         description = txn.description or txn.merchant or ""
         is_refund_by_description = any(
             keyword in description.lower() for keyword in REFUND_KEYWORDS
         )
+        is_refund = txn.is_refund or is_refund_by_description
 
-        # For refunds, negate my_owed and my_paid to show as credits
-        if txn.is_refund or is_refund_by_description:
-            my_owed = -my_owed
-            my_paid = -my_paid
+        # Calculate amount: negative for refunds, positive for expenses
+        raw_amount = txn.raw_amount if txn.raw_amount else txn.amount
+        if is_refund:
+            amount = -abs(raw_amount)
+        else:
+            amount = abs(raw_amount)
+
+        # For refunds, negate both my_owed and my_paid (if extracted)
+        if is_refund:
+            my_owed = -abs(my_owed)
+            my_paid = -abs(my_paid)
+
+        # If payment info not extracted (still 0), set based on split type
+        if my_paid == 0.0 and my_owed == 0.0:
+            split_type = SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF
+            if split_type == SPLIT_TYPE_SELF:
+                my_paid = amount
+                my_owed = amount
+            else:
+                # Assume 50/50 split
+                my_paid = amount / 2
+                my_owed = amount / 2
 
         # Calculate MY_NET
         my_net = my_paid - my_owed
@@ -295,9 +322,7 @@ def fetch_from_database(
         # Create row in exact column order to match existing exports
         row = {
             ExportColumns.DATE: txn.date,
-            ExportColumns.AMOUNT: (
-                abs(txn.raw_amount) if txn.raw_amount else abs(txn.amount)
-            ),
+            ExportColumns.AMOUNT: amount,
             ExportColumns.CATEGORY: txn.category or "Uncategorized",
             ExportColumns.DESCRIPTION: txn.description or txn.merchant,
             ExportColumns.DETAILS: details,
