@@ -27,6 +27,25 @@
       }
     },
     {
+      "name": "Monthly Export Pipeline",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export/monthly_export_pipeline.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "--year",
+        "2026",
+        "--start-date",
+        "2026-01-01",
+        "--end-date",
+        "2026-01-31"
+      ]
+    },
+    {
         "name": "Dry Run",
         "type": "debugpy",
         "request": "launch",

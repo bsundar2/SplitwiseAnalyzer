@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     -- Transaction characteristics
     is_refund BOOLEAN DEFAULT 0,           -- True if this is a refund/credit
     is_shared BOOLEAN DEFAULT 0,           -- True if expense was shared on Splitwise
+    split_type TEXT,                       -- Split type: 'self', 'split', 'partner'
     currency TEXT DEFAULT 'USD',           -- Currency code
     
     -- Splitwise integration

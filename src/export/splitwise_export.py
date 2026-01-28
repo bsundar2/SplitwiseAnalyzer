@@ -322,7 +322,7 @@ def fetch_from_database(
         my_net = my_paid - my_owed
 
         # Determine split type
-        split_type = SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF
+        split_type = txn.split_type or (SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF)
 
         # Create row in exact column order to match existing exports
         row = {
@@ -531,8 +531,7 @@ def fetch_and_write(
             lambda r: generate_fingerprint(
                 r.get(ExportColumns.DATE),
                 r.get(ExportColumns.AMOUNT),
-                r.get(ExportColumns.DESCRIPTION)
-                or r.get(ExportColumns.FRIENDS_SPLIT, ""),
+                r.get(ExportColumns.DESCRIPTION, ""),
             ),
             axis=1,
         )
@@ -624,6 +623,10 @@ def fetch_and_write(
         new_df[ExportColumns.AMOUNT] = pd.to_numeric(
             new_df[ExportColumns.AMOUNT], errors="coerce"
         )
+
+    # Drop FRIENDS_SPLIT column if it exists, as it's not part of the standard export columns
+    if ExportColumns.FRIENDS_SPLIT in new_df.columns:
+        new_df = new_df.drop(columns=[ExportColumns.FRIENDS_SPLIT])
 
     # Write to sheets
     if sheet_key:

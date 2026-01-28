@@ -38,6 +38,7 @@ class Transaction:
     # Characteristics
     is_refund: bool = False
     is_shared: bool = False
+    split_type: Optional[str] = None  # 'self', 'split', 'partner'
     currency: str = "USD"
 
     # Splitwise integration
