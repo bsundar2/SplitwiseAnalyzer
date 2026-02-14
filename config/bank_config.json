@@ -1,0 +1,42 @@
+{
+  "banks": {
+    "amex": {
+      "name": "American Express",
+      "file_patterns": ["*.csv", "*.txt"],
+      "date_column": "Posted Date",
+      "description_columns": ["Description"],
+      "amount_column": "Amount",
+      "reference_column": "Extended Details",
+      "category_column": "Category",
+      "amount_format": "signed",
+      "date_format": "%m/%d/%Y",
+      "category_mapping_file": "amex_category_mapping.json",
+      "description": "American Express credit card statements"
+    },
+    "bofa": {
+      "name": "Bank of America",
+      "file_patterns": ["*.csv"],
+      "date_column": "Posted Date",
+      "description_columns": ["Payee"],
+      "amount_column": "Amount",
+      "reference_column": "Reference Number",
+      "category_column": null,
+      "amount_format": "signed",
+      "date_format": "%m/%d/%Y",
+      "category_mapping_file": "bofa_category_mapping.json",
+      "description": "Bank of America credit card/checking statements",
+      "address_column": "Address",
+      "skip_rows_with_keywords": ["TOTAL"]
+    }
+  },
+  "detection_rules": {
+    "amex": {
+      "required_columns": ["Posted Date", "Description", "Amount"],
+      "optional_columns": ["Extended Details", "Category"]
+    },
+    "bofa": {
+      "required_columns": ["Posted Date", "Reference Number", "Payee", "Amount"],
+      "optional_columns": ["Address"]
+    }
+  }
+}

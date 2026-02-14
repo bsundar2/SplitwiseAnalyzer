@@ -43,6 +43,7 @@ def process_statement(
     append_to_sheet: bool = False,
     offset: int = 0,
     merchant_filter: str = None,
+    bank: str = None,
 ):
     # Use defaults from env vars if not provided
     if worksheet_name is None:
@@ -52,8 +53,8 @@ def process_statement(
     if end_date is None:
         end_date = os.getenv("END_DATE", "2026-12-31")
 
-    LOG.info("Processing statement %s (dry_run=%s)", path, dry_run)
-    df = parse_statement(path)
+    LOG.info("Processing statement %s (dry_run=%s, bank=%s)", path, dry_run, bank or "auto-detect")
+    df = parse_statement(path, bank_name=bank)
     if df is None or df.empty:
         LOG.info("No transactions parsed from %s", path)
         return
@@ -171,7 +172,8 @@ def process_statement(
                     "merchant": merchant,
                     "amount": amount,
                     "category": row.get("category"),  # Pass Amex category if available
-                }
+                },
+                bank=bank or "amex"  # Use detected or specified bank, default to amex
             )
 
         # Add category info to the entry
@@ -550,6 +552,12 @@ Examples:
         "--merchant-filter",
         help="Only process transactions containing this merchant name",
     )
+    parser.add_argument(
+        "--bank",
+        choices=["amex", "bofa"],
+        default=None,
+        help="Bank statement type (auto-detect if not specified)",
+    )
 
     args = parser.parse_args()
 
@@ -571,6 +579,7 @@ Examples:
         append_to_sheet=args.append_to_sheet,
         offset=args.offset,
         merchant_filter=args.merchant_filter,
+        bank=args.bank,
     )
     return 0
 

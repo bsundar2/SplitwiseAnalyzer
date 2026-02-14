@@ -5,6 +5,10 @@ Parse CSV or PDF statements into a pandas DataFrame with columns:
   - description (string)
   - amount (positive float)
   - raw_line (string)
+
+Supports multiple bank formats:
+  - American Express (Amex)
+  - Bank of America (BoFA)
 """
 
 import os
@@ -12,6 +16,7 @@ import pandas as pd
 
 from src.constants.config import CFG_PATHS
 from src.common.utils import LOG, load_yaml, parse_date_safe
+from src.import_statement.bank_config import BankConfig
 
 # Load configuration
 CFG = None
@@ -25,37 +30,91 @@ for p in CFG_PATHS:
             CFG = None
             break
 
+# Initialize bank configuration
+BANK_CONFIG = BankConfig()
 
-def parse_csv(path):
+
+def _find_column(df, search_term):
+    """Find a column by searching column names and lowercased values.
+
+    Args:
+        df: Pandas DataFrame
+        search_term: Column name pattern to find ('date', 'description', 'amount')
+
+    Returns:
+        Column name or None if not found
+    """
+    for col in df.columns:
+        low = col.lower()
+        if search_term.lower() in low:
+            return col
+    return None
+
+
+def parse_csv(path, bank_name=None):
+    """Parse a CSV statement file.
+
+    Args:
+        path: Path to CSV file
+        bank_name: Optional bank name ('amex', 'bofa'). If None, auto-detect.
+
+    Returns:
+        Parsed DataFrame with normalized columns
+    """
     LOG.info("Parsing CSV: %s", path)
     df = pd.read_csv(path, dtype=str)
 
     # Store original row count for logging
     original_count = len(df)
 
-    # Try to find common columns
-    col_map = {}
-    for c in df.columns:
-        low = c.lower()
-        if "date" in low:
-            col_map["date"] = c
-        # Match "Description" column specifically (not "Extended Details")
-        if low == "description" or "merchant" in low:
-            col_map["description"] = c
-        if "amount" in low or "debit" in low or "credit" in low:
-            col_map["amount"] = c
-        # Match "Extended Details" or "Reference" for detail field
-        if "extended" in low or "reference" in low or low == "ref":
-            col_map["detail"] = c
-        if low == "category" or low == "type":
-            col_map["category"] = c
+    # Auto-detect bank if not specified
+    if bank_name is None:
+        bank_name = BANK_CONFIG.detect_bank(df)
+        LOG.info("Auto-detected bank: %s", bank_name)
 
+    # Get bank-specific configuration
+    bank_cfg = BANK_CONFIG.get_bank_config(bank_name)
+
+    # Map columns based on bank configuration
+    col_map = {}
+    
+    # Map date column
+    if bank_cfg.get("date_column") in df.columns:
+        col_map["date"] = bank_cfg["date_column"]
+    else:
+        col_map["date"] = _find_column(df, "date")
+
+    # Map description column (may have multiple options)
+    desc_cols = bank_cfg.get("description_columns", [])
+    col_map["description"] = next(
+        (c for c in desc_cols if c in df.columns),
+        _find_column(df, "description")
+    )
+
+    # Map amount column
+    if bank_cfg.get("amount_column") in df.columns:
+        col_map["amount"] = bank_cfg["amount_column"]
+    else:
+        col_map["amount"] = _find_column(df, "amount")
+
+    # Map optional columns
+    if bank_cfg.get("reference_column") and bank_cfg["reference_column"] in df.columns:
+        col_map["detail"] = bank_cfg["reference_column"]
+    
+    if bank_cfg.get("category_column") and bank_cfg["category_column"] in df.columns:
+        col_map["category"] = bank_cfg["category_column"]
+    
+    if bank_cfg.get("address_column") and bank_cfg["address_column"] in df.columns:
+        col_map["address"] = bank_cfg["address_column"]
+
+    # Fallback to first three columns if mapping failed
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
-        # fallback: try first three columns
         col_names = list(df.columns)
-        col_map["date"] = col_names[0]
-        col_map["description"] = col_names[1]
-        col_map["amount"] = col_names[2]
+        col_map["date"] = col_map.get("date", col_names[0])
+        col_map["description"] = col_map.get("description", col_names[1])
+        col_map["amount"] = col_map.get("amount", col_names[2])
+
+    LOG.info("Column mapping for %s: %s", bank_name, col_map)
 
     # Create output dataframe with basic columns
     out = pd.DataFrame()
@@ -67,8 +126,7 @@ def parse_csv(path):
     # Add category column if it exists in the input
     if "category" in col_map:
         out["category"] = df[col_map["category"]].astype(str).str.strip()
-    else:
-        out["category"] = None
+    # Note: Do NOT create category column if it doesn't exist in source
 
     # Extract cc_reference_id from detail/reference column if available
     if "detail" in col_map:
@@ -137,7 +195,8 @@ def parse_csv(path):
             return False
 
         # Combine description and merchant for pattern matching
-        combined_text = f"{row['description']} {out.loc[row.name, 'category'] if 'category' in out.columns else ''}".lower()
+        category_text = row.get('category', '') or ''
+        combined_text = f"{row['description']} {category_text}".lower()
 
         # Exclude payment patterns
         payment_keywords = ["payment", "autopay", "thank you", "settle"]
@@ -231,16 +290,16 @@ def parse_csv(path):
     return out
 
 
-def parse_any(path):
+def parse_any(path, bank_name=None):
     ext = os.path.splitext(path)[1].lower()
     if ext in [".csv", ".txt"]:
-        return parse_csv(path)
+        return parse_csv(path, bank_name=bank_name)
     else:
         raise ValueError("Unsupported extension: " + ext)
 
 
-def parse_statement(path):
-    return parse_any(path)
+def parse_statement(path, bank_name=None):
+    return parse_any(path, bank_name=bank_name)
 
 
 def parse_amount_safe(s):
