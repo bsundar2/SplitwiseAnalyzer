@@ -322,7 +322,9 @@ def fetch_from_database(
         my_net = my_paid - my_owed
 
         # Determine split type
-        split_type = txn.split_type or (SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF)
+        split_type = txn.split_type or (
+            SPLIT_TYPE_SPLIT if txn.is_shared else SPLIT_TYPE_SELF
+        )
 
         # Create row in exact column order to match existing exports
         row = {
