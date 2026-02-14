@@ -618,59 +618,7 @@ def _load_category_config() -> Dict:
         return default_config
 
 
-def _check_bank_category_mapping(merchant: str, bank: str = "amex") -> Optional[str]:
-    """Check if merchant matches a bank-specific category mapping.
-
-    Args:
-        merchant: Cleaned merchant name
-        bank: Bank name ('amex', 'bofa')
-
-    Returns:
-        Category path (e.g., 'Food and drink > Dining out') or None
-    """
-    if not merchant or bank == "amex":
-        return None
-
-    # Load bank-specific mappings
-    bank_mapping_file = None
-    if bank == "bofa":
-        bank_mapping_file = "bofa_category_mapping.json"
-    else:
-        return None
-
-    if not bank_mapping_file:
-        return None
-
-    try:
-        from pathlib import Path
-        import json
-
-        mapping_path = Path(__file__).parent.parent.parent / "config" / bank_mapping_file
-        if not mapping_path.exists():
-            LOG.debug(f"Bank mapping file not found: {mapping_path}")
-            return None
-
-        with open(mapping_path, "r") as f:
-            mappings = json.load(f)
-
-        # Check if merchant matches any mapping key (case-insensitive, substring match)
-        merchant_lower = merchant.lower()
-        for key, category in mappings.items():
-            if key.lower() in merchant_lower:
-                LOG.debug(f"Bank mapping match: '{merchant}' contains '{key}' → {category}")
-                return category
-
-        return None
-    except Exception as e:
-        LOG.debug(f"Error checking bank category mapping for {bank}: {e}")
-        return None
-
-    except Exception as e:
-        LOG.error(f"Error loading category config: {str(e)}", exc_info=True)
-        return default_config
-
-
-def infer_category(transaction: Dict[str, Any], bank: str = "amex") -> Dict[str, Any]:
+def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
     """Infer the most likely category for a transaction using config patterns.
 
     Args:
@@ -679,7 +627,6 @@ def infer_category(transaction: Dict[str, Any], bank: str = "amex") -> Dict[str,
             - merchant (str, optional): Merchant name
             - amount (float): Transaction amount
             - category (str, optional): Amex-provided category
-        bank: Bank name ('amex' or 'bofa'). Used to load bank-specific category mappings.
 
     Returns:
         dict: Dictionary with 'category_id', 'category_name', 'subcategory_id',
@@ -700,21 +647,8 @@ def infer_category(transaction: Dict[str, Any], bank: str = "amex") -> Dict[str,
 
     # Log the transaction being processed with cleaned merchant
     LOG.info(
-        f"Processing transaction - Description: '{description}', Cleaned Merchant: '{merchant}' (bank: {bank})"
+        f"Processing transaction - Description: '{description}', Cleaned Merchant: '{merchant}'"
     )
-
-    # STEP 0: Check bank-specific category mappings first
-    bank_specific_category = _check_bank_category_mapping(merchant, bank)
-    if bank_specific_category:
-        LOG.info(
-            f"Bank-specific mapping match: '{merchant}' → {bank_specific_category} (bank: {bank})"
-        )
-        category_ids = _resolve_category_ids(bank_specific_category)
-        if category_ids:
-            return {
-                **category_ids,
-                "confidence": f"bank_specific_{bank}",
-            }
 
     # STEP 1: Try merchant lookup first (highest confidence)
     merchant_lookup = _load_merchant_lookup()

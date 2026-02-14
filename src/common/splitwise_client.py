@@ -771,8 +771,7 @@ class SplitwiseClient:
 if __name__ == "__main__":
     client = SplitwiseClient()
     expense = client.get_expense_by_id(4291345617, use_cache=False)
-    print(expense['details'])
-    
+    print(expense["details"])
 
 
 def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:

@@ -17,7 +17,9 @@ class BankConfig:
             config_path: Path to bank_config.json. If None, uses default location.
         """
         if config_path is None:
-            config_path = Path(__file__).parent.parent.parent / "config" / "bank_config.json"
+            config_path = (
+                Path(__file__).parent.parent.parent / "config" / "bank_config.json"
+            )
 
         self.config_path = config_path
         self.config = self._load_config()

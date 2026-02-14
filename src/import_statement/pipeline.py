@@ -16,6 +16,7 @@ load_project_env()
 # Local application
 from src.constants.config import PROCESSED_DIR
 from src.constants.splitwise import SplitwiseUserId
+from src.import_statement.bank_config import BankConfig
 from src.import_statement.parse_statement import parse_statement
 from src.import_statement.process_refunds import RefundProcessor
 from src.common.sheets_sync import write_to_sheets
@@ -59,13 +60,11 @@ def process_statement(
         return
 
     # Determine bank from file path
-    from src.import_statement.bank_config import BankConfig
     bank_config = BankConfig()
     try:
-        bank_name = bank_config.detect_bank_from_path(path)
+        bank_config.detect_bank_from_path(path)
     except ValueError as e:
         LOG.error("Error determining bank from path: %s", e)
-        bank_name = "amex"  # default fallback
 
     mkdir_p(PROCESSED_DIR)
     client = None
@@ -180,8 +179,7 @@ def process_statement(
                     "merchant": merchant,
                     "amount": amount,
                     "category": row.get("category"),  # Pass Amex category if available
-                },
-                bank=bank_name  # Use bank determined from file path
+                }
             )
 
         # Add category info to the entry

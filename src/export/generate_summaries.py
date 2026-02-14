@@ -9,6 +9,7 @@ Creates multiple analysis tabs:
 """
 
 import argparse
+import json
 import os
 import re
 from typing import Dict
@@ -20,7 +21,7 @@ from src.common.env import load_project_env
 
 load_project_env()
 
-from src.common.sheets_sync import write_to_sheets, read_from_sheets
+from src.common.sheets_sync import write_to_sheets
 from src.common.utils import LOG
 from src.constants.gsheets import (
     WORKSHEET_MONTHLY_SUMMARY,
@@ -337,8 +338,6 @@ def load_budget(budget_file: str) -> Dict[str, float]:
     Returns:
         Dictionary mapping category to budget amount
     """
-    import json
-
     if not os.path.exists(budget_file):
         LOG.warning(f"Budget file not found: {budget_file}")
         return {}
