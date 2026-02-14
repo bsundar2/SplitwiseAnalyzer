@@ -1,14 +1,13 @@
-# scripts/parse_statement.py
 """
-Parse CSV or PDF statements into a pandas DataFrame with columns:
+Parse CSV statements into a pandas DataFrame with columns:
   - date (YYYY-MM-DD)
   - description (string)
   - amount (positive float)
   - raw_line (string)
 
-Supports multiple bank formats:
-  - American Express (Amex)
-  - Bank of America (BoFA)
+Bank-specific parsing is determined by the file's directory:
+  - data/raw/amex/amex2026.csv → Amex format
+  - data/raw/bofa/bofa2026.csv → BoFA format
 """
 
 import os
@@ -51,12 +50,15 @@ def _find_column(df, search_term):
     return None
 
 
-def parse_csv(path, bank_name=None):
+def parse_csv(path):
     """Parse a CSV statement file.
+
+    Bank format is determined from the file's directory:
+    - data/raw/amex/* → Amex format
+    - data/raw/bofa/* → BoFA format
 
     Args:
         path: Path to CSV file
-        bank_name: Optional bank name ('amex', 'bofa'). If None, auto-detect.
 
     Returns:
         Parsed DataFrame with normalized columns
@@ -67,10 +69,9 @@ def parse_csv(path, bank_name=None):
     # Store original row count for logging
     original_count = len(df)
 
-    # Auto-detect bank if not specified
-    if bank_name is None:
-        bank_name = BANK_CONFIG.detect_bank(df)
-        LOG.info("Auto-detected bank: %s", bank_name)
+    # Determine bank from file path
+    bank_name = BANK_CONFIG.detect_bank_from_path(path)
+    LOG.info("Processing %s statement: %s", bank_name, path)
 
     # Get bank-specific configuration
     bank_cfg = BANK_CONFIG.get_bank_config(bank_name)
@@ -290,16 +291,16 @@ def parse_csv(path, bank_name=None):
     return out
 
 
-def parse_any(path, bank_name=None):
+def parse_any(path):
     ext = os.path.splitext(path)[1].lower()
     if ext in [".csv", ".txt"]:
-        return parse_csv(path, bank_name=bank_name)
+        return parse_csv(path)
     else:
         raise ValueError("Unsupported extension: " + ext)
 
 
-def parse_statement(path, bank_name=None):
-    return parse_any(path, bank_name=bank_name)
+def parse_statement(path):
+    return parse_any(path)
 
 
 def parse_amount_safe(s):

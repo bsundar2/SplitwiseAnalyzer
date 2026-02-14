@@ -1,97 +1,107 @@
-# BoFA Integration - Quick Reference
+# BoFA Integration - Folder-Based Bank Detection
 
-## Files Added/Modified
+## Quick Summary
 
-### New Files (3)
-- ✅ `src/import_statement/bank_config.py` - Bank configuration management
-- ✅ `config/bank_config.json` - Multi-bank configuration
-- ✅ `config/bofa_category_mapping.json` - BoFA merchant mappings
+Bank type is now determined by **folder structure**, not auto-detection. Much cleaner and more predictable!
 
-### Modified Files (4)  
-- ✅ `src/import_statement/parse_statement.py` - Multi-bank parsing
-- ✅ `src/common/utils.py` - Bank-specific categorization
-- ✅ `src/import_statement/pipeline.py` - Bank parameter handling
-- ✅ Documentation files added (2)
+```
+data/raw/
+├── amex/amex2026.csv     → Auto-detected as Amex
+└── bofa/bofa_card1_2026.csv → Auto-detected as BoFA
+```
 
 ## Usage
 
-### Auto-Detection (Recommended)
+### BoFA Import (from bofa/ folder)
 ```bash
-python src/import_statement/pipeline.py --statement data/raw/bofa_statement.csv
+python src/import_statement/pipeline.py --statement data/raw/bofa/bofa_card1_2026.csv
 ```
 
-### Explicit Bank
+### Amex Import (from amex/ folder)
 ```bash
-python src/import_statement/pipeline.py --statement data/raw/bofa_statement.csv --bank bofa
+python src/import_statement/pipeline.py --statement data/raw/amex/amex2026.csv
 ```
 
 ### With Date Range
 ```bash
 python src/import_statement/pipeline.py \
-  --statement data/raw/bofa_statement.csv \
+  --statement data/raw/bofa/bofa_card1_2026.csv \
   --start-date 2026-02-01 \
   --end-date 2026-02-28
 ```
 
-## BoFA CSV Format
+**No `--bank` argument needed!** Bank is determined from folder path.
 
-Required columns:
-- `Posted Date` (MM/DD/YYYY format)
-- `Reference Number` (unique transaction ID)
-- `Payee` (merchant name)
-- `Amount` (negative for debits/transactions)
+## Folder Structure
 
-Optional:
-- `Address` (merchant address)
-
-## Category Mapping
-
-Edit `config/bofa_category_mapping.json` to add merchant mappings:
-
-```json
-{
-  "YOUR_MERCHANT": "Category > Subcategory",
-  "WHOLE_FOODS": "Food and drink > Groceries",
-  "BEST_BUY": "Home > Electronics"
-}
+### Create folders if they don't exist:
+```bash
+mkdir -p data/raw/amex
+mkdir -p data/raw/bofa
 ```
 
-## Key Features
+### File naming (examples):
+```
+data/raw/amex/amex2025.csv
+data/raw/amex/amex2026.csv
+data/raw/bofa/bofa_card1_2026.csv
+data/raw/bofa/bofa_card2_2026.csv
+```
 
-✅ Auto-detection (detects BoFA vs Amex automatically)
-✅ Bank-specific categorization (uses bofa_category_mapping.json first)
-✅ Backward compatible (existing Amex workflows unchanged)
-✅ Database integration (same as Amex)
-✅ Google Sheets sync (same format as Amex)
-✅ Extensible (easy to add Chase, Discover, etc.)
+## How It Works
 
-## Test Results
+1. **Statement in `data/raw/amex/`** → Parsed as Amex format (uses "Description", "Category" fields)
+2. **Statement in `data/raw/bofa/`** → Parsed as BoFA format (uses "Payee", "Reference Number" fields)
+3. **Each bank uses its own category mapping** (amex_category_mapping.json, bofa_category_mapping.json)
+4. **No need for auto-detection** - folder path determines everything
 
-All validation tests passed:
-- ✅ Module imports
-- ✅ BoFA auto-detection
-- ✅ Amex auto-detection
-- ✅ Transaction parsing (3 transactions @ $1,180.78)
-- ✅ BoFA categorization (bank_specific_bofa confidence)
-- ✅ Mapping loading (46 merchant entries)
-- ✅ CLI argument parsing
+## Key Benefits
+
+✅ **Predictable** - No guessing or auto-detection failures
+✅ **Isolated** - Changes to one bank's logic won't affect others
+✅ **Scalable** - Add new banks by just creating a folder
+✅ **Organized** - Clear folder structure for multiple cards per bank
+✅ **Streamlined** - No command-line bank parameter needed
+
+## Multiple Cards per Bank
+
+For 2 BoFA cards:
+```bash
+# Card 1
+python src/import_statement/pipeline.py --statement data/raw/bofa/bofa_card1_2026.csv
+
+# Card 2  
+python src/import_statement/pipeline.py --statement data/raw/bofa/bofa_card2_2026.csv
+```
+
+Both automatically detected as BoFA from folder path!
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Not detected as BoFA | Check CSV columns: Posted Date, Reference Number, Payee, Amount |
-| Wrong categories | Add/update mapping in `config/bofa_category_mapping.json` |
-| Duplicates | Reference Number must be unique |
+| Issue | Fix |
+|-------|-----|
+| "Cannot determine bank from file path" | Move file to correct folder: `data/raw/amex/` or `data/raw/bofa/` |
+| Wrong categories | Update mapping in `config/bofa_category_mapping.json` or `config/amex_category_mapping.json` |
+| File not found | Ensure file is in the correct bank folder |
 
-## Documentation
+## Testing
 
-- [BoFA Integration Guide](docs/bofa_integration_guide.md) - Comprehensive guide with examples
-- [Onboarding Summary](docs/bofa_onboarding_summary.md) - Technical details and architecture
-- [Monthly Workflow](docs/monthly_workflow.md) - Full pipeline documentation
+```bash
+# Test BoFA parsing
+python src/import_statement/pipeline.py --statement data/raw/bofa/bofa_card1_2026.csv --dry-run
 
-## Support
+# Test Amex parsing
+python src/import_statement/pipeline.py --statement data/raw/amex/amex2025.csv --dry-run
+```
 
-For issues or questions, see the documentation files above.
+## Files Modified
 
-To add new bank support, follow the pattern documented in `docs/bofa_integration_guide.md` under "Adding Support for Other Banks".
+- ✅ `src/import_statement/bank_config.py` - Uses folder path for bank detection
+- ✅ `src/import_statement/parse_statement.py` - Determines bank from path
+- ✅ `src/import_statement/pipeline.py` - Removed `--bank` argument
+- ✅ `src/common/utils.py` - Bank-specific categorization
+
+## Complete Documentation
+
+See [BoFA Integration Guide](docs/bofa_integration_guide.md) for full details.
+

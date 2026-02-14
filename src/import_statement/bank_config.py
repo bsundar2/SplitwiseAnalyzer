@@ -1,4 +1,4 @@
-"""Bank statement format detection and configuration."""
+"""Bank statement format configuration and detection."""
 
 import json
 from pathlib import Path
@@ -44,31 +44,39 @@ class BankConfig:
             raise ValueError(f"Unknown bank: {bank_name}")
         return self.config["banks"][bank_name]
 
-    def detect_bank(self, df) -> str:
-        """Detect which bank statement this CSV is based on column names.
+    def detect_bank_from_path(self, file_path: str) -> str:
+        """Detect bank from file path directory structure.
+
+        Expected directory structure:
+        - data/raw/amex/amex2026.csv
+        - data/raw/bofa/bofa2026.csv
 
         Args:
-            df: Pandas DataFrame from CSV
+            file_path: Path to statement file
 
         Returns:
             Bank key (e.g., 'amex', 'bofa')
 
         Raises:
-            ValueError: If bank cannot be detected
+            ValueError: If bank cannot be determined from path
         """
-        columns = set(df.columns)
-        detection_rules = self.config.get("detection_rules", {})
+        path_obj = Path(file_path)
+        parent_dir = path_obj.parent.name.lower()
 
-        for bank_name, rules in detection_rules.items():
-            required = set(rules.get("required_columns", []))
-            if required.issubset(columns):
-                LOG.info("Detected bank: %s", bank_name)
-                return bank_name
+        # Map directory names to bank names
+        bank_mapping = {
+            "amex": "amex",
+            "bofa": "bofa",
+        }
+
+        if parent_dir in bank_mapping:
+            bank = bank_mapping[parent_dir]
+            LOG.info("Detected bank from path: %s (directory: %s)", bank, parent_dir)
+            return bank
 
         raise ValueError(
-            f"Could not detect bank from columns: {list(columns)}. "
-            f"Required columns for amex: {detection_rules['amex']['required_columns']}, "
-            f"for bofa: {detection_rules['bofa']['required_columns']}"
+            f"Cannot determine bank from file path: {file_path}. "
+            f"Expected directory: data/raw/amex/ or data/raw/bofa/"
         )
 
     def get_category_mapping(self, bank_name: str) -> Dict[str, str]:

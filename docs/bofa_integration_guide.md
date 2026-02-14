@@ -2,58 +2,67 @@
 
 ## Overview
 
-The SplitwiseImporter now supports Bank of America credit card and checking account statements in addition to American Express (Amex) statements. The system auto-detects the bank format based on CSV column names.
+The SplitwiseImporter now supports Bank of America credit card and checking account statements in addition to American Express (Amex) statements. The bank type is determined by the **folder structure** - no auto-detection needed, making it streamlined and predictable.
 
 ## Supported Banks
 
 ### American Express (Amex)
-- **Required columns**: Posted Date, Description, Amount
+- **Location**: `data/raw/amex/amex2026.csv`
+- **Required columns**: Date, Description, Amount
 - **Optional columns**: Extended Details, Category
-- **Auto-detection**: YES
 - **Category mapping**: amex_category_mapping.json
 
 ### Bank of America (BoFA)
+- **Location**: `data/raw/bofa/bofa_card1_2026.csv` (multiple cards supported)
 - **Required columns**: Posted Date, Reference Number, Payee, Amount  
 - **Optional columns**: Address
-- **Auto-detection**: YES
 - **Category mapping**: bofa_category_mapping.json
+
+## Folder Structure
+
+```
+data/raw/
+├── amex/
+│   ├── amex2025.csv
+│   ├── amex2026.csv
+│   └── ... (one file per year)
+└── bofa/
+    ├── bofa_card1_2026.csv      # First BoFA card
+    ├── bofa_card2_2026.csv      # Second BoFA card
+    └── ... (add more cards as needed)
+```
 
 ## Quick Start
 
-### Automatic Bank Detection (Recommended)
+### Import BoFA Statement
 
-The system auto-detects the bank format from your CSV headers:
+Place your BoFA CSV in the `data/raw/bofa/` folder and run:
 
 ```bash
 python src/import_statement/pipeline.py \
-  --statement data/raw/bofa_statement.csv \
+  --statement data/raw/bofa/bofa_card1_2026.csv \
   --start-date 2026-01-01 \
   --end-date 2026-01-31
 ```
 
-### Explicit Bank Specification
+The bank type is automatically determined from the folder path - no `--bank` argument needed!
 
-To force a specific bank format:
+### Import Amex Statement
+
+Place your Amex CSV in the `data/raw/amex/` folder and run:
 
 ```bash
-# BoFA statement
 python src/import_statement/pipeline.py \
-  --statement data/raw/bofa_statement.csv \
-  --bank bofa \
+  --statement data/raw/amex/amex2026.csv \
   --start-date 2026-01-01 \
   --end-date 2026-01-31
-
-# Amex statement (explicit, though not needed with auto-detect)
-python src/import_statement/pipeline.py \
-  --statement data/raw/amex_statement.csv \
-  --bank amex \
-  --start-date 2025-01-01 \
-  --end-date 2025-12-31
 ```
 
 ## CSV Format Examples
 
 ### Bank of America Statement Format
+
+**Location**: `data/raw/bofa/bofa_card1_2026.csv`
 
 ```
 Posted Date,Reference Number,Payee,Address,Amount
@@ -67,14 +76,22 @@ Posted Date,Reference Number,Payee,Address,Amount
 - Uses "Reference Number" instead of "Extended Details"
 - Includes optional "Address" field
 - No built-in "Category" column (uses merchant-based categorization)
+- Amount column contains negative values for transactions
 
 ### American Express Statement Format
 
+**Location**: `data/raw/amex/amex2026.csv`
+
 ```
-Posted Date,Description,Extended Details,Category,Amount
+Date,Description,Extended Details,Category,Amount
 01/15/2026,GEICO AUTO PAY,12345678,"Travel-Lodging",-200.00
 01/12/2026,AMAZON.COM,87654321,"Merchandise & Supplies-General Retail",-50.00
 ```
+
+**Key features**:
+- Location in `data/raw/amex/` folder determines parsing format
+- Includes "Category" column from Amex
+- Amount column contains negative values for transactions
 
 ## Category Mapping
 
@@ -140,13 +157,14 @@ To add a new merchant to the BoFA mapping:
 1. Log into Bank of America online banking
 2. Go to your Credit Card or Checking Account
 3. Select date range and export as CSV
-4. Save to `data/raw/` directory (e.g., `data/raw/bofa_february.csv`)
+4. **Move to `data/raw/bofa/` directory** (important for bank detection!)
+5. **Rename file** with descriptive name (e.g., `bofa_card1_feb2026.csv` or `bofa_card2_feb2026.csv`)
 
 ### Step 2: Preview (Dry Run)
 
 ```bash
 python src/import_statement/pipeline.py \
-  --statement data/raw/bofa_february.csv \
+  --statement data/raw/bofa/bofa_card1_2026.csv \
   --dry-run \
   --start-date 2026-02-01 \
   --end-date 2026-02-28
@@ -154,7 +172,7 @@ python src/import_statement/pipeline.py \
 
 This shows:
 - Number of transactions parsed
-- Detected bank format
+- **Bank type automatically detected from folder** ✓
 - Column mapping
 - Categorization results (without creating expenses in Splitwise)
 
@@ -162,22 +180,30 @@ This shows:
 
 ```bash
 python src/import_statement/pipeline.py \
-  --statement data/raw/bofa_february.csv \
+  --statement data/raw/bofa/bofa_card1_2026.csv \
   --start-date 2026-02-01 \
   --end-date 2026-02-28
 ```
 
 This:
-- Parses the BoFA statement
-- Detects bank format automatically
+- Detects BoFA from `data/raw/bofa/` folder
 - Categorizes transactions using BoFA merchant mappings
 - Creates Splitwise expenses
 - Syncs to Google Sheets
 - Exports transaction summaries
 
-### Step 4: Review & Sync
+### Step 4: Process Second BoFA Card (if applicable)
 
-If you need to sync any manual Splitwise edits back to the database:
+```bash
+python src/import_statement/pipeline.py \
+  --statement data/raw/bofa/bofa_card2_2026.csv \
+  --start-date 2026-02-01 \
+  --end-date 2026-02-28
+```
+
+### Step 5: Sync Database
+
+If you made manual edits in Splitwise, sync back to database:
 
 ```bash
 python src/db_sync/sync_from_splitwise.py --year 2026 --live
@@ -185,15 +211,22 @@ python src/db_sync/sync_from_splitwise.py --year 2026 --live
 
 ## Troubleshooting
 
-### Issue: Statement not detected as BoFA
+### Issue: "Cannot determine bank from file path"
 
-**Solution**: Ensure CSV has exactly these column names:
-- `Posted Date`
-- `Reference Number`
-- `Payee`
-- `Amount`
+**Cause**: File is not in the correct folder structure.
 
-Check your CSV file first row to verify column names match exactly.
+**Solution**: Move your file to the correct folder:
+- BoFA statements → `data/raw/bofa/bofa_*.csv`
+- Amex statements → `data/raw/amex/amex_*.csv`
+
+Example:
+```bash
+# Wrong location
+cp mystatement.csv data/raw/mystatement.csv
+
+# Correct location
+cp mystatement.csv data/raw/bofa/bofa_card1_2026.csv
+```
 
 ### Issue: Transactions getting wrong categories
 
@@ -201,11 +234,11 @@ Check your CSV file first row to verify column names match exactly.
 
 ```bash
 # 1. Check which merchants are being categorized incorrectly
-python src/import_statement/pipeline.py --statement data/raw/bofa.csv --dry-run
+python src/import_statement/pipeline.py --statement data/raw/bofa/bofa_card1_2026.csv --dry-run
 
 # 2. Find the merchant name in output
 # 3. Edit config/bofa_category_mapping.json
-# 4. Add mapping for that merchant
+# 4. Add/update mapping for that merchant
 # 5. Re-run import
 ```
 
@@ -217,77 +250,48 @@ python src/import_statement/pipeline.py --statement data/raw/bofa.csv --dry-run
 
 If you see duplicate errors, verify the reference numbers are unique in your CSV.
 
-## Advanced: Custom Column Mapping
+### Issue: Amex statement showing as wrong bank
 
-If your BoFA export has different column names, edit `config/bank_config.json`:
+**Cause**: Amex CSV file is in `data/raw/bofa/` folder instead of `data/raw/amex/`
+
+**Solution**: Move to correct folder:
+```bash
+mv data/raw/bofa/amex_2026.csv data/raw/amex/amex_2026.csv
+```
+
+## Advanced: Custom Column Mapping (if needed)
+
+If your BoFA or Amex export has non-standard column names, edit `config/bank_config.json`:
 
 ```json
 {
   "banks": {
     "bofa": {
       "date_column": "Transaction Date",      // Change from "Posted Date"
-      "description_columns": ["Merchant"],    // Add alternatives
-      "amount_column": "Debit/Credit",        // Change from "Amount"
+      "description_columns": ["Merchant"],    // Change from "Payee"
+      "amount_column": "Debit",               // Change from "Amount"
       ...
     }
   }
 }
 ```
 
-Then run with explicit bank specification:
+Then run normally - the bank is determined from the folder path:
 
 ```bash
-python src/import_statement/pipeline.py \
-  --statement data/raw/custom_bofa.csv \
-  --bank bofa
-```
-
-## Integration with Automated Pipeline
-
-Once you have BoFA statements working, use the monthly pipeline for full automation:
-
-```bash
-export PYTHONPATH=/home/balaji94/PycharmProjects/SplitwiseImporter
-
-# Full pipeline: Import BoFA → Sync DB → Export to Sheets → Generate Summaries
-python src/export/monthly_export_pipeline.py \
-  --statement data/raw/bofa_february.csv \
-  --year 2026 \
-  --start-date 2026-02-01 \
-  --end-date 2026-02-28
-```
-
-This runs all four steps in sequence:
-1. **Import** - Parse BoFA CSV and add to Splitwise
-2. **Sync** - Pull updates from Splitwise to database
-3. **Export** - Write transactions to Google Sheets
-4. **Summaries** - Generate monthly budget analysis
-
-## Supported CSV Column Names
-
-### BoFA Auto-Detection Rules
-
-The system looks for these exact column names:
-
-```
-Required: Posted Date, Reference Number, Payee, Amount
-Optional: Address
-```
-
-If your CSV doesn't have these exact names, use the `--bank bofa` flag explicitly, or edit `config/bank_config.json`.
-
-### Amex Auto-Detection Rules
-
-```
-Required: Posted Date, Description, Amount
-Optional: Extended Details, Category
+python src/import_statement/pipeline.py --statement data/raw/bofa/custom_bofa.csv
 ```
 
 ## Adding Support for Other Banks
 
-To add support for a new bank (e.g., Chase, Discover):
+To add support for a new bank (e.g., Chase):
 
-1. **Create bank configuration** in `config/bank_config.json`:
+1. **Create the folder structure**:
+```bash
+mkdir -p data/raw/chase
+```
+
+2. **Add bank configuration** in `config/bank_config.json`:
 
 ```json
 {
@@ -297,8 +301,7 @@ To add support for a new bank (e.g., Chase, Discover):
       "date_column": "Transaction Date",
       "description_columns": ["Description"],
       "amount_column": "Amount",
-      "reference_column": "Reference Number",
-      "category_mapping_file": "chase_category_mapping.json"
+      "reference_column": "Reference Number"
     }
   },
   "detection_rules": {
@@ -309,7 +312,7 @@ To add support for a new bank (e.g., Chase, Discover):
 }
 ```
 
-2. **Create category mapping** in `config/chase_category_mapping.json`:
+3. **Create category mapping** in `config/chase_category_mapping.json`:
 
 ```json
 {
@@ -318,13 +321,12 @@ To add support for a new bank (e.g., Chase, Discover):
 }
 ```
 
-3. **Test auto-detection**:
+4. **Test with a sample file**:
 
 ```bash
-python src/import_statement/pipeline.py --statement data/raw/chase.csv --dry-run
+cp data/raw/amex/sample.csv data/raw/chase/chase_2026.csv
+python src/import_statement/pipeline.py --statement data/raw/chase/chase_2026.csv --dry-run
 ```
-
-4. Update this guide with the new bank details
 
 ## Questions or Issues?
 
