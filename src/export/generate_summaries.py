@@ -567,7 +567,7 @@ Examples:
     for _, row in monthly_summary.iterrows():
         year_month = str(row["Month"])
         existing = db.get_monthly_summary(year_month)
-        
+
         # Add month if not written yet, or if data has changed significantly
         if not existing or not existing.get("written_to_sheet", False):
             unwritten_months.append(row)
@@ -575,9 +575,11 @@ Examples:
             # Check if transaction count changed (simple way to detect data changes)
             existing_txn_count = existing.get("transaction_count", 0)
             new_txn_count = int(row["Transaction Count"])
-            
+
             if existing_txn_count != new_txn_count:
-                LOG.info(f"Detected data change for {year_month}: {existing_txn_count} → {new_txn_count} transactions")
+                LOG.info(
+                    f"Detected data change for {year_month}: {existing_txn_count} → {new_txn_count} transactions"
+                )
                 unwritten_months.append(row)
 
     if not unwritten_months:
