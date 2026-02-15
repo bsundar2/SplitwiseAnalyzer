@@ -16,6 +16,7 @@ load_project_env()
 # Local application
 from src.constants.config import PROCESSED_DIR
 from src.constants.splitwise import SplitwiseUserId
+from src.import_statement.bank_config import BankConfig
 from src.import_statement.parse_statement import parse_statement
 from src.import_statement.process_refunds import RefundProcessor
 from src.common.sheets_sync import write_to_sheets
@@ -46,7 +47,7 @@ def process_statement(
 ):
     # Use defaults from env vars if not provided
     if worksheet_name is None:
-        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports")
+        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Statement Imports")
     if start_date is None:
         start_date = os.getenv("START_DATE", "2026-01-01")
     if end_date is None:
@@ -58,13 +59,21 @@ def process_statement(
         LOG.info("No transactions parsed from %s", path)
         return
 
+    # Determine bank from file path
+    bank_config = BankConfig()
+    try:
+        bank_config.detect_bank_from_path(path)
+    except ValueError as e:
+        LOG.error("Error determining bank from path: %s", e)
+
     mkdir_p(PROCESSED_DIR)
-    client = None
     db = DatabaseManager()  # Initialize database manager
 
-    if not dry_run:
-        client = SplitwiseClient()
+    # Initialize client for duplicate detection (both dry-run and live mode)
+    # In dry-run, we still need to check Splitwise to see what would/wouldn't be added
+    client = SplitwiseClient()
 
+    if not dry_run:
         # Pre-fetch expenses for the specified date range to build disk cache
         # This ensures we can detect duplicates across the entire period
         LOG.info(
@@ -518,7 +527,7 @@ Examples:
     )
     parser.add_argument(
         "--worksheet-name",
-        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports"),
+        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Statement Imports"),
         help="Worksheet name for dry-run logging",
     )
     parser.add_argument(

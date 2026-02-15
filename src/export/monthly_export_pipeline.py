@@ -25,6 +25,10 @@ from pathlib import Path
 
 from src.common.env import load_project_env
 from src.common.utils import LOG
+from src.import_statement.pipeline import main as import_main
+from src.db_sync.sync_from_splitwise import sync_from_splitwise
+from src.export.splitwise_export import main as export_main
+from src.export.generate_summaries import main as summaries_main
 
 # Load environment variables
 load_project_env()
@@ -48,8 +52,6 @@ def run_import_statement(
     Returns:
         True if successful, False otherwise
     """
-    from src.import_statement.pipeline import main as import_main
-
     LOG.info("=" * 60)
     LOG.info("STEP 2: Import statement to Splitwise")
     LOG.info("=" * 60)
@@ -91,8 +93,6 @@ def run_sync_database(
     Returns:
         True if successful, False otherwise
     """
-    from src.db_sync.sync_from_splitwise import sync_from_splitwise
-
     LOG.info("=" * 60)
     LOG.info(f"STEP {step_number}: Sync database with Splitwise")
     LOG.info("=" * 60)
@@ -128,8 +128,6 @@ def run_export_to_sheets(
     Returns:
         True if successful, False otherwise
     """
-    from src.export.splitwise_export import main as export_main
-
     LOG.info("=" * 60)
     LOG.info("STEP 3: Export to Google Sheets")
     LOG.info("=" * 60)
@@ -179,8 +177,6 @@ def run_generate_summaries(year: int, dry_run: bool = False) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    from src.export.generate_summaries import main as summaries_main
-
     LOG.info("=" * 60)
     LOG.info("STEP 4: Generate Budget Summaries")
     LOG.info("=" * 60)

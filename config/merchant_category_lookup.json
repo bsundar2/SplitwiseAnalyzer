@@ -1215,5 +1215,150 @@
     "confidence": 1.0,
     "count": 2,
     "primary_count": 2
+  },
+  "geico": {
+    "canonical_name": "GEICO",
+    "category": "Life",
+    "subcategory": "Insurance"
+  },
+  "cobs spain": {
+    "canonical_name": "Cobs Spain",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "immigration visa": {
+    "canonical_name": "Immigration Visa",
+    "category": "Life",
+    "subcategory": "Other"
+  },
+  "whole foods market": {
+    "canonical_name": "Whole Foods Market",
+    "category": "Food and drink",
+    "subcategory": "Groceries"
+  },
+  "gas station": {
+    "canonical_name": "Gas Station",
+    "category": "Transportation",
+    "subcategory": "Gas/fuel"
+  },
+  "hotel": {
+    "canonical_name": "Hotel",
+    "category": "Transportation",
+    "subcategory": "Hotel"
+  },
+  "airline": {
+    "canonical_name": "Airline",
+    "category": "Transportation",
+    "subcategory": "Plane"
+  },
+  "pharmacy": {
+    "canonical_name": "Pharmacy",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "doctor": {
+    "canonical_name": "Doctor",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "hospital": {
+    "canonical_name": "Hospital",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "fuel": {
+    "canonical_name": "Fuel",
+    "category": "Transportation",
+    "subcategory": "Gas/fuel"
+  },
+  "parking": {
+    "canonical_name": "Parking",
+    "category": "Transportation",
+    "subcategory": "Parking"
+  },
+  "rental car": {
+    "canonical_name": "Rental Car",
+    "category": "Transportation",
+    "subcategory": "Car"
+  },
+  "auto repair": {
+    "canonical_name": "Auto Repair",
+    "category": "Transportation",
+    "subcategory": "Car"
+  },
+  "clothing": {
+    "canonical_name": "Clothing",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "shoes": {
+    "canonical_name": "Shoes",
+    "category": "Life",
+    "subcategory": "Clothing"
+  },
+  "insurance": {
+    "canonical_name": "Insurance",
+    "category": "Life",
+    "subcategory": "Insurance"
+  },
+  "utility": {
+    "canonical_name": "Utility",
+    "category": "Utilities",
+    "subcategory": "Electric/Water"
+  },
+  "phone": {
+    "canonical_name": "Phone",
+    "category": "Utilities",
+    "subcategory": "TV/Phone/Internet"
+  },
+  "electric": {
+    "canonical_name": "Electric",
+    "category": "Utilities",
+    "subcategory": "Electric/Water"
+  },
+  "water": {
+    "canonical_name": "Water",
+    "category": "Utilities",
+    "subcategory": "Electric/Water"
+  },
+  "mortgage": {
+    "canonical_name": "Mortgage",
+    "category": "Home",
+    "subcategory": "Rent"
+  },
+  "furniture": {
+    "canonical_name": "Furniture",
+    "category": "Home",
+    "subcategory": "Furniture"
+  },
+  "home depot": {
+    "canonical_name": "Home Depot",
+    "category": "Home",
+    "subcategory": "Household supplies"
+  },
+  "lowes": {
+    "canonical_name": "Lowe's",
+    "category": "Home",
+    "subcategory": "Household supplies"
+  },
+  "bookstore": {
+    "canonical_name": "Bookstore",
+    "category": "Entertainment",
+    "subcategory": "Other"
+  },
+  "office supplies": {
+    "canonical_name": "Office Supplies",
+    "category": "Home",
+    "subcategory": "Household supplies"
+  },
+  "dental": {
+    "canonical_name": "Dental",
+    "category": "Life",
+    "subcategory": "Medical expenses"
+  },
+  "yoga": {
+    "canonical_name": "Yoga",
+    "category": "Entertainment",
+    "subcategory": "Sports"
   }
 }

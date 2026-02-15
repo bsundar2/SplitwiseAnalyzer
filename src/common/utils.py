@@ -614,7 +614,7 @@ def _load_category_config() -> Dict:
         LOG.warning("Using default category configuration")
         return default_config
     except Exception as e:
-        LOG.error(f"Error loading category config: {str(e)}", exc_info=True)
+        LOG.error(f"Error loading category config: {e}")
         return default_config
 
 
@@ -626,6 +626,7 @@ def infer_category(transaction: Dict[str, Any]) -> Dict[str, Any]:
             - description (str): Transaction description
             - merchant (str, optional): Merchant name
             - amount (float): Transaction amount
+            - category (str, optional): Amex-provided category
 
     Returns:
         dict: Dictionary with 'category_id', 'category_name', 'subcategory_id',
