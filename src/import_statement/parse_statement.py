@@ -1,10 +1,13 @@
-# scripts/parse_statement.py
 """
-Parse CSV or PDF statements into a pandas DataFrame with columns:
+Parse CSV statements into a pandas DataFrame with columns:
   - date (YYYY-MM-DD)
   - description (string)
   - amount (positive float)
   - raw_line (string)
+
+Bank-specific parsing is determined by the file's directory:
+  - data/raw/amex/amex2026.csv → Amex format
+  - data/raw/bofa/bofa2026.csv → BoFA format
 """
 
 import os
@@ -12,6 +15,7 @@ import pandas as pd
 
 from src.constants.config import CFG_PATHS
 from src.common.utils import LOG, load_yaml, parse_date_safe
+from src.import_statement.bank_config import BankConfig
 
 # Load configuration
 CFG = None
@@ -25,37 +29,92 @@ for p in CFG_PATHS:
             CFG = None
             break
 
+# Initialize bank configuration
+BANK_CONFIG = BankConfig()
+
+
+def _find_column(df, search_term):
+    """Find a column by searching column names and lowercased values.
+
+    Args:
+        df: Pandas DataFrame
+        search_term: Column name pattern to find ('date', 'description', 'amount')
+
+    Returns:
+        Column name or None if not found
+    """
+    for col in df.columns:
+        low = col.lower()
+        if search_term.lower() in low:
+            return col
+    return None
+
 
 def parse_csv(path):
+    """Parse a CSV statement file.
+
+    Bank format is determined from the file's directory:
+    - data/raw/amex/* → Amex format
+    - data/raw/bofa/* → BoFA format
+
+    Args:
+        path: Path to CSV file
+
+    Returns:
+        Parsed DataFrame with normalized columns
+    """
     LOG.info("Parsing CSV: %s", path)
     df = pd.read_csv(path, dtype=str)
 
     # Store original row count for logging
     original_count = len(df)
 
-    # Try to find common columns
-    col_map = {}
-    for c in df.columns:
-        low = c.lower()
-        if "date" in low:
-            col_map["date"] = c
-        # Match "Description" column specifically (not "Extended Details")
-        if low == "description" or "merchant" in low:
-            col_map["description"] = c
-        if "amount" in low or "debit" in low or "credit" in low:
-            col_map["amount"] = c
-        # Match "Extended Details" or "Reference" for detail field
-        if "extended" in low or "reference" in low or low == "ref":
-            col_map["detail"] = c
-        if low == "category" or low == "type":
-            col_map["category"] = c
+    # Determine bank from file path
+    bank_name = BANK_CONFIG.detect_bank_from_path(path)
+    LOG.info("Processing %s statement: %s", bank_name, path)
 
+    # Get bank-specific configuration
+    bank_cfg = BANK_CONFIG.get_bank_config(bank_name)
+
+    # Map columns based on bank configuration
+    col_map = {}
+
+    # Map date column
+    if bank_cfg.get("date_column") in df.columns:
+        col_map["date"] = bank_cfg["date_column"]
+    else:
+        col_map["date"] = _find_column(df, "date")
+
+    # Map description column (may have multiple options)
+    desc_cols = bank_cfg.get("description_columns", [])
+    col_map["description"] = next(
+        (c for c in desc_cols if c in df.columns), _find_column(df, "description")
+    )
+
+    # Map amount column
+    if bank_cfg.get("amount_column") in df.columns:
+        col_map["amount"] = bank_cfg["amount_column"]
+    else:
+        col_map["amount"] = _find_column(df, "amount")
+
+    # Map optional columns
+    if bank_cfg.get("reference_column") and bank_cfg["reference_column"] in df.columns:
+        col_map["detail"] = bank_cfg["reference_column"]
+
+    if bank_cfg.get("category_column") and bank_cfg["category_column"] in df.columns:
+        col_map["category"] = bank_cfg["category_column"]
+
+    if bank_cfg.get("address_column") and bank_cfg["address_column"] in df.columns:
+        col_map["address"] = bank_cfg["address_column"]
+
+    # Fallback to first three columns if mapping failed
     if "date" not in col_map or "description" not in col_map or "amount" not in col_map:
-        # fallback: try first three columns
         col_names = list(df.columns)
-        col_map["date"] = col_names[0]
-        col_map["description"] = col_names[1]
-        col_map["amount"] = col_names[2]
+        col_map["date"] = col_map.get("date", col_names[0])
+        col_map["description"] = col_map.get("description", col_names[1])
+        col_map["amount"] = col_map.get("amount", col_names[2])
+
+    LOG.info("Column mapping for %s: %s", bank_name, col_map)
 
     # Create output dataframe with basic columns
     out = pd.DataFrame()
@@ -67,8 +126,7 @@ def parse_csv(path):
     # Add category column if it exists in the input
     if "category" in col_map:
         out["category"] = df[col_map["category"]].astype(str).str.strip()
-    else:
-        out["category"] = None
+    # Note: Do NOT create category column if it doesn't exist in source
 
     # Extract cc_reference_id from detail/reference column if available
     if "detail" in col_map:
@@ -80,6 +138,9 @@ def parse_csv(path):
     out["raw_line"] = df.apply(
         lambda r: " | ".join([str(r[c]) for c in df.columns]), axis=1
     )
+
+    # Store bank name for later use in amount handling
+    out["_bank"] = bank_name
 
     # Filter out rows with null dates
     out = out.dropna(subset=["date"])
@@ -127,8 +188,20 @@ def parse_csv(path):
                 )
 
     # Identify credits (negative amounts) but keep them instead of filtering
-    # Credits will be handled differently in the pipeline (reversed split)
-    out["is_credit"] = out["amount"] < 0
+    # NOTE: This is bank-specific!
+    # - Amex: negative = refund/credit (need to flip sign)
+    # - BoFA: negative = normal expense (keep as-is)
+    def is_credit(row):
+        """Check if transaction is a credit based on amount and bank."""
+        bank = row.get("_bank", "amex")
+        amount = row["amount"]
+        # Only treat negative as credit for Amex
+        if bank == "amex":
+            return amount < 0
+        # For BoFA, negative is normal, so no credits
+        return False
+
+    out["is_credit"] = out.apply(is_credit, axis=1)
 
     # Identify refunds specifically (credits with refund/credit keywords, excluding payments)
     def is_likely_refund(row):
@@ -137,7 +210,8 @@ def parse_csv(path):
             return False
 
         # Combine description and merchant for pattern matching
-        combined_text = f"{row['description']} {out.loc[row.name, 'category'] if 'category' in out.columns else ''}".lower()
+        category_text = row.get("category", "") or ""
+        combined_text = f"{row['description']} {category_text}".lower()
 
         # Exclude payment patterns
         payment_keywords = ["payment", "autopay", "thank you", "settle"]
@@ -161,7 +235,9 @@ def parse_csv(path):
             credits_count - refunds_count,
         )
 
-    # Take absolute value of amounts (credits will be positive in Splitwise)
+    # Normalize amounts to positive:
+    # - For Amex: take absolute value (credits/refunds were negative)
+    # - For BoFA: take absolute value (expenses are negative, need to flip to positive)
     out["amount"] = out["amount"].abs()
 
     # Filter out payment/autopay transactions only (not credits/refunds)
@@ -227,6 +303,10 @@ def parse_csv(path):
             )
 
     LOG.info("[TEMP] Transaction filtering complete")
+
+    # Remove internal bank tracking column before returning
+    if "_bank" in out.columns:
+        out = out.drop(columns=["_bank"])
 
     return out
 

@@ -200,7 +200,9 @@ def write_to_sheets(
         worksheet.set_dataframe(write_data, (1, 1), copy_index=False, copy_head=True)
 
     # Post-write formatting: freeze header, autosize and format columns
-    worksheet.frozen_rows = 1
+    # Only freeze if there are data rows (can't freeze when no data rows exist)
+    if len(write_data) > 0:
+        worksheet.frozen_rows = 1
 
     # Autosize columns if API available (best-effort)
     for i in range(1, num_cols + 1):

@@ -9,6 +9,7 @@ Creates multiple analysis tabs:
 """
 
 import argparse
+import json
 import os
 import re
 from typing import Dict
@@ -20,7 +21,7 @@ from src.common.env import load_project_env
 
 load_project_env()
 
-from src.common.sheets_sync import write_to_sheets, read_from_sheets
+from src.common.sheets_sync import write_to_sheets
 from src.common.utils import LOG
 from src.constants.gsheets import (
     WORKSHEET_MONTHLY_SUMMARY,
@@ -337,8 +338,6 @@ def load_budget(budget_file: str) -> Dict[str, float]:
     Returns:
         Dictionary mapping category to budget amount
     """
-    import json
-
     if not os.path.exists(budget_file):
         LOG.warning(f"Budget file not found: {budget_file}")
         return {}
@@ -563,13 +562,25 @@ Examples:
 
     db = DatabaseManager()
 
-    # Filter out months that have already been written to avoid duplicates
+    # Filter out months that have already been written with matching data
     unwritten_months = []
     for _, row in monthly_summary.iterrows():
         year_month = str(row["Month"])
         existing = db.get_monthly_summary(year_month)
+
+        # Add month if not written yet, or if data has changed significantly
         if not existing or not existing.get("written_to_sheet", False):
             unwritten_months.append(row)
+        else:
+            # Check if transaction count changed (simple way to detect data changes)
+            existing_txn_count = existing.get("transaction_count", 0)
+            new_txn_count = int(row["Transaction Count"])
+
+            if existing_txn_count != new_txn_count:
+                LOG.info(
+                    f"Detected data change for {year_month}: {existing_txn_count} → {new_txn_count} transactions"
+                )
+                unwritten_months.append(row)
 
     if not unwritten_months:
         print(f"✓ {WORKSHEET_MONTHLY_SUMMARY}: All months already written")
@@ -577,7 +588,7 @@ Examples:
         # Create DataFrame with only unwritten months
         unwritten_df = pd.DataFrame(unwritten_months)
 
-        # Write only the unwritten months
+        # Write only the unwritten months (append to preserve other years)
         write_to_sheets(
             unwritten_df,
             worksheet_name=WORKSHEET_MONTHLY_SUMMARY,
