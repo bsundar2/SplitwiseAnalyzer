@@ -767,13 +767,6 @@ class SplitwiseClient:
         return self.sObj.getCategories()
 
 
-# Example usage:
-if __name__ == "__main__":
-    client = SplitwiseClient()
-    expense = client.get_expense_by_id(4291345617, use_cache=False)
-    print(expense["details"])
-
-
 def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:
     """Get SplitwiseClient instance (None in dry-run mode).
 
@@ -784,3 +777,11 @@ def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:
         SplitwiseClient instance or None
     """
     return None if dry_run else SplitwiseClient()
+
+
+# Example usage:
+if __name__ == "__main__":
+    client = SplitwiseClient()
+    expense = client.get_expense_by_id(4291345617, use_cache=False)
+    print(expense["details"])
+    
