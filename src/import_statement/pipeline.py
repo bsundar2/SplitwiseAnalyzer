@@ -47,7 +47,7 @@ def process_statement(
 ):
     # Use defaults from env vars if not provided
     if worksheet_name is None:
-        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports")
+        worksheet_name = os.getenv("DRY_RUN_WORKSHEET_NAME", "Statement Imports")
     if start_date is None:
         start_date = os.getenv("START_DATE", "2026-01-01")
     if end_date is None:
@@ -527,7 +527,7 @@ Examples:
     )
     parser.add_argument(
         "--worksheet-name",
-        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Amex Imports"),
+        default=os.getenv("DRY_RUN_WORKSHEET_NAME", "Statement Imports"),
         help="Worksheet name for dry-run logging",
     )
     parser.add_argument(
