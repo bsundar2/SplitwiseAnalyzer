@@ -73,7 +73,7 @@
         "envFile": "${workspaceFolder}/config/.env",
         "args": [
           "--statement",
-          "data/raw/sample_statement.csv",
+          "data/raw/bofa/bofa_card1_2026.csv",
           "--dry-run",
           "--worksheet-name",
           "${env:DRY_RUN_WORKSHEET_NAME}"

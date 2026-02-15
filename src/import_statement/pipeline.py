@@ -67,12 +67,13 @@ def process_statement(
         LOG.error("Error determining bank from path: %s", e)
 
     mkdir_p(PROCESSED_DIR)
-    client = None
     db = DatabaseManager()  # Initialize database manager
 
-    if not dry_run:
-        client = SplitwiseClient()
+    # Initialize client for duplicate detection (both dry-run and live mode)
+    # In dry-run, we still need to check Splitwise to see what would/wouldn't be added
+    client = SplitwiseClient()
 
+    if not dry_run:
         # Pre-fetch expenses for the specified date range to build disk cache
         # This ensures we can detect duplicates across the entire period
         LOG.info(
