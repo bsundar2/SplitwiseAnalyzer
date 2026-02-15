@@ -103,6 +103,7 @@ def parse_expense_to_transaction(row: Dict[str, Any]) -> Transaction:
         category=category_name,
         is_refund=is_refund,
         is_shared=not is_self,
+        split_type=split_type,
         currency="USD",
         splitwise_id=expense_id,
         cc_reference_id=cc_reference_id,
@@ -254,6 +255,15 @@ def sync_from_splitwise(
         if sw_category and sw_category != txn.category:
             changes.append(f"category: '{txn.category}' → '{sw_category}'")
             updates["category"] = sw_category
+
+        # Check split_type
+        sw_split_type = expense.get(ExportColumns.SPLIT_TYPE)
+        if sw_split_type and sw_split_type != txn.split_type:
+            changes.append(f"split_type: {txn.split_type or 'None'} → {sw_split_type}")
+            updates["split_type"] = sw_split_type
+            # Also update is_shared for backward compatibility
+            is_self = sw_split_type == SPLIT_TYPE_SELF
+            updates["is_shared"] = not is_self
 
         # Check and update cc_reference_id from Splitwise details
         sw_details = expense.get(ExportColumns.DETAILS, "")

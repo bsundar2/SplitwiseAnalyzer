@@ -366,6 +366,76 @@ class SplitwiseClient:
         LOG.info(f"Found {len(data)} expenses between {start_date} and {end_date}")
         return pd.DataFrame(data)
 
+    def get_expense_by_id(
+        self,
+        expense_id: Union[int, str],
+        use_cache: bool = True,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch a single Splitwise expense by ID.
+
+        Optionally checks the local disk cache first (if a date range is provided),
+        then falls back to the Splitwise API.
+
+        Args:
+            expense_id: Splitwise expense ID
+            use_cache: If True, try disk cache first
+            start_date: Cache search start date (YYYY-MM-DD)
+            end_date: Cache search end date (YYYY-MM-DD)
+
+        Returns:
+            dict: Normalized expense dict, or None if not found / deleted
+        """
+        if expense_id is None:
+            return None
+
+        expense_id = int(expense_id)
+
+        # -------------------------
+        # 1. Try disk cache first
+        # -------------------------
+        if use_cache and start_date and end_date:
+            try:
+                cache = self.fetch_expenses_with_details(
+                    start_date, end_date, use_cache=True
+                )
+                cached = cache.get(expense_id)
+                if cached:
+                    LOG.info(f"Found expense {expense_id} in disk cache")
+                    return cached
+            except Exception as e:
+                LOG.debug(f"Cache lookup failed for expense {expense_id}: {e}")
+
+        # -------------------------
+        # 2. Fallback to API
+        # -------------------------
+        try:
+            exp = self.sObj.getExpense(expense_id)
+        except Exception as e:
+            LOG.warning(f"Failed to fetch expense {expense_id} from API: {e}")
+            return None
+
+        # Skip deleted expenses
+        if hasattr(exp, DELETED_AT_FIELD) and getattr(exp, DELETED_AT_FIELD):
+            LOG.info(f"Expense {expense_id} is deleted")
+            return None
+
+        # -------------------------
+        # 3. Normalize to dict
+        # -------------------------
+        normalized = {
+            "id": exp.getId(),
+            "date": exp.getDate(),
+            "description": exp.getDescription(),
+            "cost": parse_float_safe(exp.getCost()),
+            "details": exp.getDetails() or "",
+            "category": (exp.getCategory().getName() if exp.getCategory() else None),
+        }
+
+        LOG.info(f"Fetched expense {expense_id} from API")
+        return normalized
+
     def find_expense_by_cc_reference(
         self,
         cc_reference_id: str = None,
@@ -700,22 +770,9 @@ class SplitwiseClient:
 # Example usage:
 if __name__ == "__main__":
     client = SplitwiseClient()
-    print(f"User ID: {client.get_current_user_id()}")
-
-    categories = client.get_categories()
-    print(
-        "Available Splitwise categories: %s",
-        [
-            {
-                "id": c.id,
-                "name": c.name,
-                "subcategories": [
-                    {"id": s.id, "name": s.name} for s in c.subcategories
-                ],
-            }
-            for c in categories
-        ],
-    )
+    expense = client.get_expense_by_id(4291345617, use_cache=False)
+    print(expense['details'])
+    
 
 
 def get_splitwise_client(dry_run: bool = False) -> Optional["SplitwiseClient"]:

@@ -27,6 +27,44 @@
       }
     },
     {
+      "name": "Monthly Export Pipeline",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export/monthly_export_pipeline.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "--year",
+        "2026",
+        "--start-date",
+        "2026-02-01",
+        "--end-date",
+        "2026-02-28",
+        "--statement",
+        "data/raw/amex2026.csv",
+        "--append-only"
+      ]
+    },
+    {
+      "name": "Monthly Export Sync Only",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/export/monthly_export_pipeline.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "--year",
+        "2026",
+        "--sync-only"
+      ]
+    },
+    {
         "name": "Dry Run",
         "type": "debugpy",
         "request": "launch",
@@ -34,9 +72,9 @@
         "console": "integratedTerminal",
         "envFile": "${workspaceFolder}/config/.env",
         "args": [
-            "--statement",
-            "data/raw/sample_statement.csv",
-            "--dry-run",
+          "--statement",
+          "data/raw/sample_statement.csv",
+          "--dry-run",
           "--worksheet-name",
           "${env:DRY_RUN_WORKSHEET_NAME}"
         ]
@@ -46,9 +84,11 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
-      "console": "integratedTerminal"
-      ,
-      "envFile": "${workspaceFolder}/config/.env"
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/config/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
     }
   ]
 }
